@@ -3,3 +3,8 @@ dist
 .env
 uploads/*
 !uploads/.gitkeep
+server/uploads/*
+!server/uploads/.gitkeep
+testdata
+*.png
+server/test_image.png
