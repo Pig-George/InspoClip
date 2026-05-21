@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="client/public/favicon.svg" alt="InspoClip" width="120" />
+</p>
+
 # InspoClip
 
 AI 驱动的设计灵感剪贴簿。每日粘贴设计截图，AI 自动生成中英双语设计术语，以拼贴风格的周视图呈现。
