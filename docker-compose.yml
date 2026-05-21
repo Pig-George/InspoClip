@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: aimood
-      POSTGRES_PASSWORD: aimood
-      POSTGRES_DB: aimood
+      POSTGRES_USER: inspoclip
+      POSTGRES_PASSWORD: inspoclip
+      POSTGRES_DB: inspoclip
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - '127.0.0.1:5432:5432'
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U aimood']
+      test: ['CMD-SHELL', 'pg_isready -U inspoclip']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -21,7 +21,7 @@ services:
     build: ./server
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://aimood:aimood@postgres:5432/aimood
+      DATABASE_URL: postgresql://inspoclip:inspoclip@postgres:5432/inspoclip
       AI_PROVIDER: ${AI_PROVIDER:-openai}
       AI_API_KEY: ${AI_API_KEY:-sk-placeholder}
       AI_API_BASE: ${AI_API_BASE:-https://api.deepseek.com/v1}

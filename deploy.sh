@@ -8,7 +8,7 @@ if [ -f .env ]; then
   export $(grep -v '^#' .env | xargs)
 fi
 
-echo "=== AIMood Docker Deploy ==="
+echo "=== InspoClip Docker Deploy ==="
 echo ""
 echo "Stopping existing containers..."
 docker compose down 2>/dev/null || true

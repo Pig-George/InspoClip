@@ -101,7 +101,7 @@ async function start() {
   }
 
   app.listen(PORT, () => {
-    console.log(`AIMood server running on http://localhost:${PORT}`);
+    console.log(`InspoClip server running on http://localhost:${PORT}`);
   });
 }
 

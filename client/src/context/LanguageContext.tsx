@@ -16,7 +16,7 @@ const LanguageContext = createContext<LanguageContextType>({
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocale] = useState<Locale>(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('aimood-locale');
+      const stored = localStorage.getItem('inspoclip-locale');
       if (stored === 'en' || stored === 'zh') return stored;
       // Try browser language
       const nav = navigator.language?.toLowerCase();
@@ -27,7 +27,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = locale;
-    localStorage.setItem('aimood-locale', locale);
+    localStorage.setItem('inspoclip-locale', locale);
   }, [locale]);
 
   const toggle = useCallback(() => setLocale((l) => (l === 'zh' ? 'en' : 'zh')), []);

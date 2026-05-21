@@ -12,7 +12,7 @@ const ThemeContext = createContext<ThemeContextType>({ theme: 'light', toggle: (
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('aimood-theme');
+      const stored = localStorage.getItem('inspoclip-theme');
       if (stored === 'dark' || stored === 'light') return stored;
       if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
     }
@@ -22,7 +22,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle('dark', theme === 'dark');
-    localStorage.setItem('aimood-theme', theme);
+    localStorage.setItem('inspoclip-theme', theme);
   }, [theme]);
 
   const toggle = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
