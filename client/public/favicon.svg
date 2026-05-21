@@ -20,9 +20,8 @@
     </filter>
   </defs>
 
-  <rect width="64" height="64" rx="14" fill="#faf3e6"/>
-  <path d="M6 14c9-4 14 2 22-2 10-5 18-3 30 5v41H6z" fill="#f5e6d3" opacity="0.65"/>
   <g filter="url(#soft-shadow)">
+    <path d="M17 15.5 48.5 12l4.5 39.5-34 3.5z" fill="url(#paper)" stroke="#4a3028" stroke-opacity="0.18" stroke-width="3.5"/>
     <path d="M17 15.5 48.5 12l4.5 39.5-34 3.5z" fill="url(#paper)" stroke="#d4c4ac" stroke-width="2"/>
     <path d="M20.5 20.5 45 18l2.2 20.2-24.5 2.7z" fill="url(#photo)" stroke="#fdf7ef" stroke-width="4"/>
     <path d="M24 45.5c4.5-1.7 11.5-2.5 19-2.2" fill="none" stroke="#c0784a" stroke-width="3" stroke-linecap="round"/>
