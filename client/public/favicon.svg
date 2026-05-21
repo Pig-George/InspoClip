@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">InspoClip icon</title>
+  <desc id="desc">A scrapbook style polaroid with a mood spark.</desc>
+  <defs>
+    <linearGradient id="paper" x1="12" y1="8" x2="52" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fdf7ef"/>
+      <stop offset="1" stop-color="#f3dfc5"/>
+    </linearGradient>
+    <linearGradient id="photo" x1="18" y1="20" x2="45" y2="42" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b4c8e8"/>
+      <stop offset="1" stop-color="#b8d8b8"/>
+    </linearGradient>
+    <linearGradient id="tape" x1="15" y1="9" x2="49" y2="18" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e8b4b4"/>
+      <stop offset="0.5" stop-color="#e8d5b0"/>
+      <stop offset="1" stop-color="#b4c8e8"/>
+    </linearGradient>
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2.2" flood-color="#4a3028" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <rect width="64" height="64" rx="14" fill="#faf3e6"/>
+  <path d="M6 14c9-4 14 2 22-2 10-5 18-3 30 5v41H6z" fill="#f5e6d3" opacity="0.65"/>
+  <g filter="url(#soft-shadow)">
+    <path d="M17 15.5 48.5 12l4.5 39.5-34 3.5z" fill="url(#paper)" stroke="#d4c4ac" stroke-width="2"/>
+    <path d="M20.5 20.5 45 18l2.2 20.2-24.5 2.7z" fill="url(#photo)" stroke="#fdf7ef" stroke-width="4"/>
+    <path d="M24 45.5c4.5-1.7 11.5-2.5 19-2.2" fill="none" stroke="#c0784a" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <path d="M16 11.5 48.5 8l1 8.5L17 20z" fill="url(#tape)" opacity="0.9"/>
+  <path d="M20 12.5 18 19M28 11.5l-2 7M36 10.5l-2 7M44 9.5l-2 7" stroke="#fff6e9" stroke-width="1.2" opacity="0.45"/>
+
+  <path d="M42 21.5 44.4 27l5.8 2-5.8 2-2.4 5.5-2.4-5.5-5.8-2 5.8-2z" fill="#fffbe6" stroke="#c0784a" stroke-width="2" stroke-linejoin="round"/>
+  <circle cx="23" cy="24" r="2.4" fill="#fdf7ef" opacity="0.9"/>
+  <circle cx="31" cy="34" r="1.6" fill="#4a3028" opacity="0.35"/>
+  <circle cx="38" cy="33" r="1.6" fill="#4a3028" opacity="0.35"/>
+</svg>
