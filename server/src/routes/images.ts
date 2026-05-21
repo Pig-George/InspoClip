@@ -1,0 +1,95 @@
+import { Router, Request, Response } from 'express';
+import { db } from '../db/index.js';
+import { images, terms as termsTable } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
+import { upload } from '../middleware/upload.js';
+import { generateTerms } from '../services/ai.js';
+import fs from 'fs/promises';
+import path from 'path';
+
+const router = Router();
+
+router.post('/', upload.single('image'), async (req: Request, res: Response) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: 'No image file provided' });
+      return;
+    }
+
+    const { weekId, dayOfWeek } = req.body;
+    if (!weekId || dayOfWeek === undefined) {
+      res.status(400).json({ error: 'weekId and dayOfWeek are required' });
+      return;
+    }
+
+    const decorations = ['tape', 'pin', 'clip', 'washi', 'stitch', 'staple', 'sticker', 'corner'];
+    const decoration = decorations[Math.floor(Math.random() * decorations.length)];
+
+    const [image] = await db
+      .insert(images)
+      .values({
+        weekId,
+        dayOfWeek: parseInt(dayOfWeek),
+        filePath: file.filename,
+        decoration,
+      })
+      .returning();
+
+    try {
+      const keywords = await generateTerms(file.path);
+      if (keywords.length > 0) {
+        const termRows = keywords.map((kw, i) => ({
+          imageId: image.id,
+          keyword: kw,
+          position: i,
+        }));
+        await db.insert(termsTable).values(termRows);
+      } else {
+        console.warn(`AI returned no terms for image ${image.id}`);
+        await db.insert(termsTable).values({
+          imageId: image.id,
+          keyword: 'design element',
+          position: 0,
+        });
+      }
+    } catch (aiErr: any) {
+      console.error('AI generation failed:', aiErr?.message || aiErr);
+      await db.insert(termsTable).values({
+        imageId: image.id,
+        keyword: 'design element',
+        position: 0,
+      });
+    }
+
+    const imageTerms = await db
+      .select()
+      .from(termsTable)
+      .where(eq(termsTable.imageId, image.id))
+      .orderBy(termsTable.position);
+
+    res.json({ ...image, terms: imageTerms });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+
+    const [image] = await db.select().from(images).where(eq(images.id, id)).limit(1);
+    if (image) {
+      const uploadDir = process.env.UPLOAD_DIR || './uploads';
+      const filePath = path.join(uploadDir, image.filePath);
+      await fs.unlink(filePath).catch(() => {});
+    }
+
+    await db.delete(images).where(eq(images.id, id));
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+export default router;
