@@ -1,0 +1,79 @@
+import { WeekData } from '@/types';
+
+const BASE = '/api';
+
+export async function fetchWeek(dateStr: string): Promise<WeekData> {
+  const res = await fetch(`${BASE}/weeks/${dateStr}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }));
+    throw new Error(err.error || 'Failed to fetch week');
+  }
+  return res.json();
+}
+
+export async function uploadImage(
+  file: File,
+  weekId: string,
+  dayOfWeek: number
+): Promise<any> {
+  const form = new FormData();
+  form.append('image', file);
+  form.append('weekId', weekId);
+  form.append('dayOfWeek', String(dayOfWeek));
+
+  const res = await fetch(`${BASE}/images`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) {
+    if (res.status === 413) throw new Error('图片过大，超出上传限制');
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    throw new Error(err.error || `上传失败 (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function deleteImage(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/images/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Delete failed');
+}
+
+export async function deleteTerm(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/terms/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Delete failed');
+}
+
+export async function saveNotes(weekId: string, content: string): Promise<void> {
+  const res = await fetch(`${BASE}/weeks/${weekId}/notes`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error('Save failed');
+}
+
+export function imageUrl(filePath: string): string {
+  return `${BASE}/uploads/${filePath}`;
+}
+
+export interface AIConfig {
+  AI_PROVIDER?: string;
+  AI_API_KEY?: string;
+  AI_API_BASE?: string;
+  AI_MODEL?: string;
+}
+
+export async function fetchConfig(): Promise<AIConfig> {
+  const res = await fetch(`${BASE}/config`);
+  if (!res.ok) throw new Error('Failed to fetch config');
+  return res.json();
+}
+
+export async function updateConfig(updates: AIConfig): Promise<void> {
+  const res = await fetch(`${BASE}/config`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) throw new Error('Failed to update config');
+}
