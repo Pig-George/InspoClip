@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="client/public/favicon.svg" alt="InspoClip" width="120" />
+  <img src="client/public/favicon.png" alt="InspoClip" width="120" />
 </p>
 
 # InspoClip

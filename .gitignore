@@ -7,4 +7,5 @@ server/uploads/*
 !server/uploads/.gitkeep
 testdata
 *.png
+!client/public/favicon.png
 server/test_image.png
