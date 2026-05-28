@@ -1,4 +1,4 @@
-import { WeekData } from '@/types';
+import { WeekData, Tag } from '@/types';
 
 const BASE = '/api';
 
@@ -76,4 +76,39 @@ export async function updateConfig(updates: AIConfig): Promise<void> {
     body: JSON.stringify(updates),
   });
   if (!res.ok) throw new Error('Failed to update config');
+}
+
+export async function fetchTags(): Promise<Tag[]> {
+  const res = await fetch(`${BASE}/tags`);
+  if (!res.ok) throw new Error('Failed to fetch tags');
+  return res.json();
+}
+
+export async function createTag(name: string, color?: string): Promise<Tag> {
+  const res = await fetch(`${BASE}/tags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, color }),
+  });
+  if (!res.ok) throw new Error('Failed to create tag');
+  return res.json();
+}
+
+export async function deleteTag(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/tags/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete tag');
+}
+
+export async function addTagToImage(imageId: string, tagId: string): Promise<void> {
+  const res = await fetch(`${BASE}/tags/image/${imageId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tagId }),
+  });
+  if (!res.ok) throw new Error('Failed to add tag');
+}
+
+export async function removeTagFromImage(imageId: string, tagId: string): Promise<void> {
+  const res = await fetch(`${BASE}/tags/image/${imageId}/${tagId}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to remove tag');
 }

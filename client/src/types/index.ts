@@ -6,6 +6,7 @@ export interface Image {
   decoration: DecorationType;
   createdAt: string;
   terms: Term[];
+  tags: Tag[];
 }
 
 export interface Term {
@@ -13,6 +14,13 @@ export interface Term {
   imageId: string;
   keyword: string;
   position: number;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+  createdAt?: string;
 }
 
 export interface Week {
