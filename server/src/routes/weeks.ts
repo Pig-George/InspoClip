@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
-import { weeks, images, terms as termsTable, notes } from '../db/schema.js';
+import { weeks, images, terms as termsTable, notes, tags as tagsTable, imageTags } from '../db/schema.js';
 import { eq, inArray } from 'drizzle-orm';
 
 const router = Router();
@@ -51,6 +51,27 @@ router.get('/:date', async (req: Request, res: Response) => {
       termsByImage[t.imageId].push(t);
     }
 
+    // Query tags for these images
+    let allImageTags: any[] = [];
+    if (imageIds.length > 0) {
+      allImageTags = await db
+        .select({
+          imageId: imageTags.imageId,
+          tagId: tagsTable.id,
+          tagName: tagsTable.name,
+          tagColor: tagsTable.color,
+        })
+        .from(imageTags)
+        .innerJoin(tagsTable, eq(imageTags.tagId, tagsTable.id))
+        .where(inArray(imageTags.imageId, imageIds));
+    }
+
+    const tagsByImage: Record<string, any[]> = {};
+    for (const at of allImageTags) {
+      if (!tagsByImage[at.imageId]) tagsByImage[at.imageId] = [];
+      tagsByImage[at.imageId].push({ id: at.tagId, name: at.tagName, color: at.tagColor });
+    }
+
     const weekNotes = await db.select().from(notes).where(eq(notes.weekId, weekId)).limit(1);
 
     res.json({
@@ -58,6 +79,7 @@ router.get('/:date', async (req: Request, res: Response) => {
       images: weekImages.map((img) => ({
         ...img,
         terms: termsByImage[img.id] || [],
+        tags: tagsByImage[img.id] || [],
       })),
       notes: weekNotes[0] || null,
     });

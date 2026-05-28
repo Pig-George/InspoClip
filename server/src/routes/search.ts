@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
-import { images as imagesTable, terms as termsTable } from '../db/schema.js';
-import { ilike, inArray, sql } from 'drizzle-orm';
+import { images as imagesTable, terms as termsTable, tags as tagsTable, imageTags } from '../db/schema.js';
+import { ilike, inArray, eq } from 'drizzle-orm';
 
 const router = Router();
 
@@ -47,9 +47,31 @@ router.get('/', async (req: Request, res: Response) => {
       termsByImage[imgId].push(t);
     }
 
+    // Query tags for these images
+    let allImageTags: any[] = [];
+    if (imageIdList.length > 0) {
+      allImageTags = await db
+        .select({
+          imageId: imageTags.imageId,
+          tagId: tagsTable.id,
+          tagName: tagsTable.name,
+          tagColor: tagsTable.color,
+        })
+        .from(imageTags)
+        .innerJoin(tagsTable, eq(imageTags.tagId, tagsTable.id))
+        .where(inArray(imageTags.imageId, imageIdList));
+    }
+
+    const tagsByImage: Record<string, any[]> = {};
+    for (const at of allImageTags) {
+      if (!tagsByImage[at.imageId]) tagsByImage[at.imageId] = [];
+      tagsByImage[at.imageId].push({ id: at.tagId, name: at.tagName, color: at.tagColor });
+    }
+
     res.json(matchingImages.map((img) => ({
       ...img,
       terms: termsByImage[img.id] || [],
+      tags: tagsByImage[img.id] || [],
     })));
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Search failed' });
