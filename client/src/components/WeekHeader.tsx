@@ -13,11 +13,15 @@ interface WeekHeaderProps {
   onViewModeChange: (mode: ViewMode) => void;
   onPrevWeek?: () => void;
   onNextWeek?: () => void;
+  searchOpen?: boolean;
+  onSearchOpenChange?: (open: boolean) => void;
 }
 
-export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onNextWeek }: WeekHeaderProps) {
+export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onNextWeek, searchOpen: searchOpenProp, onSearchOpenChange }: WeekHeaderProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchOpenLocal, setSearchOpenLocal] = useState(false);
+  const searchOpen = searchOpenProp ?? searchOpenLocal;
+  const setSearchOpen = onSearchOpenChange ?? setSearchOpenLocal;
   const { locale, toggle: toggleLocale } = useLanguage();
 
   const formatRange = (monday: Date): string => {
