@@ -50,6 +50,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       {open && (
         <motion.div
           ref={overlayRef}
+          data-dialog-overlay
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

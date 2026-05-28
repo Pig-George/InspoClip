@@ -196,6 +196,7 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
           {showDetail && (
             <motion.div
               ref={detailOverlayRef}
+              data-dialog-overlay
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -295,6 +296,7 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
           {showConfirm && (
             <motion.div
               ref={confirmOverlayRef}
+              data-dialog-overlay
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

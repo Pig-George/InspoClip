@@ -53,6 +53,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
       {open && (
         <motion.div
           ref={overlayRef}
+          data-dialog-overlay
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
