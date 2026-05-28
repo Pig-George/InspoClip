@@ -35,3 +35,17 @@ export const config = pgTable('config', {
   key: text('key').notNull().unique(),
   value: text('value').notNull().default(''),
 });
+
+export const tags = pgTable('tags', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull().unique(),
+  color: text('color').notNull().default('#c0784a'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const imageTags = pgTable('image_tags', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  imageId: uuid('image_id').references(() => images.id, { onDelete: 'cascade' }),
+  tagId: uuid('tag_id').references(() => tags.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').defaultNow(),
+});

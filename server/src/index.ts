@@ -52,6 +52,19 @@ async function initDB() {
       key TEXT NOT NULL UNIQUE,
       value TEXT NOT NULL DEFAULT ''
     );
+    CREATE TABLE IF NOT EXISTS tags (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT NOT NULL UNIQUE,
+      color TEXT NOT NULL DEFAULT '#c0784a',
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS image_tags (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      image_id UUID REFERENCES images(id) ON DELETE CASCADE,
+      tag_id UUID REFERENCES tags(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(image_id, tag_id)
+    );
   `);
   console.log('Database tables ready');
 
