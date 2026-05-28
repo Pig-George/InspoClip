@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, AlertTriangle, X, Check } from 'lucide-react';
 import { DecorElement } from './DecorElement';
 import { TermTag } from './TermTag';
+import { TagManager } from './TagManager';
 import { deleteImage, imageUrl } from '@/lib/api';
 import { consumeIfMatches } from '@/lib/events';
 import { toast } from '@/components/Toast';
@@ -282,6 +283,15 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
                     <span className="text-sm text-[var(--text-muted)]">No terms</span>
                   )}
                 </div>
+              </div>
+
+              {/* Tags */}
+              <div className="px-6 pb-4">
+                <TagManager
+                  imageId={image.id}
+                  imageTags={image.tags || []}
+                  onTagsChange={onRefresh}
+                />
               </div>
             </motion.div>
           </motion.div>
