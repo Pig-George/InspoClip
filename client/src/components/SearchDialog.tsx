@@ -4,7 +4,8 @@ import { X, Search } from 'lucide-react';
 import { ImageCard } from './ImageCard';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { useLanguage } from '@/context/LanguageContext';
-import type { Image as ImageType } from '@/types';
+import { fetchTags } from '@/lib/api';
+import type { Image as ImageType, Tag } from '@/types';
 
 interface SearchDialogProps {
   open: boolean;
@@ -15,9 +16,15 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ImageType[]>([]);
   const [loading, setLoading] = useState(false);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const overlayRef = useScrollLock(open);
   const { locale } = useLanguage();
+
+  useEffect(() => {
+    if (open) fetchTags().then(setAllTags).catch(console.error);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -86,6 +93,24 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               </button>
             </div>
 
+            {/* Tag filter */}
+            {allTags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 px-4 py-2 border-b border-[var(--card-border)]">
+                {allTags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    onClick={() => setSelectedTag(selectedTag === tag.id ? null : tag.id)}
+                    className={`px-2 py-0.5 rounded-full text-xs font-heading transition-opacity ${
+                      selectedTag === tag.id ? 'ring-2 ring-[var(--accent)]' : 'opacity-70 hover:opacity-100'
+                    }`}
+                    style={{ backgroundColor: tag.color + '20', color: tag.color }}
+                  >
+                    #{tag.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Results */}
             <div className="flex-1 overflow-y-auto p-4">
               {loading && (
@@ -100,9 +125,11 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
               )}
               {!loading && results.length > 0 && (
                 <div className="grid grid-cols-2 gap-3">
-                  {results.map((img) => (
-                    <ImageCard key={img.id} image={img} onRefresh={() => doSearch(query)} />
-                  ))}
+                  {results
+                    .filter((img) => !selectedTag || img.tags?.some((t) => t.id === selectedTag))
+                    .map((img) => (
+                      <ImageCard key={img.id} image={img} onRefresh={() => doSearch(query)} />
+                    ))}
                 </div>
               )}
             </div>
