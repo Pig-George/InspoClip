@@ -22,8 +22,11 @@ router.get('/week/:date', async (req: Request, res: Response) => {
   try {
     const dateStr = req.params.date as string;
     const format = (req.query.format as string) || 'markdown';
-    const monday = getMonday(new Date(dateStr + 'T00:00:00'));
-    const mondayStr = formatDate(monday);
+    const date = new Date(dateStr + 'T00:00:00');
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    date.setDate(diff);
+    const mondayStr = date.toISOString().split('T')[0];
 
     const [week] = await db.select().from(weeks).where(eq(weeks.weekStart, mondayStr)).limit(1);
     if (!week) {
