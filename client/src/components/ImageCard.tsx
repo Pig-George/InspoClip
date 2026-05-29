@@ -54,7 +54,9 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
   // Auto-open detail modal for newly uploaded image (delay to let DOM settle)
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (consumeIfMatches(image.id)) setShowDetail(true);
+      const matched = consumeIfMatches(image.id);
+      console.log('[ImageCard] consumeIfMatches:', image.id, matched);
+      if (matched) setShowDetail(true);
     }, 150);
     return () => clearTimeout(timer);
   }, [image.id]);
