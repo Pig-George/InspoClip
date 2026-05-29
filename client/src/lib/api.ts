@@ -152,6 +152,10 @@ export async function fetchMonth(yearMonth: string): Promise<TimelineMonth> {
   return res.json();
 }
 
+export function exportWeekUrl(dateStr: string, format: 'json' | 'markdown'): string {
+  return `${BASE}/export/week/${dateStr}?format=${format}`;
+}
+
 export async function fetchDesignPrompt(imageId: string): Promise<DesignPrompt | null> {
   const res = await fetch(`${BASE}/images/${imageId}/prompt`);
   if (!res.ok) return null;

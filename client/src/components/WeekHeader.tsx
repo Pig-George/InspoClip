@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Settings, LayoutGrid, Columns, Search, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Settings, LayoutGrid, Columns, Search, Clock, Download } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { SettingsDialog } from './SettingsDialog';
 import { SearchDialog } from './SearchDialog';
+import { ExportDialog } from './ExportDialog';
 import { useLanguage } from '@/context/LanguageContext';
 import { getWeekNumber, getMonday, formatISODate } from '@/lib/utils';
 import type { ViewMode } from '@/types';
@@ -19,6 +20,7 @@ interface WeekHeaderProps {
 
 export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onNextWeek, searchOpen: searchOpenProp, onSearchOpenChange }: WeekHeaderProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [searchOpenLocal, setSearchOpenLocal] = useState(false);
   const searchOpen = searchOpenProp ?? searchOpenLocal;
   const setSearchOpen = onSearchOpenChange ?? setSearchOpenLocal;
@@ -118,6 +120,13 @@ export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onN
           </button>
 
           <button
+            onClick={() => setExportOpen(true)}
+            className="p-2 rounded-full hover:bg-[var(--muted)] transition-colors"
+            aria-label="Export"
+          >
+            <Download className="w-5 h-5 text-[var(--accent)]" />
+          </button>
+          <button
             onClick={() => setSearchOpen(true)}
             className="p-2 rounded-full hover:bg-[var(--muted)] transition-colors"
             aria-label="Search"
@@ -147,6 +156,7 @@ export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onN
 
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} weekDate={formatISODate(monday)} />
     </>
   );
 }

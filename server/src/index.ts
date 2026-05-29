@@ -12,6 +12,7 @@ import termsRouter from './routes/terms.js';
 import configRouter from './routes/config.js';
 import searchRouter from './routes/search.js';
 import tagsRouter from './routes/tags.js';
+import exportRouter from './routes/export.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -112,6 +113,7 @@ app.use('/api/terms', termsRouter);
 app.use('/api/config', configRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/tags', tagsRouter);
+app.use('/api/export', exportRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
