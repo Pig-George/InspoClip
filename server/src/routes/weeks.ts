@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
 import { weeks, images, terms as termsTable, notes, tags as tagsTable, imageTags, imageColors as imageColorsTable } from '../db/schema.js';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, and, gte, lt } from 'drizzle-orm';
 
 const router = Router();
 
@@ -129,6 +129,64 @@ router.patch('/:weekId/notes', async (req: Request, res: Response) => {
     }
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+// GET /api/weeks/month/:yearMonth — get all images for a month
+router.get('/month/:yearMonth', async (req: Request, res: Response) => {
+  try {
+    const { yearMonth } = req.params;
+    const [year, month] = yearMonth.split('-').map(Number);
+    if (!year || !month || month < 1 || month > 12) {
+      res.status(400).json({ error: 'Invalid yearMonth format. Use YYYY-MM' });
+      return;
+    }
+
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endMonth = month === 12 ? 1 : month + 1;
+    const endYear = month === 12 ? year + 1 : year;
+    const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+
+    const monthWeeks = await db
+      .select()
+      .from(weeks)
+      .where(and(gte(weeks.weekStart, startDate), lt(weeks.weekStart, endDate)));
+
+    const weekIds = monthWeeks.map((w) => w.id);
+
+    if (weekIds.length === 0) {
+      res.json({ month: yearMonth, weeks: [] });
+      return;
+    }
+
+    const monthImages = await db
+      .select()
+      .from(images)
+      .where(inArray(images.weekId, weekIds))
+      .orderBy(images.createdAt);
+
+    const imageIds = monthImages.map((img) => img.id);
+
+    const allTerms = imageIds.length > 0
+      ? await db.select().from(termsTable).where(inArray(termsTable.imageId, imageIds)).orderBy(termsTable.position)
+      : [];
+
+    const termsByImage: Record<string, any[]> = {};
+    for (const t of allTerms) {
+      if (!termsByImage[t.imageId]) termsByImage[t.imageId] = [];
+      termsByImage[t.imageId].push(t);
+    }
+
+    const weeksData = monthWeeks.map((week) => ({
+      week,
+      images: monthImages
+        .filter((img) => img.weekId === week.id)
+        .map((img) => ({ ...img, terms: termsByImage[img.id] || [] })),
+    }));
+
+    res.json({ month: yearMonth, weeks: weeksData });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

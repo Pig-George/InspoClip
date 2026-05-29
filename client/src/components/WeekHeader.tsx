@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Settings, LayoutGrid, Columns, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Settings, LayoutGrid, Columns, Search, Clock } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { SettingsDialog } from './SettingsDialog';
 import { SearchDialog } from './SearchDialog';
@@ -80,6 +80,17 @@ export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onN
               title={locale === 'zh' ? '周视图' : 'Week view'}
             >
               <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onViewModeChange('timeline')}
+              className={`p-1.5 rounded-md transition-colors ${
+                viewMode === 'timeline'
+                  ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+              }`}
+              title={locale === 'zh' ? '时间轴' : 'Timeline'}
+            >
+              <Clock className="w-4 h-4" />
             </button>
           </div>
         </div>

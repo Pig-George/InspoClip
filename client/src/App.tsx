@@ -4,6 +4,7 @@ import { LanguageProvider } from '@/context/LanguageContext';
 import { WeekHeader } from '@/components/WeekHeader';
 import { DayView } from '@/components/DayView';
 import { WeekView } from '@/components/WeekView';
+import { TimelineView } from '@/components/TimelineView';
 import { ToastContainer, toast } from '@/components/Toast';
 import { fetchWeek, uploadImage } from '@/lib/api';
 import { setLastUploadedImageId } from '@/lib/events';
@@ -135,7 +136,9 @@ function AppInner() {
         searchOpen={searchOpen}
         onSearchOpenChange={setSearchOpen}
       />
-      {loading && viewMode === 'week' ? (
+      {viewMode === 'timeline' ? (
+        <TimelineView />
+      ) : loading && viewMode === 'week' ? (
         <div className="flex items-center justify-center h-64 text-[var(--text-muted)] text-xl">
           Loading...
         </div>

@@ -1,4 +1,4 @@
-import { WeekData, Tag } from '@/types';
+import { WeekData, Tag, Week, Image } from '@/types';
 
 const BASE = '/api';
 
@@ -139,6 +139,17 @@ export interface DesignPrompt {
   imageId: string;
   contentEn: string;
   contentZh: string;
+}
+
+export interface TimelineMonth {
+  month: string;
+  weeks: { week: Week; images: Image[] }[];
+}
+
+export async function fetchMonth(yearMonth: string): Promise<TimelineMonth> {
+  const res = await fetch(`${BASE}/weeks/month/${yearMonth}`);
+  if (!res.ok) throw new Error('Failed to fetch month');
+  return res.json();
 }
 
 export async function fetchDesignPrompt(imageId: string): Promise<DesignPrompt | null> {

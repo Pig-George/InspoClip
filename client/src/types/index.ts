@@ -54,7 +54,7 @@ export type DayName =
   | 'Saturday'
   | 'Sunday';
 
-export type ViewMode = 'day' | 'week';
+export type ViewMode = 'day' | 'week' | 'timeline';
 
 export const ALL_DAYS: { dayOfWeek: number; dayName: DayName }[] = [
   { dayOfWeek: 0, dayName: 'Monday' },
