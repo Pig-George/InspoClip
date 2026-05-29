@@ -5,6 +5,8 @@ import { eq } from 'drizzle-orm';
 import { upload } from '../middleware/upload.js';
 import { generateTerms, generateDesignPrompt } from '../services/ai.js';
 import { extractColors } from '../services/colors.js';
+import { computePhash, areSimilar } from '../services/phash.js';
+import { sql } from 'drizzle-orm';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -74,13 +76,32 @@ router.post('/', upload.single('image'), async (req: Request, res: Response) => 
       })
       .catch((err) => console.error('Color extraction failed:', err.message));
 
+    // Compute perceptual hash and detect similar images
+    let similarImages: any[] = [];
+    try {
+      const phash = await computePhash(file.path);
+      await db.update(images).set({ phash }).where(eq(images.id, image.id));
+
+      const allImages = await db
+        .select({ id: images.id, phash: images.phash, filePath: images.filePath })
+        .from(images)
+        .where(sql`${images.phash} IS NOT NULL AND ${images.id} != ${image.id}`);
+
+      similarImages = allImages
+        .filter((img) => img.phash && areSimilar(phash, img.phash))
+        .slice(0, 3)
+        .map((img) => ({ id: img.id, filePath: img.filePath }));
+    } catch (err: any) {
+      console.error('Phash failed:', err.message);
+    }
+
     const imageTerms = await db
       .select()
       .from(termsTable)
       .where(eq(termsTable.imageId, image.id))
       .orderBy(termsTable.position);
 
-    res.json({ ...image, terms: imageTerms });
+    res.json({ ...image, terms: imageTerms, similarImages });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Internal server error' });
   }

@@ -33,6 +33,7 @@ async function initDB() {
       day_of_week SMALLINT NOT NULL,
       file_path TEXT NOT NULL,
       decoration TEXT NOT NULL,
+      phash TEXT,
       created_at TIMESTAMP DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS terms (

@@ -12,6 +12,7 @@ export const images = pgTable('images', {
   dayOfWeek: smallint('day_of_week').notNull(), // 0=Mon..6=Sun
   filePath: text('file_path').notNull(),
   decoration: text('decoration').notNull(), // 'tape'|'pin'|'clip'|'washi'
+  phash: text('phash'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
