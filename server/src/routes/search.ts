@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
-import { images as imagesTable, terms as termsTable, tags as tagsTable, imageTags } from '../db/schema.js';
+import { images as imagesTable, terms as termsTable, tags as tagsTable, imageTags, imageColors as imageColorsTable } from '../db/schema.js';
 import { ilike, inArray, eq } from 'drizzle-orm';
 
 const router = Router();
@@ -68,10 +68,27 @@ router.get('/', async (req: Request, res: Response) => {
       tagsByImage[at.imageId].push({ id: at.tagId, name: at.tagName, color: at.tagColor });
     }
 
+    // Query colors for these images
+    let allColors: any[] = [];
+    if (imageIdList.length > 0) {
+      allColors = await db
+        .select()
+        .from(imageColorsTable)
+        .where(inArray(imageColorsTable.imageId, imageIdList))
+        .orderBy(imageColorsTable.position);
+    }
+
+    const colorsByImage: Record<string, string[]> = {};
+    for (const c of allColors) {
+      if (!colorsByImage[c.imageId]) colorsByImage[c.imageId] = [];
+      colorsByImage[c.imageId].push(c.hex);
+    }
+
     res.json(matchingImages.map((img) => ({
       ...img,
       terms: termsByImage[img.id] || [],
       tags: tagsByImage[img.id] || [],
+      colors: colorsByImage[img.id] || [],
     })));
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Search failed' });

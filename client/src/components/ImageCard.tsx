@@ -5,6 +5,7 @@ import { Trash2, AlertTriangle, X, Check } from 'lucide-react';
 import { DecorElement } from './DecorElement';
 import { TermTag } from './TermTag';
 import { TagManager } from './TagManager';
+import { ColorPalette } from './ColorPalette';
 import { deleteImage, imageUrl } from '@/lib/api';
 import { consumeIfMatches } from '@/lib/events';
 import { toast } from '@/components/Toast';
@@ -293,6 +294,16 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
                   onTagsChange={onRefresh}
                 />
               </div>
+
+              {/* Colors */}
+              {image.colors && image.colors.length > 0 && (
+                <div className="px-6 pb-4">
+                  <h3 className="text-sm font-heading text-[var(--text-muted)] mb-2">
+                    {t('ColorPalette')}
+                  </h3>
+                  <ColorPalette colors={image.colors} />
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}

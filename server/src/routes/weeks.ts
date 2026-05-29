@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
-import { weeks, images, terms as termsTable, notes, tags as tagsTable, imageTags } from '../db/schema.js';
+import { weeks, images, terms as termsTable, notes, tags as tagsTable, imageTags, imageColors as imageColorsTable } from '../db/schema.js';
 import { eq, inArray } from 'drizzle-orm';
 
 const router = Router();
@@ -72,6 +72,22 @@ router.get('/:date', async (req: Request, res: Response) => {
       tagsByImage[at.imageId].push({ id: at.tagId, name: at.tagName, color: at.tagColor });
     }
 
+    // Query colors for these images
+    let allColors: any[] = [];
+    if (imageIds.length > 0) {
+      allColors = await db
+        .select()
+        .from(imageColorsTable)
+        .where(inArray(imageColorsTable.imageId, imageIds))
+        .orderBy(imageColorsTable.position);
+    }
+
+    const colorsByImage: Record<string, string[]> = {};
+    for (const c of allColors) {
+      if (!colorsByImage[c.imageId]) colorsByImage[c.imageId] = [];
+      colorsByImage[c.imageId].push(c.hex);
+    }
+
     const weekNotes = await db.select().from(notes).where(eq(notes.weekId, weekId)).limit(1);
 
     res.json({
@@ -80,6 +96,7 @@ router.get('/:date', async (req: Request, res: Response) => {
         ...img,
         terms: termsByImage[img.id] || [],
         tags: tagsByImage[img.id] || [],
+        colors: colorsByImage[img.id] || [],
       })),
       notes: weekNotes[0] || null,
     });

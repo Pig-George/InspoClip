@@ -49,3 +49,11 @@ export const imageTags = pgTable('image_tags', {
   tagId: uuid('tag_id').references(() => tags.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const imageColors = pgTable('image_colors', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  imageId: uuid('image_id').references(() => images.id, { onDelete: 'cascade' }),
+  hex: text('hex').notNull(),
+  position: smallint('position').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});

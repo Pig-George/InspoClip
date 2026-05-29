@@ -7,6 +7,7 @@ export interface Image {
   createdAt: string;
   terms: Term[];
   tags: Tag[];
+  colors: string[];
 }
 
 export interface Term {

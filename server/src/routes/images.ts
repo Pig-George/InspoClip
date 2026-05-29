@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
-import { images, terms as termsTable } from '../db/schema.js';
+import { images, terms as termsTable, imageColors } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { upload } from '../middleware/upload.js';
 import { generateTerms } from '../services/ai.js';
+import { extractColors } from '../services/colors.js';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -61,6 +62,17 @@ router.post('/', upload.single('image'), async (req: Request, res: Response) => 
         position: 0,
       });
     }
+
+    // Extract colors (non-blocking)
+    extractColors(file.path)
+      .then(async (colors) => {
+        if (colors.length > 0) {
+          await db.insert(imageColors).values(
+            colors.map((hex, i) => ({ imageId: image.id, hex, position: i }))
+          );
+        }
+      })
+      .catch((err) => console.error('Color extraction failed:', err.message));
 
     const imageTerms = await db
       .select()

@@ -63,6 +63,7 @@ export const translations = {
   Loading: { zh: '加载中...', en: 'Loading...' },
   Language: { zh: 'EN', en: '中' },
   CopySuccess: { zh: '已复制!', en: 'Copied!' },
+  ColorPalette: { zh: '配色方案', en: 'Color Palette' },
 } as const;
 
 export type TranslationKey = keyof typeof translations;
