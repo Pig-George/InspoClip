@@ -34,7 +34,7 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
   const confirmOverlayRef = useScrollLock(showConfirm);
   const menuRef = useRef<HTMLDivElement>(null);
   const rawPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
 
   const closeMenu = useCallback(() => setMenuPos(null), []);
 
@@ -210,105 +210,118 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
               initial={{ scale: 0.95, y: 10 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 10 }}
-              className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--card)]
-                border border-[var(--card-border)] shadow-2xl"
+              className="w-full max-w-4xl max-h-[85vh] flex rounded-2xl bg-[var(--card)]
+                border border-[var(--card-border)] shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--card-border)]">
-                <h2 className="text-lg font-heading font-semibold text-[var(--text)]">
-                  {t('ImageDetail')}
-                </h2>
-                <button
-                  onClick={() => setShowDetail(false)}
-                  className="p-1.5 rounded-full hover:bg-[var(--muted)] transition-colors"
-                >
-                  <X className="w-5 h-5 text-[var(--text-muted)]" />
-                </button>
-              </div>
-
-              {/* Image */}
-              <div className="p-4">
-                <div className="rounded-lg overflow-hidden bg-gray-200">
-                  <img
-                    src={imageUrl(image.filePath)}
-                    alt="Design screenshot"
-                    className="w-full h-auto max-h-[55vh] object-contain"
-                  />
-                </div>
-              </div>
-
-              {/* Terms */}
-              <div className="px-6 pb-6">
-                <div className="flex flex-wrap gap-2">
-                  {image.terms.length > 0 ? (
-                    image.terms.map((term) => {
-                      const [en, zh] = (() => {
-                        const idx = term.keyword.indexOf(' / ');
-                        if (idx === -1) return [term.keyword, term.keyword] as [string, string];
-                        return [term.keyword.slice(0, idx), term.keyword.slice(idx + 3)] as [string, string];
-                      })();
-                      const same = en === zh;
-                      return (
-                        <div
-                          key={term.id}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm
-                            bg-[var(--accent)]/10 text-[var(--accent)] font-term"
-                        >
-                          <button
-                            onClick={() => handleDetailCopy(term.id + '-en', en)}
-                            className="hover:underline cursor-pointer inline-flex items-center gap-0.5"
-                          >
-                            {detailCopiedId === term.id + '-en' && (
-                              <Check className="w-3.5 h-3.5 text-green-500" />
-                            )}
-                            {en}
-                          </button>
-                          {!same && (
-                            <>
-                              <span className="opacity-40">/</span>
-                              <button
-                                onClick={() => handleDetailCopy(term.id + '-zh', zh)}
-                                className="hover:underline cursor-pointer inline-flex items-center gap-0.5"
-                              >
-                                {detailCopiedId === term.id + '-zh' && (
-                                  <Check className="w-3.5 h-3.5 text-green-500" />
-                                )}
-                                {zh}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <span className="text-sm text-[var(--text-muted)]">No terms</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Tags */}
-              <div className="px-6 pb-4 flex items-center gap-1.5 flex-wrap">
-                <TagManager
-                  imageId={image.id}
-                  imageTags={image.tags || []}
-                  onTagsChange={onRefresh}
+              {/* Left: Image */}
+              <div className="flex-1 min-w-0 bg-gray-200/50 flex items-center justify-center p-4">
+                <img
+                  src={imageUrl(image.filePath)}
+                  alt="Design screenshot"
+                  className="max-w-full max-h-[80vh] object-contain rounded-lg"
                 />
               </div>
 
-              {/* Colors */}
-              {image.colors && image.colors.length > 0 && (
-                <div className="px-6 pb-4">
-                  <h3 className="text-sm font-heading text-[var(--text-muted)] mb-2">
-                    {t('ColorPalette')}
-                  </h3>
-                  <ColorPalette colors={image.colors} />
+              {/* Right: Details */}
+              <div className="w-[320px] flex-shrink-0 flex flex-col border-l border-[var(--card-border)]">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--card-border)]">
+                  <h2 className="text-base font-heading font-semibold text-[var(--text)]">
+                    {t('ImageDetail')}
+                  </h2>
+                  <button
+                    onClick={() => setShowDetail(false)}
+                    className="p-1 rounded-full hover:bg-[var(--muted)] transition-colors"
+                  >
+                    <X className="w-4 h-4 text-[var(--text-muted)]" />
+                  </button>
                 </div>
-              )}
 
-              {/* AI Critique */}
-              <div className="px-6 pb-4">
-                <DesignCritique imageId={image.id} />
+                {/* Scrollable content */}
+                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                  {/* Terms */}
+                  <div>
+                    <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">
+                      {locale === 'zh' ? '设计术语' : 'Design Terms'}
+                    </h3>
+                    <div className="flex flex-wrap gap-1.5">
+                      {image.terms.length > 0 ? (
+                        image.terms.map((term) => {
+                          const [en, zh] = (() => {
+                            const idx = term.keyword.indexOf(' / ');
+                            if (idx === -1) return [term.keyword, term.keyword] as [string, string];
+                            return [term.keyword.slice(0, idx), term.keyword.slice(idx + 3)] as [string, string];
+                          })();
+                          const same = en === zh;
+                          return (
+                            <div
+                              key={term.id}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs
+                                bg-[var(--accent)]/10 text-[var(--accent)] font-term"
+                            >
+                              <button
+                                onClick={() => handleDetailCopy(term.id + '-en', en)}
+                                className="hover:underline cursor-pointer inline-flex items-center gap-0.5"
+                              >
+                                {detailCopiedId === term.id + '-en' && (
+                                  <Check className="w-3 h-3 text-green-500" />
+                                )}
+                                {en}
+                              </button>
+                              {!same && (
+                                <>
+                                  <span className="opacity-40">/</span>
+                                  <button
+                                    onClick={() => handleDetailCopy(term.id + '-zh', zh)}
+                                    className="hover:underline cursor-pointer inline-flex items-center gap-0.5"
+                                  >
+                                    {detailCopiedId === term.id + '-zh' && (
+                                      <Check className="w-3 h-3 text-green-500" />
+                                    )}
+                                    {zh}
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <span className="text-xs text-[var(--text-muted)]">No terms</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tags */}
+                  <div>
+                    <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">
+                      {locale === 'zh' ? '标签' : 'Tags'}
+                    </h3>
+                    <TagManager
+                      imageId={image.id}
+                      imageTags={image.tags || []}
+                      onTagsChange={onRefresh}
+                    />
+                  </div>
+
+                  {/* Colors */}
+                  {image.colors && image.colors.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">
+                        {t('ColorPalette')}
+                      </h3>
+                      <ColorPalette colors={image.colors} />
+                    </div>
+                  )}
+
+                  {/* AI Critique */}
+                  <div>
+                    <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">
+                      {locale === 'zh' ? 'AI 点评' : 'AI Critique'}
+                    </h3>
+                    <DesignCritique imageId={image.id} />
+                  </div>
+                </div>
               </div>
             </motion.div>
           </motion.div>
