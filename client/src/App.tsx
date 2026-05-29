@@ -6,6 +6,7 @@ import { DayView } from '@/components/DayView';
 import { WeekView } from '@/components/WeekView';
 import { ToastContainer, toast } from '@/components/Toast';
 import { fetchWeek, uploadImage } from '@/lib/api';
+import { setLastUploadedImageId } from '@/lib/events';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useLanguage } from '@/context/LanguageContext';
 import { getMonday, formatISODate } from '@/lib/utils';
@@ -71,7 +72,10 @@ function AppInner() {
         // Get today's week
         const todayMonday = getMonday(now);
         const weekData = await fetchWeek(formatISODate(todayMonday));
-        await uploadImage(file, weekData.week.id, dayOfWeek);
+        const result = await uploadImage(file, weekData.week.id, dayOfWeek);
+
+        // Set last uploaded ID for auto-open detail modal
+        if (result?.id) setLastUploadedImageId(result.id);
 
         // Navigate to today's week and force DayView refresh
         setCurrentMonday(todayMonday);

@@ -30,7 +30,6 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
         if (imageFiles.length === 1) {
           // Single file: use direct upload
           const result = await uploadImage(imageFiles[0], weekId, dayOfWeek);
-          console.log('[Upload] result:', result, 'id:', result?.id);
           if (result?.id) setLastUploadedImageId(result.id);
         } else {
           // Multiple files: use batch upload
