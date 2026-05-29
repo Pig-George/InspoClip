@@ -82,6 +82,7 @@ async function initDB() {
       content_zh TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT NOW()
     );
+    ALTER TABLE images ADD COLUMN IF NOT EXISTS phash TEXT;
   `);
   console.log('Database tables ready');
 
