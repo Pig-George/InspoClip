@@ -47,8 +47,10 @@ router.get('/:date', async (req: Request, res: Response) => {
 
     const termsByImage: Record<string, any[]> = {};
     for (const t of allTerms) {
-      if (!termsByImage[t.imageId]) termsByImage[t.imageId] = [];
-      termsByImage[t.imageId].push(t);
+      const imgId = t.imageId;
+      if (!imgId) continue;
+      if (!termsByImage[imgId]) termsByImage[imgId] = [];
+      termsByImage[imgId].push(t);
     }
 
     // Query tags for these images
@@ -135,7 +137,7 @@ router.patch('/:weekId/notes', async (req: Request, res: Response) => {
 // GET /api/weeks/month/:yearMonth — get all images for a month
 router.get('/month/:yearMonth', async (req: Request, res: Response) => {
   try {
-    const { yearMonth } = req.params;
+    const yearMonth = req.params.yearMonth as string;
     const [year, month] = yearMonth.split('-').map(Number);
     if (!year || !month || month < 1 || month > 12) {
       res.status(400).json({ error: 'Invalid yearMonth format. Use YYYY-MM' });
@@ -173,8 +175,10 @@ router.get('/month/:yearMonth', async (req: Request, res: Response) => {
 
     const termsByImage: Record<string, any[]> = {};
     for (const t of allTerms) {
-      if (!termsByImage[t.imageId]) termsByImage[t.imageId] = [];
-      termsByImage[t.imageId].push(t);
+      const imgId = t.imageId;
+      if (!imgId) continue;
+      if (!termsByImage[imgId]) termsByImage[imgId] = [];
+      termsByImage[imgId].push(t);
     }
 
     const weeksData = monthWeeks.map((week) => ({

@@ -40,8 +40,10 @@ router.get('/week/:date', async (req: Request, res: Response) => {
 
     const termsByImage: Record<string, string[]> = {};
     for (const term of allTerms) {
-      if (!termsByImage[term.imageId]) termsByImage[term.imageId] = [];
-      termsByImage[term.imageId].push(term.keyword);
+      const imgId = term.imageId;
+      if (!imgId) continue;
+      if (!termsByImage[imgId]) termsByImage[imgId] = [];
+      termsByImage[imgId].push(term.keyword);
     }
 
     const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
