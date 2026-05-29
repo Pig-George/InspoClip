@@ -40,7 +40,8 @@ router.post('/', async (req: Request, res: Response) => {
 // DELETE /api/tags/:id — delete a tag
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    await db.delete(tags).where(eq(tags.id, req.params.id));
+    const id = req.params.id as string;
+    await db.delete(tags).where(eq(tags.id, id));
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -51,7 +52,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 router.post('/image/:imageId', async (req: Request, res: Response) => {
   try {
     const { tagId } = req.body;
-    const { imageId } = req.params;
+    const imageId = req.params.imageId as string;
     if (!tagId) {
       res.status(400).json({ error: 'tagId is required' });
       return;
@@ -70,8 +71,10 @@ router.post('/image/:imageId', async (req: Request, res: Response) => {
 // DELETE /api/tags/image/:imageId/:tagId — remove tag from image
 router.delete('/image/:imageId/:tagId', async (req: Request, res: Response) => {
   try {
+    const imageId = req.params.imageId as string;
+    const tagId = req.params.tagId as string;
     await db.delete(imageTags).where(
-      and(eq(imageTags.imageId, req.params.imageId), eq(imageTags.tagId, req.params.tagId))
+      and(eq(imageTags.imageId, imageId), eq(imageTags.tagId, tagId))
     );
     res.json({ success: true });
   } catch (err: any) {
@@ -82,7 +85,8 @@ router.delete('/image/:imageId/:tagId', async (req: Request, res: Response) => {
 // GET /api/tags/:tagId/images — get all images with this tag
 router.get('/:tagId/images', async (req: Request, res: Response) => {
   try {
-    const links = await db.select().from(imageTags).where(eq(imageTags.tagId, req.params.tagId));
+    const tagId = req.params.tagId as string;
+    const links = await db.select().from(imageTags).where(eq(imageTags.tagId, tagId));
     res.json(links.map((l) => l.imageId));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
