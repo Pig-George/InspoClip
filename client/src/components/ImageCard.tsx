@@ -286,7 +286,7 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
               </div>
 
               {/* Tags */}
-              <div className="px-6 pb-4">
+              <div className="px-6 pb-4 flex items-center gap-1.5 flex-wrap">
                 <TagManager
                   imageId={image.id}
                   imageTags={image.tags || []}
