@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Upload } from 'lucide-react';
-import { batchUploadImages } from '@/lib/api';
+import { uploadImage, batchUploadImages } from '@/lib/api';
 import { setLastUploadedImageId } from '@/lib/events';
 import { toast } from '@/components/Toast';
 import { useLanguage } from '@/context/LanguageContext';
@@ -25,18 +25,21 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
       if (imageFiles.length === 0) return;
 
       setUploading(true);
-      setProgress({ current: 0, total: imageFiles.length });
 
       try {
-        const results = await batchUploadImages(imageFiles, weekId, dayOfWeek, (current, total) => {
-          setProgress({ current, total });
-        });
-
-        if (results.length > 0) {
-          setLastUploadedImageId(results[results.length - 1].id);
-        }
-
-        if (results.length > 1) {
+        if (imageFiles.length === 1) {
+          // Single file: use direct upload
+          const result = await uploadImage(imageFiles[0], weekId, dayOfWeek);
+          if (result?.id) setLastUploadedImageId(result.id);
+        } else {
+          // Multiple files: use batch upload
+          setProgress({ current: 0, total: imageFiles.length });
+          const results = await batchUploadImages(imageFiles, weekId, dayOfWeek, (current, total) => {
+            setProgress({ current, total });
+          });
+          if (results.length > 0) {
+            setLastUploadedImageId(results[results.length - 1].id);
+          }
           toast('success', locale === 'zh'
             ? `成功导入 ${results.length} 张图片`
             : `Imported ${results.length} images`);
