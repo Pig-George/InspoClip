@@ -73,6 +73,13 @@ async function initDB() {
       position SMALLINT NOT NULL,
       created_at TIMESTAMP DEFAULT NOW()
     );
+    CREATE TABLE IF NOT EXISTS image_critiques (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      image_id UUID REFERENCES images(id) ON DELETE CASCADE UNIQUE,
+      content_en TEXT NOT NULL,
+      content_zh TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
   `);
   console.log('Database tables ready');
 

@@ -211,3 +211,82 @@ export async function generateTerms(imagePath: string): Promise<string[]> {
   }
   return callOpenAI(cfg.apiKey, cfg.baseURL, cfg.model, base64, mimeType);
 }
+
+const CRITIQUE_PROMPT = `Analyze this UI/UX design screenshot and provide a brief, insightful critique (2-3 sentences) in BOTH English and Chinese. Focus on what works well — mention specific aspects like typography, color harmony, spacing, visual hierarchy, or overall composition. Be encouraging but specific. Format your response as JSON:
+{"en": "Your English critique here", "zh": "你的中文点评"}`;
+
+export async function generateCritique(imagePath: string): Promise<{ en: string; zh: string }> {
+  const cfg = await getConfig();
+
+  const fs = await import('fs/promises');
+  const imageBuffer = await fs.readFile(imagePath);
+
+  let processedBuffer: Buffer = imageBuffer;
+  let mimeType = imagePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
+  try {
+    const metadata = await sharp(imageBuffer).metadata();
+    const maxDim = 1024;
+    if ((metadata.width && metadata.width > maxDim) || (metadata.height && metadata.height > maxDim)) {
+      processedBuffer = await sharp(imageBuffer)
+        .resize(maxDim, maxDim, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80 })
+        .toBuffer() as Buffer;
+      mimeType = 'image/jpeg';
+    }
+  } catch { /* use original */ }
+
+  const base64 = processedBuffer.toString('base64');
+  let rawText = '';
+
+  if (cfg.provider === 'gemini') {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:generateContent?key=${cfg.apiKey}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: CRITIQUE_PROMPT }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+        generationConfig: { maxOutputTokens: 300, temperature: 0.7 },
+      }),
+    });
+    if (!res.ok) throw new Error(`Gemini error ${res.status}`);
+    const json: any = await res.json();
+    rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '{}';
+  } else if (cfg.provider === 'anthropic') {
+    const base = cfg.baseURL || 'https://api.anthropic.com/v1';
+    const res = await fetch(`${base}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: cfg.model, max_tokens: 300,
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: CRITIQUE_PROMPT },
+          { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+        ] }],
+      }),
+    });
+    if (!res.ok) throw new Error(`Anthropic error ${res.status}`);
+    const json: any = await res.json();
+    rawText = json?.content?.[0]?.text?.trim() || '{}';
+  } else {
+    const client = new OpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseURL });
+    const stream = await client.chat.completions.create({
+      model: cfg.model,
+      messages: [{ role: 'user', content: [
+        { type: 'text', text: CRITIQUE_PROMPT },
+        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+      ] }],
+      max_tokens: 300, temperature: 0.7, stream: true,
+    });
+    for await (const chunk of stream) {
+      const delta = chunk.choices?.[0]?.delta?.content;
+      if (delta) rawText += delta;
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(rawText.trim());
+    return { en: parsed.en || '', zh: parsed.zh || '' };
+  } catch {
+    return { en: rawText.trim(), zh: rawText.trim() };
+  }
+}

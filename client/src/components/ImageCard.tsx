@@ -6,6 +6,7 @@ import { DecorElement } from './DecorElement';
 import { TermTag } from './TermTag';
 import { TagManager } from './TagManager';
 import { ColorPalette } from './ColorPalette';
+import { DesignCritique } from './DesignCritique';
 import { deleteImage, imageUrl } from '@/lib/api';
 import { consumeIfMatches } from '@/lib/events';
 import { toast } from '@/components/Toast';
@@ -304,6 +305,11 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
                   <ColorPalette colors={image.colors} />
                 </div>
               )}
+
+              {/* AI Critique */}
+              <div className="px-6 pb-4">
+                <DesignCritique imageId={image.id} />
+              </div>
             </motion.div>
           </motion.div>
         )}

@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
-import { images, terms as termsTable, imageColors } from '../db/schema.js';
+import { images, terms as termsTable, imageColors, imageCritiques } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { upload } from '../middleware/upload.js';
-import { generateTerms } from '../services/ai.js';
+import { generateTerms, generateCritique } from '../services/ai.js';
 import { extractColors } from '../services/colors.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -101,6 +101,40 @@ router.delete('/:id', async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+// POST /api/images/:id/critique — generate or get critique
+router.post('/:id/critique', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+
+    const existing = await db.select().from(imageCritiques).where(eq(imageCritiques.imageId, id)).limit(1);
+    if (existing.length > 0) {
+      res.json(existing[0]);
+      return;
+    }
+
+    const [image] = await db.select().from(images).where(eq(images.id, id)).limit(1);
+    if (!image) {
+      res.status(404).json({ error: 'Image not found' });
+      return;
+    }
+
+    const uploadDir = process.env.UPLOAD_DIR || './uploads';
+    const filePath = `${uploadDir}/${image.filePath}`;
+
+    const critique = await generateCritique(filePath);
+
+    const [saved] = await db.insert(imageCritiques).values({
+      imageId: id,
+      contentEn: critique.en,
+      contentZh: critique.zh,
+    }).returning();
+
+    res.json(saved);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

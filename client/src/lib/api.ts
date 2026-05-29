@@ -133,3 +133,16 @@ export async function batchUploadImages(
 
   return results;
 }
+
+export interface Critique {
+  id: string;
+  imageId: string;
+  contentEn: string;
+  contentZh: string;
+}
+
+export async function generateCritique(imageId: string): Promise<Critique> {
+  const res = await fetch(`${BASE}/images/${imageId}/critique`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to generate critique');
+  return res.json();
+}

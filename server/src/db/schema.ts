@@ -57,3 +57,11 @@ export const imageColors = pgTable('image_colors', {
   position: smallint('position').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const imageCritiques = pgTable('image_critiques', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  imageId: uuid('image_id').references(() => images.id, { onDelete: 'cascade' }).unique(),
+  contentEn: text('content_en').notNull(),
+  contentZh: text('content_zh').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
