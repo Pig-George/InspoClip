@@ -112,3 +112,24 @@ export async function removeTagFromImage(imageId: string, tagId: string): Promis
   const res = await fetch(`${BASE}/tags/image/${imageId}/${tagId}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to remove tag');
 }
+
+export async function batchUploadImages(
+  files: File[],
+  weekId: string,
+  dayOfWeek: number,
+  onProgress?: (current: number, total: number) => void
+): Promise<any[]> {
+  const batchSize = 3;
+  const results: any[] = [];
+
+  for (let i = 0; i < files.length; i += batchSize) {
+    const batch = files.slice(i, i + batchSize);
+    const batchResults = await Promise.all(
+      batch.map((file) => uploadImage(file, weekId, dayOfWeek))
+    );
+    results.push(...batchResults);
+    onProgress?.(Math.min(i + batchSize, files.length), files.length);
+  }
+
+  return results;
+}

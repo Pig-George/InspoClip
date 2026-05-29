@@ -1,6 +1,7 @@
 import { DayName, Image as ImageType, ViewMode } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
 import { ImageUploader } from './ImageUploader';
+import { BatchUploader } from './BatchUploader';
 import { ImageCard } from './ImageCard';
 
 interface DayColumnProps {
@@ -92,9 +93,12 @@ export function DayColumn({ dayName, dayOfWeek, weekId, images, viewMode, isToda
       </div>
 
       {/* Sticky footer — only today can upload */}
-      <div className="sticky bottom-0 z-10 px-4 py-3 border-t border-[var(--card-border)] bg-[var(--card)]">
+      <div className="sticky bottom-0 z-10 px-4 py-3 border-t border-[var(--card-border)] bg-[var(--card)] space-y-2">
         {canUpload ? (
-          <ImageUploader weekId={weekId} dayOfWeek={dayOfWeek} onUploaded={onRefresh} />
+          <>
+            <ImageUploader weekId={weekId} dayOfWeek={dayOfWeek} onUploaded={onRefresh} />
+            <BatchUploader weekId={weekId} dayOfWeek={dayOfWeek} onUploaded={onRefresh} />
+          </>
         ) : (
           <p className="text-[11px] text-[var(--text-muted)] text-center font-handwriting opacity-40">
             {locale === 'zh' ? '仅今日可上传' : 'Upload only today'}
