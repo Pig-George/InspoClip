@@ -108,11 +108,14 @@ router.delete('/:id', async (req: Request, res: Response) => {
 router.post('/:id/prompt', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
+    const force = req.query.force === 'true';
 
-    const existing = await db.select().from(imageCritiques).where(eq(imageCritiques.imageId, id)).limit(1);
-    if (existing.length > 0) {
-      res.json(existing[0]);
-      return;
+    if (!force) {
+      const existing = await db.select().from(imageCritiques).where(eq(imageCritiques.imageId, id)).limit(1);
+      if (existing.length > 0) {
+        res.json(existing[0]);
+        return;
+      }
     }
 
     const [image] = await db.select().from(images).where(eq(images.id, id)).limit(1);
@@ -126,6 +129,8 @@ router.post('/:id/prompt', async (req: Request, res: Response) => {
 
     const prompt = await generateDesignPrompt(filePath);
 
+    // Upsert: delete old if exists, then insert new
+    await db.delete(imageCritiques).where(eq(imageCritiques.imageId, id));
     const [saved] = await db.insert(imageCritiques).values({
       imageId: id,
       contentEn: prompt.en,

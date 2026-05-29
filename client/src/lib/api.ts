@@ -141,8 +141,9 @@ export interface DesignPrompt {
   contentZh: string;
 }
 
-export async function generateDesignPrompt(imageId: string): Promise<DesignPrompt> {
-  const res = await fetch(`${BASE}/images/${imageId}/prompt`, { method: 'POST' });
+export async function generateDesignPrompt(imageId: string, force?: boolean): Promise<DesignPrompt> {
+  const url = force ? `${BASE}/images/${imageId}/prompt?force=true` : `${BASE}/images/${imageId}/prompt`;
+  const res = await fetch(url, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to generate prompt');
   return res.json();
 }
