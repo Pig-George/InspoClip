@@ -3,7 +3,7 @@ import { db } from '../db/index.js';
 import { images, terms as termsTable, imageColors, imageCritiques } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { upload } from '../middleware/upload.js';
-import { generateTerms, generateCritique } from '../services/ai.js';
+import { generateTerms, generateDesignPrompt } from '../services/ai.js';
 import { extractColors } from '../services/colors.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -104,8 +104,8 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/images/:id/critique — generate or get critique
-router.post('/:id/critique', async (req: Request, res: Response) => {
+// POST /api/images/:id/prompt — generate or get design prompt
+router.post('/:id/prompt', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
 
@@ -124,12 +124,12 @@ router.post('/:id/critique', async (req: Request, res: Response) => {
     const uploadDir = process.env.UPLOAD_DIR || './uploads';
     const filePath = `${uploadDir}/${image.filePath}`;
 
-    const critique = await generateCritique(filePath);
+    const prompt = await generateDesignPrompt(filePath);
 
     const [saved] = await db.insert(imageCritiques).values({
       imageId: id,
-      contentEn: critique.en,
-      contentZh: critique.zh,
+      contentEn: prompt.en,
+      contentZh: prompt.zh,
     }).returning();
 
     res.json(saved);

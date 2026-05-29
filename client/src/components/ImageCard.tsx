@@ -6,7 +6,7 @@ import { DecorElement } from './DecorElement';
 import { TermTag } from './TermTag';
 import { TagManager } from './TagManager';
 import { ColorPalette } from './ColorPalette';
-import { DesignCritique } from './DesignCritique';
+import { DesignPrompt } from './DesignPrompt';
 import { deleteImage, imageUrl } from '@/lib/api';
 import { consumeIfMatches } from '@/lib/events';
 import { toast } from '@/components/Toast';
@@ -314,12 +314,12 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
                     </div>
                   )}
 
-                  {/* AI Critique */}
+                  {/* AI Prompt */}
                   <div>
                     <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">
-                      {locale === 'zh' ? 'AI 点评' : 'AI Critique'}
+                      AI Prompt
                     </h3>
-                    <DesignCritique imageId={image.id} />
+                    <DesignPrompt imageId={image.id} />
                   </div>
                 </div>
               </div>

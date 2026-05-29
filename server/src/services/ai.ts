@@ -212,10 +212,10 @@ export async function generateTerms(imagePath: string): Promise<string[]> {
   return callOpenAI(cfg.apiKey, cfg.baseURL, cfg.model, base64, mimeType);
 }
 
-const CRITIQUE_PROMPT = `Analyze this UI/UX design screenshot and provide a brief, insightful critique (2-3 sentences) in BOTH English and Chinese. Focus on what works well — mention specific aspects like typography, color harmony, spacing, visual hierarchy, or overall composition. Be encouraging but specific. Format your response as JSON:
-{"en": "Your English critique here", "zh": "你的中文点评"}`;
+const PROMPT_GEN_PROMPT = `Analyze this UI/UX design screenshot and generate a detailed AI image/design prompt that could recreate a similar design style. The prompt should describe the visual style, color palette, typography, layout patterns, mood, and key design elements. Provide the prompt in BOTH English and Chinese. Format your response as JSON:
+{"en": "Your English prompt here", "zh": "你的中文提示词"}`;
 
-export async function generateCritique(imagePath: string): Promise<{ en: string; zh: string }> {
+export async function generateDesignPrompt(imagePath: string): Promise<{ en: string; zh: string }> {
   const cfg = await getConfig();
 
   const fs = await import('fs/promises');
@@ -244,7 +244,7 @@ export async function generateCritique(imagePath: string): Promise<{ en: string;
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: CRITIQUE_PROMPT }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+        contents: [{ parts: [{ text: PROMPT_GEN_PROMPT }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
         generationConfig: { maxOutputTokens: 300, temperature: 0.7 },
       }),
     });
@@ -259,7 +259,7 @@ export async function generateCritique(imagePath: string): Promise<{ en: string;
       body: JSON.stringify({
         model: cfg.model, max_tokens: 300,
         messages: [{ role: 'user', content: [
-          { type: 'text', text: CRITIQUE_PROMPT },
+          { type: 'text', text: PROMPT_GEN_PROMPT },
           { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
         ] }],
       }),
@@ -272,7 +272,7 @@ export async function generateCritique(imagePath: string): Promise<{ en: string;
     const stream = await client.chat.completions.create({
       model: cfg.model,
       messages: [{ role: 'user', content: [
-        { type: 'text', text: CRITIQUE_PROMPT },
+        { type: 'text', text: PROMPT_GEN_PROMPT },
         { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
       ] }],
       max_tokens: 300, temperature: 0.7, stream: true,
