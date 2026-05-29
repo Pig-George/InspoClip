@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Upload } from 'lucide-react';
-import { uploadImage } from '@/lib/api';
+import { batchUploadImages } from '@/lib/api';
 import { setLastUploadedImageId } from '@/lib/events';
 import { toast } from '@/components/Toast';
 import { useLanguage } from '@/context/LanguageContext';
@@ -14,16 +14,34 @@ interface ImageUploaderProps {
 
 export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [dragOver, setDragOver] = useState(false);
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback(
-    async (file: File) => {
-      if (!file.type.startsWith('image/')) return;
+  const handleFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      if (imageFiles.length === 0) return;
+
       setUploading(true);
+      setProgress({ current: 0, total: imageFiles.length });
+
       try {
-        const result = await uploadImage(file, weekId, dayOfWeek);
-        if (result?.id) setLastUploadedImageId(result.id);
+        const results = await batchUploadImages(imageFiles, weekId, dayOfWeek, (current, total) => {
+          setProgress({ current, total });
+        });
+
+        if (results.length > 0) {
+          setLastUploadedImageId(results[results.length - 1].id);
+        }
+
+        if (results.length > 1) {
+          toast('success', locale === 'zh'
+            ? `成功导入 ${results.length} 张图片`
+            : `Imported ${results.length} images`);
+        }
+
         onUploaded();
       } catch (err: any) {
         const msg = err?.message || String(err);
@@ -36,23 +54,26 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
         }
       } finally {
         setUploading(false);
+        setProgress({ current: 0, total: 0 });
       }
     },
-    [weekId, dayOfWeek, onUploaded]
+    [weekId, dayOfWeek, onUploaded, locale]
   );
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
+      const files: File[] = [];
       for (const item of Array.from(items)) {
         if (item.type.startsWith('image/')) {
           const file = item.getAsFile();
-          if (file) handleFile(file);
+          if (file) files.push(file);
         }
       }
+      if (files.length > 0) handleFiles(files);
     },
-    [handleFile]
+    [handleFiles]
   );
 
   const handleDrop = useCallback(
@@ -60,9 +81,9 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
       e.preventDefault();
       setDragOver(false);
       const files = e.dataTransfer?.files;
-      if (files?.[0]) handleFile(files[0]);
+      if (files?.length > 0) handleFiles(files);
     },
-    [handleFile]
+    [handleFiles]
   );
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -73,10 +94,12 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
   const handleDragLeave = () => setDragOver(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
+    const files = e.target.files;
+    if (files?.length > 0) handleFiles(files);
     e.target.value = '';
   };
+
+  const isBatch = progress.total > 1;
 
   return (
     <div
@@ -91,20 +114,45 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
     >
       <label className="cursor-pointer flex flex-col items-center gap-1.5">
         {uploading ? (
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ repeat: Infinity, duration: 1 }}
-            className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full"
-          />
+          isBatch ? (
+            <>
+              <div className="w-full h-1 bg-[var(--muted)] rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-[var(--accent)] rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(progress.current / progress.total) * 100}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+              <span className="text-xs text-[var(--text-muted)] font-handwriting">
+                {locale === 'zh' ? `上传中 ${progress.current}/${progress.total}` : `Uploading ${progress.current}/${progress.total}`}
+              </span>
+            </>
+          ) : (
+            <>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1 }}
+                className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full"
+              />
+              <span className="text-xs text-[var(--text-muted)] font-handwriting">
+                {t('Analyzing')}
+              </span>
+            </>
+          )
         ) : (
-          <Upload className="w-4 h-4 text-[var(--text-muted)]" />
+          <>
+            <Upload className="w-4 h-4 text-[var(--text-muted)]" />
+            <span className="text-xs text-[var(--text-muted)] font-handwriting">
+              {t('PasteOrDrop')}
+            </span>
+          </>
         )}
-        <span className="text-xs text-[var(--text-muted)] font-handwriting">
-          {uploading ? t('Analyzing') : t('PasteOrDrop')}
-        </span>
         <input
+          ref={inputRef}
           type="file"
           accept="image/*"
+          multiple
           onChange={handleInputChange}
           className="hidden"
         />
