@@ -31,6 +31,7 @@ router.get('/week/:date', async (req: Request, res: Response) => {
     console.error('[Export] dateStr:', dateStr, 'mondayStr:', mondayStr);
     const [week] = await db.select().from(weeks).where(eq(weeks.weekStart, mondayStr)).limit(1);
     console.error('[Export] week found:', !!week, week?.id);
+    console.log('[Export] LOG TEST - this should appear in stdout');
     if (!week) {
       res.status(404).json({ error: 'Week not found' });
       return;
