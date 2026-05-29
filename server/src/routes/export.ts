@@ -5,33 +5,21 @@ import { eq, inArray } from 'drizzle-orm';
 
 const router = Router();
 
-function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  return d;
-}
-
-function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
-}
-
 // GET /api/export/week/:date?format=markdown|json
 router.get('/week/:date', async (req: Request, res: Response) => {
   try {
     const dateStr = req.params.date as string;
     const format = (req.query.format as string) || 'markdown';
-    const date = new Date(dateStr + 'T00:00:00');
-    const day = date.getDay();
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-    date.setDate(diff);
-    const mondayStr = date.toISOString().split('T')[0];
 
-    console.error('[Export] dateStr:', dateStr, 'mondayStr:', mondayStr);
+    // Compute Monday of the given date's week
+    const date = new Date(dateStr + 'T00:00:00');
+    const dayOfWeek = date.getDay();
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const monday = new Date(date);
+    monday.setDate(date.getDate() - daysFromMonday);
+    const mondayStr = monday.toISOString().split('T')[0];
+
     const [week] = await db.select().from(weeks).where(eq(weeks.weekStart, mondayStr)).limit(1);
-    console.error('[Export] week found:', !!week, week?.id);
-    console.log('[Export] LOG TEST - this should appear in stdout');
     if (!week) {
       res.status(404).json({ error: 'Week not found' });
       return;
