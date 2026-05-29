@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Loader2, Copy, Check, RefreshCw } from 'lucide-react';
-import { generateDesignPrompt, type DesignPrompt as DesignPromptType } from '@/lib/api';
+import { fetchDesignPrompt, generateDesignPrompt, type DesignPrompt as DesignPromptType } from '@/lib/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { toast } from '@/components/Toast';
 
@@ -17,6 +17,12 @@ export function DesignPrompt({ imageId }: DesignPromptProps) {
   const [copied, setCopied] = useState(false);
   const [langMode, setLangMode] = useState<LangMode>('auto');
   const { locale } = useLanguage();
+
+  useEffect(() => {
+    fetchDesignPrompt(imageId).then((existing) => {
+      if (existing) setPrompt(existing);
+    }).catch(() => {});
+  }, [imageId]);
 
   const handleGenerate = async (force = false) => {
     setLoading(true);

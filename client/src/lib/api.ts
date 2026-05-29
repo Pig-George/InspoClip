@@ -141,6 +141,12 @@ export interface DesignPrompt {
   contentZh: string;
 }
 
+export async function fetchDesignPrompt(imageId: string): Promise<DesignPrompt | null> {
+  const res = await fetch(`${BASE}/images/${imageId}/prompt`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function generateDesignPrompt(imageId: string, force?: boolean): Promise<DesignPrompt> {
   const url = force ? `${BASE}/images/${imageId}/prompt?force=true` : `${BASE}/images/${imageId}/prompt`;
   const res = await fetch(url, { method: 'POST' });

@@ -104,6 +104,21 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/images/:id/prompt — get existing prompt
+router.get('/:id/prompt', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const existing = await db.select().from(imageCritiques).where(eq(imageCritiques.imageId, id)).limit(1);
+    if (existing.length > 0) {
+      res.json(existing[0]);
+    } else {
+      res.json(null);
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/images/:id/prompt — generate or get design prompt
 router.post('/:id/prompt', async (req: Request, res: Response) => {
   try {
