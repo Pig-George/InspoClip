@@ -7,7 +7,7 @@ import { TermTag } from './TermTag';
 import { TagManager } from './TagManager';
 import { ColorPalette } from './ColorPalette';
 import { DesignPrompt } from './DesignPrompt';
-import { deleteImage, imageUrl } from '@/lib/api';
+import { deleteImage, imageUrl, thumbnailUrl } from '@/lib/api';
 import { consumeIfMatches } from '@/lib/events';
 import { toast } from '@/components/Toast';
 import { useScrollLock } from '@/hooks/useScrollLock';
@@ -153,7 +153,7 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
       {/* Image */}
       <div className="relative overflow-hidden rounded-sm aspect-[4/3] bg-gray-200">
         <img
-          src={imageUrl(image.filePath)}
+          src={image.thumbnailPath ? thumbnailUrl(image.thumbnailPath) : imageUrl(image.filePath)}
           alt="Design screenshot"
           className="w-full h-full object-cover"
           loading="lazy"

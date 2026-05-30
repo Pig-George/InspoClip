@@ -3,6 +3,7 @@ export interface Image {
   weekId: string;
   dayOfWeek: number;
   filePath: string;
+  thumbnailPath: string | null;
   decoration: DecorationType;
   createdAt: string;
   terms: Term[];

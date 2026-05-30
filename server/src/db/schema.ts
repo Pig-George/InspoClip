@@ -13,6 +13,7 @@ export const images = pgTable('images', {
   filePath: text('file_path').notNull(),
   decoration: text('decoration').notNull(), // 'tape'|'pin'|'clip'|'washi'
   phash: text('phash'),
+  thumbnailPath: text('thumbnail_path'),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

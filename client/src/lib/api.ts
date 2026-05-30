@@ -70,6 +70,10 @@ export function imageUrl(filePath: string): string {
   return `${BASE}/uploads/${filePath}`;
 }
 
+export function thumbnailUrl(thumbnailPath: string): string {
+  return `${BASE}/uploads/${thumbnailPath}`;
+}
+
 export interface AIConfig {
   AI_PROVIDER?: string;
   AI_API_KEY?: string;

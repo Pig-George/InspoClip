@@ -83,6 +83,7 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     );
     ALTER TABLE images ADD COLUMN IF NOT EXISTS phash TEXT;
+    ALTER TABLE images ADD COLUMN IF NOT EXISTS thumbnail_path TEXT;
   `);
   console.log('Database tables ready');
 

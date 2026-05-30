@@ -6,6 +6,7 @@ import { upload } from '../middleware/upload.js';
 import { generateTerms, generateDesignPrompt } from '../services/ai.js';
 import { extractColors } from '../services/colors.js';
 import { computePhash, areSimilar } from '../services/phash.js';
+import { generateThumbnail } from '../services/thumbnail.js';
 import { sql } from 'drizzle-orm';
 import fs from 'fs/promises';
 import path from 'path';
@@ -123,6 +124,15 @@ router.post('/', upload.single('image'), async (req: Request, res: Response) => 
         .map((img) => ({ id: img.id, filePath: img.filePath }));
     } catch (err: any) {
       console.error('Phash failed:', err.message);
+    }
+
+    // Generate smart thumbnail
+    try {
+      const uploadDir = process.env.UPLOAD_DIR || './uploads';
+      const thumbPath = await generateThumbnail(file.path, uploadDir);
+      await db.update(images).set({ thumbnailPath: thumbPath }).where(eq(images.id, image.id));
+    } catch (err: any) {
+      console.error('Thumbnail failed:', err.message);
     }
 
     const imageTerms = await db
