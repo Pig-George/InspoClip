@@ -31,6 +31,10 @@
   let analyzedData = null;
   let capturedBlob = null;
   let lastPreviewUrl = null;
+
+  // Analysis history
+  let analysisHistory = []; // [{data, previewUrl, timestamp}]
+  let historyIndex = -1;
   let serverUrl = 'http://localhost:3001';
   let locale = (navigator.language || 'en').startsWith('zh') ? 'zh' : 'en';
   let promptLangMode = 'auto';
@@ -90,8 +94,10 @@
       if (!res.ok) throw new Error('Analysis failed');
       analyzedData = await res.json();
 
-      // Phase 2: Transition toast → modal
+      // Phase 2: Save to history and transition toast → modal
       lastPreviewUrl = imageUrl ? URL.createObjectURL(capturedBlob) : null;
+      analysisHistory.push({ data: analyzedData, previewUrl: lastPreviewUrl, timestamp: Date.now() });
+      historyIndex = analysisHistory.length - 1;
       transitionToModal(analyzedData, lastPreviewUrl);
     } catch (err) {
       showToast(locale === 'zh' ? `分析失败: ${err.message}` : `Analysis failed: ${err.message}`, 'error');
@@ -182,6 +188,11 @@
         <div class="inspoclip-modal-header">
           <h3>${locale === 'zh' ? '分析结果' : 'Analysis Result'}</h3>
           <div class="inspoclip-modal-actions">
+            ${analysisHistory.length > 1 ? `
+              <button class="inspoclip-nav-btn" id="inspoclip-prev" title="${locale === 'zh' ? '上一条' : 'Previous'}">▲</button>
+              <span class="inspoclip-nav-index">${historyIndex + 1}/${analysisHistory.length}</span>
+              <button class="inspoclip-nav-btn" id="inspoclip-next" title="${locale === 'zh' ? '下一条' : 'Next'}">▼</button>
+            ` : ''}
             <button class="inspoclip-modal-close">✕</button>
           </div>
         </div>
@@ -251,6 +262,16 @@
     modal.querySelector('.inspoclip-modal-close').addEventListener('click', removeModal);
     modal.querySelector('.inspoclip-close-btn').addEventListener('click', removeModal);
     modal.addEventListener('click', (e) => { if (e.target === modal) removeModal(); });
+
+    // History navigation
+    const prevBtn = modal.querySelector('#inspoclip-prev');
+    const nextBtn = modal.querySelector('#inspoclip-next');
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => navigateHistory(-1));
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => navigateHistory(1));
+    }
 
     // Copy all buttons
     modal.querySelectorAll('.inspoclip-copy-all').forEach((btn) => {
@@ -340,6 +361,37 @@
     }
   }
 
+  function navigateHistory(direction) {
+    const newIndex = historyIndex + direction;
+    if (newIndex < 0 || newIndex >= analysisHistory.length) return;
+
+    historyIndex = newIndex;
+    const entry = analysisHistory[historyIndex];
+    analyzedData = entry.data;
+    lastPreviewUrl = entry.previewUrl;
+
+    // Re-render modal content
+    renderTerms(analyzedData.terms || []);
+    renderColors(analyzedData.colors || []);
+    renderPrompt(analyzedData.prompt);
+
+    // Update preview
+    const previewImg = currentModal?.querySelector('.inspoclip-preview img');
+    if (previewImg && entry.previewUrl) {
+      previewImg.src = entry.previewUrl;
+    }
+
+    // Update nav index
+    const navIndex = currentModal?.querySelector('.inspoclip-nav-index');
+    if (navIndex) navIndex.textContent = `${historyIndex + 1}/${analysisHistory.length}`;
+
+    // Update button states
+    const prevBtn = currentModal?.querySelector('#inspoclip-prev');
+    const nextBtn = currentModal?.querySelector('#inspoclip-next');
+    if (prevBtn) prevBtn.disabled = historyIndex === 0;
+    if (nextBtn) nextBtn.disabled = historyIndex === analysisHistory.length - 1;
+  }
+
   function showFloatingTab() {
     removeFloatingTab();
 
@@ -410,9 +462,12 @@
   function removeFloatingTab() {
     if (currentTab) {
       const tab = currentTab;
-      tab.classList.remove('inspoclip-tab-visible');
-      setTimeout(() => tab.remove(), 300);
       currentTab = null;
+      tab.style.pointerEvents = 'none';
+      tab.classList.remove('inspoclip-tab-visible');
+      tab.addEventListener('transitionend', () => tab.remove(), { once: true });
+      // Fallback removal if transition doesn't fire
+      setTimeout(() => { if (tab.parentNode) tab.remove(); }, 400);
     }
     removeContextMenu();
   }
@@ -428,7 +483,11 @@
         removeFloatingTab();
         showModal(analyzedData, lastPreviewUrl, window.innerWidth - 20, 20);
       }},
-      { icon: '🙈', label: locale === 'zh' ? '隐藏标签' : 'Hide tab', action: () => { removeFloatingTab(); analyzedData = null; capturedBlob = null; lastPreviewUrl = null; } },
+      { icon: '🙈', label: locale === 'zh' ? '隐藏标签' : 'Hide tab', action: () => {
+        removeFloatingTab();
+        analyzedData = null; capturedBlob = null; lastPreviewUrl = null;
+        analysisHistory = []; historyIndex = -1;
+      }},
     ];
 
     items.forEach((item) => {
@@ -709,6 +768,36 @@
         font-weight: 700;
         color: #c0784a;
         margin: 0;
+      }
+
+      .inspoclip-modal-actions {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+
+      .inspoclip-nav-btn {
+        background: none;
+        border: none;
+        font-size: 10px;
+        color: #8a7060;
+        cursor: pointer;
+        padding: 4px 6px;
+        border-radius: 4px;
+        transition: background 0.2s, color 0.2s;
+        line-height: 1;
+      }
+
+      .inspoclip-nav-btn:hover { background: #e8d5b0; color: #4a3028; }
+      .inspoclip-nav-btn:disabled { opacity: 0.3; cursor: default; }
+      .inspoclip-nav-btn:disabled:hover { background: transparent; color: #8a7060; }
+
+      .inspoclip-nav-index {
+        font-size: 10px;
+        color: #8a7060;
+        min-width: 28px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
       }
 
       .inspoclip-modal-close {
