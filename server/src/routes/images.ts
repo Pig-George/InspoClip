@@ -52,10 +52,11 @@ router.post('/analyze', upload.single('image'), async (req: Request, res: Respon
       return;
     }
 
-    // Run all analyses in parallel
-    const [terms, colors] = await Promise.all([
+    // Run all analyses in parallel, including similarity check
+    const [terms, colors, hashes] = await Promise.all([
       generateTerms(file.path).catch(() => ['design element']),
       extractColors(file.path).catch(() => []),
+      computeHashes(file.path).catch(() => null),
     ]);
 
     // Generate prompt
@@ -63,6 +64,22 @@ router.post('/analyze', upload.single('image'), async (req: Request, res: Respon
     try {
       prompt = await generateDesignPrompt(file.path);
     } catch { /* ignore */ }
+
+    // Check for similar images
+    let similar: { id: string; filePath: string }[] = [];
+    if (hashes) {
+      try {
+        const allImages = await db
+          .select({ id: images.id, phash: images.phash, ahash: images.ahash, filePath: images.filePath })
+          .from(images)
+          .where(sql`${images.phash} IS NOT NULL`);
+
+        similar = allImages
+          .filter((img) => img.phash && img.ahash && areSimilar(hashes.phash, hashes.ahash, img.phash, img.ahash))
+          .slice(0, 5)
+          .map((img) => ({ id: img.id, filePath: img.filePath }));
+      } catch { /* ignore */ }
+    }
 
     // Clean up temp file
     const fs = await import('fs/promises');
@@ -72,6 +89,7 @@ router.post('/analyze', upload.single('image'), async (req: Request, res: Respon
       terms,
       colors,
       prompt,
+      similar,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
