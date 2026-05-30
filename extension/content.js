@@ -449,15 +449,16 @@
     container.appendChild(menu);
     currentCtxMenu = menu;
 
-    // Close on click outside
+    // Close on click outside (use composedPath for shadow DOM)
     setTimeout(() => {
       const closeHandler = (e) => {
-        if (!menu.contains(e.target)) {
+        const path = e.composedPath();
+        if (!path.includes(menu)) {
           removeContextMenu();
-          document.removeEventListener('mousedown', closeHandler);
+          root.shadowRoot.removeEventListener('mousedown', closeHandler);
         }
       };
-      document.addEventListener('mousedown', closeHandler);
+      root.shadowRoot.addEventListener('mousedown', closeHandler);
     }, 50);
   }
 
