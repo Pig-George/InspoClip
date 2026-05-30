@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { upload } from '../middleware/upload.js';
 import { generateTerms, generateDesignPrompt } from '../services/ai.js';
 import { extractColors } from '../services/colors.js';
-import { computePhash, areSimilar } from '../services/phash.js';
+import { computeHashes, areSimilar } from '../services/phash.js';
 import { generateThumbnail } from '../services/thumbnail.js';
 import { sql } from 'drizzle-orm';
 import fs from 'fs/promises';
@@ -22,15 +22,15 @@ router.post('/check-similarity', upload.single('image'), async (req: Request, re
       return;
     }
 
-    const phash = await computePhash(file.path);
+    const { phash, ahash } = await computeHashes(file.path);
 
     const allImages = await db
-      .select({ id: images.id, phash: images.phash, filePath: images.filePath })
+      .select({ id: images.id, phash: images.phash, ahash: images.ahash, filePath: images.filePath })
       .from(images)
       .where(sql`${images.phash} IS NOT NULL`);
 
     const similar = allImages
-      .filter((img) => img.phash && areSimilar(phash, img.phash))
+      .filter((img) => img.phash && img.ahash && areSimilar(phash, ahash, img.phash, img.ahash))
       .slice(0, 5)
       .map((img) => ({ id: img.id, filePath: img.filePath }));
 
@@ -142,23 +142,23 @@ router.post('/', upload.single('image'), async (req: Request, res: Response) => 
       })
       .catch((err) => console.error('Color extraction failed:', err.message));
 
-    // Compute perceptual hash and detect similar images
+    // Compute dual-hash and detect similar images
     let similarImages: any[] = [];
     try {
-      const phash = await computePhash(file.path);
-      await db.update(images).set({ phash }).where(eq(images.id, image.id));
+      const { phash, ahash } = await computeHashes(file.path);
+      await db.update(images).set({ phash, ahash }).where(eq(images.id, image.id));
 
       const allImages = await db
-        .select({ id: images.id, phash: images.phash, filePath: images.filePath })
+        .select({ id: images.id, phash: images.phash, ahash: images.ahash, filePath: images.filePath })
         .from(images)
         .where(sql`${images.phash} IS NOT NULL AND ${images.id} != ${image.id}`);
 
       similarImages = allImages
-        .filter((img) => img.phash && areSimilar(phash, img.phash))
-        .slice(0, 3)
+        .filter((img) => img.phash && img.ahash && areSimilar(phash, ahash, img.phash, img.ahash))
+        .slice(0, 5)
         .map((img) => ({ id: img.id, filePath: img.filePath }));
     } catch (err: any) {
-      console.error('Phash failed:', err.message);
+      console.error('Hash failed:', err.message);
     }
 
     // Generate smart thumbnail
