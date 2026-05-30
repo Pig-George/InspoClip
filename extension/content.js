@@ -1022,8 +1022,8 @@
       /* Modal */
       .inspoclip-modal {
         position: fixed;
+        left: var(--target-x);
         top: var(--target-y);
-        right: 20px;
         width: 380px;
         max-height: calc(100vh - 40px);
         background: #faf3e6;
@@ -1032,11 +1032,11 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
-        /* Start from toast position */
+        /* Start from origin position */
         opacity: 0;
-        transform: scale(0.6) translate(calc(var(--origin-x) - var(--target-x)), calc(var(--origin-y) - var(--target-y)));
+        transform: scale(0.5) translate(calc(var(--origin-x) - var(--target-x)), calc(var(--origin-y) - var(--target-y)));
         transform-origin: top right;
-        transition: all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+        transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
       }
 
       .inspoclip-modal-visible {
