@@ -51,8 +51,6 @@ router.post('/', upload.single('image'), async (req: Request, res: Response) => 
       return;
     }
 
-    console.log('[Upload] file:', file.filename, 'size:', file.size, 'mimetype:', file.mimetype, 'path:', file.path);
-
     const { weekId, dayOfWeek } = req.body;
     if (!weekId || dayOfWeek === undefined) {
       res.status(400).json({ error: 'weekId and dayOfWeek are required' });
