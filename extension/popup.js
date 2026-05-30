@@ -374,23 +374,56 @@ function renderPrompt(prompt) {
 
 // Render analysis results
 function renderAnalysis(data) {
-  // Terms
+  // Terms — each part (en/zh) independently clickable
   const termsList = document.getElementById('termsList');
   termsList.innerHTML = '';
   if (data.terms?.length) {
     data.terms.forEach((term) => {
       const tag = document.createElement('span');
       tag.className = 'term-tag';
-      tag.textContent = term;
-      tag.title = 'Click to copy';
-      tag.addEventListener('click', async () => {
+
+      const idx = term.indexOf(' / ');
+      const en = idx === -1 ? term : term.slice(0, idx);
+      const zh = idx === -1 ? null : term.slice(idx + 3);
+      const same = en === zh;
+
+      // English part
+      const enSpan = document.createElement('span');
+      enSpan.className = 'term-part';
+      enSpan.textContent = en;
+      enSpan.title = 'Click to copy English';
+      enSpan.addEventListener('click', async () => {
         try {
-          await navigator.clipboard.writeText(term);
-          tag.classList.add('copied');
-          tag.textContent = '✓ ' + term;
-          setTimeout(() => { tag.classList.remove('copied'); tag.textContent = term; }, 1000);
+          await navigator.clipboard.writeText(en);
+          enSpan.classList.add('copied');
+          enSpan.textContent = '✓';
+          setTimeout(() => { enSpan.classList.remove('copied'); enSpan.textContent = en; }, 1000);
         } catch {}
       });
+      tag.appendChild(enSpan);
+
+      // Separator + Chinese part
+      if (zh && !same) {
+        const sep = document.createElement('span');
+        sep.className = 'term-sep';
+        sep.textContent = '/';
+        tag.appendChild(sep);
+
+        const zhSpan = document.createElement('span');
+        zhSpan.className = 'term-part';
+        zhSpan.textContent = zh;
+        zhSpan.title = '点击复制中文';
+        zhSpan.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(zh);
+            zhSpan.classList.add('copied');
+            zhSpan.textContent = '✓';
+            setTimeout(() => { zhSpan.classList.remove('copied'); zhSpan.textContent = zh; }, 1000);
+          } catch {}
+        });
+        tag.appendChild(zhSpan);
+      }
+
       termsList.appendChild(tag);
     });
   } else {
