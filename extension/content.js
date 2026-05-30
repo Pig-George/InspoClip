@@ -1019,27 +1019,28 @@
         position: fixed;
         right: 0;
         top: 50%;
-        transform: translateY(-50%) translateX(calc(100% - 28px));
         z-index: 2147483646;
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: 0;
         padding: 10px 10px 10px 10px;
         background: #c0784a;
         color: white;
         border-radius: 10px 0 0 10px;
         cursor: pointer;
         box-shadow: -2px 2px 12px rgba(0,0,0,0.15);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         user-select: none;
         pointer-events: auto;
+        /* Start fully hidden behind right edge */
+        transform: translateY(-50%) translateX(100%);
+        transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
       }
 
       .inspoclip-tab-visible {
         transform: translateY(-50%) translateX(0);
       }
 
-      .inspoclip-tab:hover {
+      .inspoclip-tab-visible:hover {
         transform: translateY(-50%) translateX(0);
       }
 
@@ -1050,7 +1051,7 @@
         transition: transform 0.2s;
       }
 
-      .inspoclip-tab:hover .inspoclip-tab-arrow {
+      .inspoclip-tab-visible:hover .inspoclip-tab-arrow {
         transform: translateX(-2px);
       }
 
@@ -1062,10 +1063,10 @@
         overflow: hidden;
         max-width: 0;
         opacity: 0;
-        transition: max-width 0.3s ease, opacity 0.2s ease;
+        transition: max-width 0.25s ease, opacity 0.2s ease;
       }
 
-      .inspoclip-tab:hover .inspoclip-tab-label {
+      .inspoclip-tab-visible:hover .inspoclip-tab-label {
         max-width: 80px;
         opacity: 1;
       }
