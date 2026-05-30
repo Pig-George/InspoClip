@@ -11,6 +11,20 @@ export async function fetchWeek(dateStr: string): Promise<WeekData> {
   return res.json();
 }
 
+export interface SimilarImage {
+  id: string;
+  filePath: string;
+}
+
+export async function checkSimilarity(file: File): Promise<SimilarImage[]> {
+  const form = new FormData();
+  form.append('image', file);
+  const res = await fetch(`${BASE}/images/check-similarity`, { method: 'POST', body: form });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.similar || [];
+}
+
 export async function uploadImage(
   file: File,
   weekId: string,

@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Upload } from 'lucide-react';
-import { uploadImage, batchUploadImages } from '@/lib/api';
+import { uploadImage, batchUploadImages, checkSimilarity } from '@/lib/api';
 import { setLastUploadedImageId } from '@/lib/events';
 import { toast } from '@/components/Toast';
 import { useLanguage } from '@/context/LanguageContext';
-import { SimilarityWarning } from './SimilarityWarning';
+import { SimilarityConfirmDialog } from './SimilarityConfirmDialog';
+import type { SimilarImage } from '@/lib/api';
 
 interface ImageUploaderProps {
   weekId: string;
@@ -13,42 +14,32 @@ interface ImageUploaderProps {
   onUploaded: () => void;
 }
 
-interface SimilarImage {
-  id: string;
-  filePath: string;
-}
-
 export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [dragOver, setDragOver] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [similarImages, setSimilarImages] = useState<SimilarImage[]>([]);
+  const pendingFilesRef = useRef<File[]>([]);
   const { t, locale } = useLanguage();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFiles = useCallback(
-    async (files: FileList | File[]) => {
-      const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
-      if (imageFiles.length === 0) return;
-
+  const doUpload = useCallback(
+    async (files: File[]) => {
       setUploading(true);
 
       try {
-        if (imageFiles.length === 1) {
-          const result = await uploadImage(imageFiles[0], weekId, dayOfWeek);
+        if (files.length === 1) {
+          const result = await uploadImage(files[0], weekId, dayOfWeek);
           if (result?.id) setLastUploadedImageId(result.id);
-          if (result?.similarImages?.length > 0) {
-            setSimilarImages(result.similarImages);
-          }
         } else {
-          setProgress({ current: 0, total: imageFiles.length });
-          const results = await batchUploadImages(imageFiles, weekId, dayOfWeek, (current, total) => {
+          setProgress({ current: 0, total: files.length });
+          const results = await batchUploadImages(files, weekId, dayOfWeek, (current, total) => {
             setProgress({ current, total });
           });
           if (results.length > 0) {
             setLastUploadedImageId(results[results.length - 1].id);
-            const allSimilar = results.flatMap((r: any) => r.similarImages || []);
-            if (allSimilar.length > 0) setSimilarImages(allSimilar.slice(0, 3));
           }
           toast('success', locale === 'zh'
             ? `成功导入 ${results.length} 张图片`
@@ -72,6 +63,48 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
     },
     [weekId, dayOfWeek, onUploaded, locale]
   );
+
+  const handleFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      if (imageFiles.length === 0) return;
+
+      // Only check similarity for single file uploads (batch is too expensive)
+      if (imageFiles.length === 1) {
+        setChecking(true);
+        try {
+          const similar = await checkSimilarity(imageFiles[0]);
+          if (similar.length > 0) {
+            pendingFilesRef.current = imageFiles;
+            setSimilarImages(similar);
+            setConfirmOpen(true);
+            setChecking(false);
+            return;
+          }
+        } catch {
+          // If check fails, proceed with upload anyway
+        }
+        setChecking(false);
+      }
+
+      doUpload(imageFiles);
+    },
+    [doUpload]
+  );
+
+  const handleConfirm = useCallback(() => {
+    setConfirmOpen(false);
+    setSimilarImages([]);
+    const files = pendingFilesRef.current;
+    pendingFilesRef.current = [];
+    if (files.length > 0) doUpload(files);
+  }, [doUpload]);
+
+  const handleCancel = useCallback(() => {
+    setConfirmOpen(false);
+    setSimilarImages([]);
+    pendingFilesRef.current = [];
+  }, []);
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
@@ -113,6 +146,7 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
   };
 
   const isBatch = progress.total > 1;
+  const isBusy = uploading || checking;
 
   return (
     <>
@@ -127,7 +161,7 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
         tabIndex={0}
       >
         <label className="cursor-pointer flex flex-col items-center gap-1.5">
-          {uploading ? (
+          {isBusy ? (
             isBatch ? (
               <>
                 <div className="w-full h-1 bg-[var(--muted)] rounded-full overflow-hidden">
@@ -150,7 +184,9 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
                   className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full"
                 />
                 <span className="text-xs text-[var(--text-muted)] font-handwriting">
-                  {t('Analyzing')}
+                  {checking
+                    ? (locale === 'zh' ? '检测相似图片中...' : 'Checking for duplicates...')
+                    : t('Analyzing')}
                 </span>
               </>
             )
@@ -173,12 +209,12 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
         </label>
       </div>
 
-      {similarImages.length > 0 && (
-        <SimilarityWarning
-          similarImages={similarImages}
-          onDismiss={() => setSimilarImages([])}
-        />
-      )}
+      <SimilarityConfirmDialog
+        open={confirmOpen}
+        similarImages={similarImages}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </>
   );
 }

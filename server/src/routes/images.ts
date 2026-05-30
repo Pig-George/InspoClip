@@ -12,6 +12,36 @@ import path from 'path';
 
 const router = Router();
 
+// POST /api/images/check-similarity — check for similar images before upload
+router.post('/check-similarity', upload.single('image'), async (req: Request, res: Response) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: 'No image file provided' });
+      return;
+    }
+
+    const phash = await computePhash(file.path);
+
+    const allImages = await db
+      .select({ id: images.id, phash: images.phash, filePath: images.filePath })
+      .from(images)
+      .where(sql`${images.phash} IS NOT NULL`);
+
+    const similar = allImages
+      .filter((img) => img.phash && areSimilar(phash, img.phash))
+      .slice(0, 5)
+      .map((img) => ({ id: img.id, filePath: img.filePath }));
+
+    // Clean up temp file
+    await fs.unlink(file.path).catch(() => {});
+
+    res.json({ similar });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/', upload.single('image'), async (req: Request, res: Response) => {
   try {
     const file = req.file;
