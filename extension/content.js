@@ -156,14 +156,21 @@
 
     container.appendChild(dialog);
 
-    // Load preview images via fetch to avoid CORS/mixed-content issues
+    // Load preview images via fetch + object URL
     similar.slice(0, 3).forEach((img, i) => {
       const imgEl = dialog.querySelector(`img[data-idx="${i}"]`);
       if (!imgEl) return;
       fetch(`${serverUrl}/api/uploads/${img.filePath}`)
-        .then((res) => res.blob())
+        .then((res) => {
+          if (!res.ok) throw new Error('Not found');
+          return res.blob();
+        })
         .then((imgBlob) => {
-          imgEl.src = URL.createObjectURL(imgBlob);
+          if (imgBlob.size > 0) {
+            imgEl.src = URL.createObjectURL(imgBlob);
+          } else {
+            imgEl.style.display = 'none';
+          }
         })
         .catch(() => {
           imgEl.style.display = 'none';
@@ -192,7 +199,7 @@
   }
 
   async function doUpload(blob) {
-    showToast(locale === 'zh' ? '正在保存...' : 'Saving...');
+    showToast(locale === 'zh' ? '正在保存到 InspoClip...' : 'Saving to InspoClip...', 'loading');
 
     try {
       const now = new Date();
@@ -212,13 +219,16 @@
       formData.append('dayOfWeek', String(dayOfWeek));
 
       const uploadRes = await fetch(`${serverUrl}/api/images`, { method: 'POST', body: formData });
-      if (!uploadRes.ok) throw new Error('Upload failed');
+      if (!uploadRes.ok) {
+        const errText = await uploadRes.text().catch(() => '');
+        throw new Error(errText || `HTTP ${uploadRes.status}`);
+      }
 
       showToast(locale === 'zh' ? '✓ 已保存到 InspoClip' : '✓ Saved to InspoClip', 'success');
-      setTimeout(removeToast, 2500);
+      setTimeout(removeToast, 3500);
     } catch (err) {
-      showToast(locale === 'zh' ? `保存失败: ${err.message}` : `Save failed: ${err.message}`, 'error');
-      setTimeout(removeToast, 3000);
+      showToast(locale === 'zh' ? `✗ 保存失败: ${err.message}` : `✗ Save failed: ${err.message}`, 'error');
+      setTimeout(removeToast, 5000);
     }
   }
 
@@ -848,6 +858,7 @@
         transform: translateX(30px);
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         pointer-events: auto;
+        max-width: 320px;
       }
 
       .inspoclip-toast-visible {
@@ -855,8 +866,18 @@
         transform: translateX(0);
       }
 
+      .inspoclip-toast-success {
+        border-left: 4px solid #4caf50;
+        background: #f0faf0;
+      }
+
       .inspoclip-toast-error {
-        border-left: 3px solid #f44336;
+        border-left: 4px solid #f44336;
+        background: #fef0f0;
+      }
+
+      .inspoclip-toast-loading {
+        border-left: 4px solid #c0784a;
       }
 
       .inspoclip-toast-icon {
