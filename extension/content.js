@@ -25,6 +25,7 @@
 
   // State
   let currentToast = null;
+  let toastTimer = null;
   let currentModal = null;
   let currentTab = null;
   let currentCtxMenu = null;
@@ -118,8 +119,8 @@
         }
         await doUpload(blob);
       } catch (uploadErr) {
-        showToast(locale === 'zh' ? `保存失败: ${uploadErr.message}` : `Save failed: ${uploadErr.message}`, 'error');
-        setTimeout(removeToast, 3000);
+        showToast(locale === 'zh' ? `✗ 保存失败: ${uploadErr.message}` : `✗ Save failed: ${uploadErr.message}`, 'error');
+        toastTimer = setTimeout(removeToast, 5000);
       }
     }
   }
@@ -225,10 +226,10 @@
       }
 
       showToast(locale === 'zh' ? '✓ 已保存到 InspoClip' : '✓ Saved to InspoClip', 'success');
-      setTimeout(removeToast, 3500);
+      toastTimer = setTimeout(removeToast, 3500);
     } catch (err) {
       showToast(locale === 'zh' ? `✗ 保存失败: ${err.message}` : `✗ Save failed: ${err.message}`, 'error');
-      setTimeout(removeToast, 5000);
+      toastTimer = setTimeout(removeToast, 5000);
     }
   }
 
@@ -293,6 +294,8 @@
   // ---- Toast ----
 
   function showToast(message, type = 'loading') {
+    // Clear any pending removal timer
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
     removeToast();
     const toast = document.createElement('div');
     toast.className = `inspoclip-toast inspoclip-toast-${type}`;
@@ -308,10 +311,12 @@
   }
 
   function removeToast() {
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
     if (currentToast) {
-      currentToast.classList.remove('inspoclip-toast-visible');
-      setTimeout(() => currentToast?.remove(), 300);
+      const t = currentToast;
       currentToast = null;
+      t.classList.remove('inspoclip-toast-visible');
+      setTimeout(() => t.remove(), 300);
     }
   }
 
