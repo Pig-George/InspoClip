@@ -1,28 +1,44 @@
 const DEFAULT_SERVER = 'http://localhost:3001';
 
 chrome.runtime.onInstalled.addListener(() => {
+  // Save — image-specific and page-level
   chrome.contextMenus.create({
-    id: 'inspoclip-save',
-    title: 'Save to InspoClip',
-    contexts: ['image', 'page']
+    id: 'inspoclip-save-image',
+    title: 'Save Image to InspoClip',
+    contexts: ['image']
   });
   chrome.contextMenus.create({
-    id: 'inspoclip-analyze',
-    title: 'Analyze with InspoClip',
-    contexts: ['image', 'page']
+    id: 'inspoclip-save-page',
+    title: 'Save Page to InspoClip',
+    contexts: ['page']
+  });
+  // Analyze — image-specific and page-level
+  chrome.contextMenus.create({
+    id: 'inspoclip-analyze-image',
+    title: 'Analyze Image with InspoClip',
+    contexts: ['image']
+  });
+  chrome.contextMenus.create({
+    id: 'inspoclip-analyze-page',
+    title: 'Analyze Page with InspoClip',
+    contexts: ['page']
   });
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId === 'inspoclip-analyze') {
-    // Store action so popup can pick it up
-    await chrome.storage.local.set({ pendingAction: 'analyze' });
-    // Open the popup programmatically
+  // Analyze actions
+  if (info.menuItemId === 'inspoclip-analyze-image' || info.menuItemId === 'inspoclip-analyze-page') {
+    const payload = { pendingAction: 'analyze' };
+    if (info.mediaType === 'image' && info.srcUrl) {
+      payload.imageUrl = info.srcUrl;
+    }
+    await chrome.storage.local.set(payload);
     try { await chrome.action.openPopup(); } catch { /* popup may already be open */ }
     return;
   }
 
-  if (info.menuItemId !== 'inspoclip-save') return;
+  // Save actions
+  if (info.menuItemId !== 'inspoclip-save-image' && info.menuItemId !== 'inspoclip-save-page') return;
 
   try {
     const server = await getServerUrl();

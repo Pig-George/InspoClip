@@ -34,11 +34,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   testServerConnection();
 
   // Check for pending analyze action from context menu
-  const { pendingAction } = await chrome.storage.local.get(['pendingAction']);
+  const { pendingAction, imageUrl } = await chrome.storage.local.get(['pendingAction', 'imageUrl']);
   if (pendingAction === 'analyze') {
-    await chrome.storage.local.remove(['pendingAction']);
-    // Trigger analyze after a short delay to let UI render
-    setTimeout(() => analyzeBtn.click(), 300);
+    await chrome.storage.local.remove(['pendingAction', 'imageUrl']);
+    // Trigger analyze with stored image URL
+    setTimeout(() => doAnalyze(imageUrl), 300);
   }
 
   // Test connection button
@@ -58,24 +58,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => hideStatus(), 2000);
   });
 
-  // Analyze button
-  analyzeBtn.addEventListener('click', async () => {
+  // Analyze button — captures the visible tab
+  analyzeBtn.addEventListener('click', () => doAnalyze());
+
+  // Core analyze function: if imageUrl is provided, fetch that image directly;
+  // otherwise capture the visible tab.
+  async function doAnalyze(imageUrl) {
     analyzeBtn.disabled = true;
     analyzeBtn.innerHTML = '<span class="spinner"></span> <span>Analyzing...</span>';
 
     try {
-      // Capture the current tab
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
-      capturedBlob = dataUrlToBlob(dataUrl);
+      if (imageUrl) {
+        // Fetch the specific image directly
+        try {
+          const response = await fetch(imageUrl);
+          capturedBlob = await response.blob();
+        } catch {
+          // CORS fallback: capture visible tab
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
+          capturedBlob = dataUrlToBlob(dataUrl);
+        }
+      } else {
+        // Capture the visible tab
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
+        capturedBlob = dataUrlToBlob(dataUrl);
+      }
 
       // Show preview
       const previewImg = document.getElementById('previewImage');
-      previewImg.src = dataUrl;
+      if (imageUrl && capturedBlob.type.startsWith('image/')) {
+        previewImg.src = URL.createObjectURL(capturedBlob);
+      } else {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
+        previewImg.src = dataUrl;
+      }
 
       // Send to server for analysis
+      const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
       const formData = new FormData();
-      formData.append('image', capturedBlob, 'screenshot.jpg');
+      formData.append('image', capturedBlob, 'analyze' + ext);
 
       const res = await fetch(`${serverUrl}/api/images/analyze`, {
         method: 'POST',
@@ -96,7 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       analyzeBtn.disabled = false;
       analyzeBtn.innerHTML = '<span class="btn-icon">🔍</span> <span>Analyze Page</span>';
     }
-  });
+  }
 
   // Close analysis panel
   closeAnalysis.addEventListener('click', () => {
