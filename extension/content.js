@@ -319,9 +319,10 @@
 
   function removeModal() {
     if (currentModal) {
-      const modal = currentModal.querySelector('.inspoclip-modal');
+      const overlay = currentModal;
+      const modal = overlay.querySelector('.inspoclip-modal');
       if (modal) modal.classList.remove('inspoclip-modal-visible');
-      setTimeout(() => currentModal?.remove(), 350);
+      setTimeout(() => overlay.remove(), 350);
       currentModal = null;
     }
     analyzedData = null;
