@@ -5,6 +5,7 @@ export interface Image {
   filePath: string;
   thumbnailPath: string | null;
   decoration: DecorationType;
+  sortOrder: number;
   createdAt: string;
   terms: Term[];
   tags: Tag[];

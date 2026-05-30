@@ -219,4 +219,23 @@ router.post('/:id/prompt', async (req: Request, res: Response) => {
   }
 });
 
+// PATCH /api/images/reorder — update sort order
+router.patch('/reorder', async (req: Request, res: Response) => {
+  try {
+    const { orders } = req.body; // Array of { id: string, sortOrder: number }
+    if (!Array.isArray(orders)) {
+      res.status(400).json({ error: 'orders array is required' });
+      return;
+    }
+
+    for (const { id, sortOrder } of orders) {
+      await db.update(images).set({ sortOrder }).where(eq(images.id, id));
+    }
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

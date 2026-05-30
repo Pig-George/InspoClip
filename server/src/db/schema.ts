@@ -14,6 +14,7 @@ export const images = pgTable('images', {
   decoration: text('decoration').notNull(), // 'tape'|'pin'|'clip'|'washi'
   phash: text('phash'),
   thumbnailPath: text('thumbnail_path'),
+  sortOrder: smallint('sort_order').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

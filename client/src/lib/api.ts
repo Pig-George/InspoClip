@@ -16,6 +16,15 @@ export interface SimilarImage {
   filePath: string;
 }
 
+export async function reorderImages(orders: { id: string; sortOrder: number }[]): Promise<void> {
+  const res = await fetch(`${BASE}/images/reorder`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orders }),
+  });
+  if (!res.ok) throw new Error('Failed to reorder');
+}
+
 export async function checkSimilarity(file: File): Promise<SimilarImage[]> {
   const form = new FormData();
   form.append('image', file);
