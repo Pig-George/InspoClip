@@ -8,6 +8,7 @@
   // Create isolated container
   const root = document.createElement('div');
   root.id = INSPOCLIP_ID;
+  root.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:visible;z-index:2147483647;pointer-events:none;';
   root.attachShadow({ mode: 'open' });
 
   // Inject styles
@@ -438,11 +439,14 @@
         position: fixed;
         top: 0;
         right: 0;
+        bottom: 0;
+        left: 0;
         z-index: 2147483647;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
         color: #4a3028;
         font-size: 13px;
         line-height: 1.5;
+        pointer-events: none;
       }
 
       /* Toast */
