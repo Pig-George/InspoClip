@@ -270,6 +270,22 @@
       if (!res.ok) throw new Error('Analysis failed');
       analyzedData = await res.json();
 
+      // Check for similar images
+      try {
+        const simForm = new FormData();
+        simForm.append('image', capturedBlob, 'check' + ext);
+        const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, {
+          method: 'POST',
+          body: simForm,
+        });
+        if (simRes.ok) {
+          const simData = await simRes.json();
+          analyzedData.similarImages = simData.similar || [];
+        }
+      } catch {
+        analyzedData.similarImages = [];
+      }
+
       // Phase 2: Save to history and transition toast → modal
       lastPreviewUrl = imageUrl ? URL.createObjectURL(capturedBlob) : null;
       analysisHistory.push({ data: analyzedData, previewUrl: lastPreviewUrl, timestamp: Date.now() });
@@ -368,13 +384,17 @@
         <div class="inspoclip-modal-header">
           <div class="inspoclip-modal-title-row">
             <h3>${locale === 'zh' ? '分析结果' : 'Analysis Result'}</h3>
-            ${data.similar && data.similar.length > 0 ? `
+            ${data.similarImages && data.similarImages.length > 0 ? `
               <div class="inspoclip-similar-badge" id="inspoclip-similar-badge">
-                <span class="inspoclip-similar-icon">👁</span>
-                <span class="inspoclip-similar-count">${data.similar.length}</span>
+                <span class="inspoclip-similar-icon">🔍</span>
+                <span class="inspoclip-similar-count">${data.similarImages.length}</span>
                 <div class="inspoclip-similar-tooltip" id="inspoclip-similar-tooltip">
-                  <div class="inspoclip-similar-title">${locale === 'zh' ? '相似图片' : 'Similar images'}</div>
-                  <div class="inspoclip-similar-previews" id="inspoclip-similar-previews"></div>
+                  <span class="inspoclip-similar-tooltip-title">${locale === 'zh' ? '相似图片' : 'Similar images'}</span>
+                  <div class="inspoclip-similar-previews">
+                    ${data.similarImages.slice(0, 4).map((img) =>
+                      `<img class="inspoclip-similar-thumb" data-fp="${img.filePath}" />`
+                    ).join('')}
+                  </div>
                 </div>
               </div>
             ` : ''}
@@ -440,6 +460,18 @@
     container.appendChild(modal);
     currentModal = modal;
 
+    // Load similar image thumbnails
+    if (data.similarImages?.length > 0) {
+      data.similarImages.slice(0, 4).forEach((img) => {
+        const thumbEl = modal.querySelector(`img[data-fp="${img.filePath}"]`);
+        if (!thumbEl) return;
+        fetch(`${serverUrl}/api/uploads/${img.filePath}`)
+          .then((res) => { if (!res.ok) throw new Error(); return res.blob(); })
+          .then((blob) => { if (blob.size > 0) thumbEl.src = URL.createObjectURL(blob); })
+          .catch(() => { thumbEl.style.display = 'none'; });
+      });
+    }
+
     // Trigger expand animation
     requestAnimationFrame(() => {
       modal.querySelector('.inspoclip-modal').classList.add('inspoclip-modal-visible');
@@ -449,23 +481,6 @@
     renderTerms(data.terms || []);
     renderColors(data.colors || []);
     renderPrompt(data.prompt);
-
-    // Load similar image previews
-    if (data.similar && data.similar.length > 0) {
-      const previewsEl = modal.querySelector('#inspoclip-similar-previews');
-      if (previewsEl) {
-        data.similar.forEach((img, i) => {
-          const imgEl = document.createElement('img');
-          imgEl.className = 'inspoclip-similar-img';
-          imgEl.alt = '';
-          previewsEl.appendChild(imgEl);
-          fetch(`${serverUrl}/api/uploads/${img.filePath}`)
-            .then((res) => { if (res.ok) return res.blob(); throw new Error(); })
-            .then((blob) => { if (blob.size > 0) imgEl.src = URL.createObjectURL(blob); else imgEl.remove(); })
-            .catch(() => imgEl.remove());
-        });
-      }
-    }
 
     // Bind events
     modal.querySelector('.inspoclip-modal-close').addEventListener('click', removeModal);
@@ -599,6 +614,33 @@
     const nextBtn = currentModal?.querySelector('#inspoclip-next');
     if (prevBtn) prevBtn.disabled = historyIndex === 0;
     if (nextBtn) nextBtn.disabled = historyIndex === analysisHistory.length - 1;
+
+    // Update similar badge
+    const badge = currentModal?.querySelector('#inspoclip-similar-badge');
+    if (badge) {
+      const sims = analyzedData.similarImages || [];
+      if (sims.length > 0) {
+        badge.style.display = 'inline-flex';
+        badge.querySelector('.inspoclip-similar-count').textContent = sims.length;
+        // Reload thumbnails
+        const previews = badge.querySelector('.inspoclip-similar-previews');
+        if (previews) {
+          previews.innerHTML = sims.slice(0, 4).map((img) =>
+            `<img class="inspoclip-similar-thumb" data-fp="${img.filePath}" />`
+          ).join('');
+          sims.slice(0, 4).forEach((img) => {
+            const thumbEl = previews.querySelector(`img[data-fp="${img.filePath}"]`);
+            if (!thumbEl) return;
+            fetch(`${serverUrl}/api/uploads/${img.filePath}`)
+              .then((res) => { if (!res.ok) throw new Error(); return res.blob(); })
+              .then((blob) => { if (blob.size > 0) thumbEl.src = URL.createObjectURL(blob); })
+              .catch(() => { thumbEl.style.display = 'none'; });
+          });
+        }
+      } else {
+        badge.style.display = 'none';
+      }
+    }
   }
 
   function showFloatingTab() {
@@ -992,13 +1034,6 @@
         flex-shrink: 0;
       }
 
-      .inspoclip-modal-header h3 {
-        font-size: 15px;
-        font-weight: 700;
-        color: #c0784a;
-        margin: 0;
-      }
-
       .inspoclip-modal-title-row {
         display: flex;
         align-items: center;
@@ -1017,35 +1052,47 @@
         border-radius: 10px;
         font-size: 11px;
         font-weight: 600;
-        cursor: default;
+        cursor: pointer;
+        transition: background 0.2s;
       }
 
-      .inspoclip-similar-icon { font-size: 12px; }
+      .inspoclip-similar-badge:hover {
+        background: #ff980030;
+      }
 
+      .inspoclip-similar-icon { font-size: 11px; }
+      .inspoclip-similar-count { font-variant-numeric: tabular-nums; }
+
+      /* Tooltip */
       .inspoclip-similar-tooltip {
-        display: none;
         position: absolute;
         top: calc(100% + 8px);
         left: 50%;
         transform: translateX(-50%);
         background: white;
         border-radius: 10px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        box-shadow: 0 6px 24px rgba(0,0,0,0.15);
         padding: 10px;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.2s, visibility 0.2s;
+        pointer-events: none;
         z-index: 10;
         min-width: 160px;
       }
 
       .inspoclip-similar-badge:hover .inspoclip-similar-tooltip {
-        display: block;
+        opacity: 1;
+        visibility: visible;
       }
 
-      .inspoclip-similar-title {
+      .inspoclip-similar-tooltip-title {
+        display: block;
         font-size: 10px;
         color: #8a7060;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
         margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
       }
 
       .inspoclip-similar-previews {
@@ -1053,12 +1100,20 @@
         gap: 4px;
       }
 
-      .inspoclip-similar-img {
-        width: 48px;
-        height: 48px;
+      .inspoclip-similar-thumb {
+        width: 40px;
+        height: 40px;
         object-fit: cover;
         border-radius: 6px;
         border: 1px solid #e8d5b0;
+        background: #f0e6d6;
+      }
+
+      .inspoclip-modal-header h3 {
+        font-size: 15px;
+        font-weight: 700;
+        color: #c0784a;
+        margin: 0;
       }
 
       .inspoclip-modal-actions {
