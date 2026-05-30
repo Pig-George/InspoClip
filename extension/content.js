@@ -397,13 +397,15 @@
   async function copyText(el, text) {
     try {
       await navigator.clipboard.writeText(text);
-      const original = el.textContent;
-      el.textContent = '✓';
+      const check = document.createElement('span');
+      check.className = 'inspoclip-check-mark';
+      check.textContent = ' ✓';
+      el.appendChild(check);
       el.classList.add('inspoclip-copied');
       setTimeout(() => {
-        el.textContent = original;
+        check.remove();
         el.classList.remove('inspoclip-copied');
-      }, 1000);
+      }, 1200);
     } catch {}
   }
 
@@ -661,6 +663,8 @@
 
       .inspoclip-term-part:hover { background: #c0784a20; text-decoration: underline; }
       .inspoclip-copied { background: #4caf5020 !important; color: #4caf50 !important; text-decoration: none !important; }
+      .inspoclip-check-mark { color: #4caf50; font-weight: 600; font-size: 12px; animation: inspoclip-check-in 0.25s ease; }
+      @keyframes inspoclip-check-in { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
       .inspoclip-term-sep { opacity: 0.35; user-select: none; }
 
       /* Colors */
