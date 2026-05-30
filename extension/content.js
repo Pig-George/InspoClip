@@ -406,14 +406,23 @@
     container.appendChild(tab);
     currentTab = tab;
 
-    // Animate in
-    requestAnimationFrame(() => tab.classList.add('inspoclip-tab-visible'));
+    // Animate in after a frame so the initial transform is applied first
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (currentTab === tab) tab.classList.add('inspoclip-tab-visible');
+      });
+    });
 
-    // Click to reopen modal
+    // Click to reopen modal — wait for tab exit animation
     tab.addEventListener('click', (e) => {
       if (tab._dragging) return;
-      removeFloatingTab();
-      showModal(analyzedData, lastPreviewUrl, window.innerWidth - 20, 20);
+      tab.style.pointerEvents = 'none';
+      tab.classList.remove('inspoclip-tab-visible');
+      currentTab = null;
+      setTimeout(() => {
+        tab.remove();
+        showModal(analyzedData, lastPreviewUrl, window.innerWidth - 20, 20);
+      }, 280);
     });
 
     // Right-click context menu
