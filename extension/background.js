@@ -27,12 +27,20 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     let imageBlob;
 
     if (info.mediaType === 'image' && info.srcUrl) {
-      const response = await fetch(info.srcUrl);
-      imageBlob = await response.blob();
+      // Right-clicked on an image: try to fetch it directly
+      try {
+        const response = await fetch(info.srcUrl);
+        imageBlob = await response.blob();
+      } catch (e) {
+        // If direct fetch fails (CORS), capture the visible tab instead
+        console.log('Direct fetch failed, capturing tab instead:', e.message);
+        const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
+        imageBlob = dataUrlToBlob(dataUrl);
+      }
     } else {
+      // Right-clicked on page: capture visible tab
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
-      const response = await fetch(dataUrl);
-      imageBlob = await response.blob();
+      imageBlob = dataUrlToBlob(dataUrl);
     }
 
     const formData = new FormData();
@@ -92,8 +100,7 @@ async function captureAndUpload(serverUrl, dayOfWeek) {
   const weekData = await weekRes.json();
 
   const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
+  const blob = dataUrlToBlob(dataUrl);
 
   const formData = new FormData();
   formData.append('image', blob, 'screenshot.jpg');
@@ -107,6 +114,20 @@ async function captureAndUpload(serverUrl, dayOfWeek) {
 
   if (!uploadRes.ok) throw new Error('Upload failed');
   return uploadRes.json();
+}
+
+/**
+ * Convert a data URL to a Blob (works in service worker context)
+ */
+function dataUrlToBlob(dataUrl) {
+  const parts = dataUrl.split(',');
+  const mime = parts[0].match(/:(.*?);/)[1];
+  const binaryStr = atob(parts[1]);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mime });
 }
 
 async function getServerUrl() {
