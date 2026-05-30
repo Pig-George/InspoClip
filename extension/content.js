@@ -679,12 +679,15 @@
     // Click to reopen modal — wait for tab exit animation
     tab.addEventListener('click', (e) => {
       if (tab._dragging) return;
+      const rect = tab.getBoundingClientRect();
+      const tabX = rect.left;
+      const tabY = rect.top + rect.height / 2;
       tab.style.pointerEvents = 'none';
       tab.classList.remove('inspoclip-tab-visible');
       currentTab = null;
       setTimeout(() => {
         tab.remove();
-        showModal(analyzedData, lastPreviewUrl, window.innerWidth - 20, 20);
+        showModal(analyzedData, lastPreviewUrl, tabX, tabY);
       }, 280);
     });
 
@@ -752,8 +755,12 @@
     const items = [
       { icon: '👁', label: locale === 'zh' ? '查看分析结果' : 'View results', action: () => {
         if (!analyzedData) { removeFloatingTab(); return; }
+        const tabEl = currentTab;
+        const rect = tabEl ? tabEl.getBoundingClientRect() : { left: window.innerWidth - 20, top: 20, height: 40 };
+        const tabX = rect.left;
+        const tabY = rect.top + rect.height / 2;
         removeFloatingTab();
-        showModal(analyzedData, lastPreviewUrl, window.innerWidth - 20, 20);
+        showModal(analyzedData, lastPreviewUrl, tabX, tabY);
       }},
       { icon: '🙈', label: locale === 'zh' ? '隐藏标签' : 'Hide tab', action: () => {
         removeFloatingTab();
