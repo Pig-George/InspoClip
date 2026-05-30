@@ -27,6 +27,7 @@
   let currentToast = null;
   let currentModal = null;
   let currentTab = null;
+  let currentCtxMenu = null;
   let analyzedData = null;
   let capturedBlob = null;
   let lastPreviewUrl = null;
@@ -363,6 +364,13 @@
       showModal(analyzedData, lastPreviewUrl, window.innerWidth - 20, 20);
     });
 
+    // Right-click context menu
+    tab.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenu(e.clientX, e.clientY);
+    });
+
     // Drag to reposition
     let dragStartY = 0;
     let startTop = 0;
@@ -404,6 +412,59 @@
       currentTab.classList.remove('inspoclip-tab-visible');
       setTimeout(() => currentTab?.remove(), 300);
       currentTab = null;
+    }
+    removeContextMenu();
+  }
+
+  function showContextMenu(x, y) {
+    removeContextMenu();
+    const menu = document.createElement('div');
+    menu.className = 'inspoclip-ctx-menu';
+
+    const items = [
+      { icon: '👁', label: locale === 'zh' ? '查看分析结果' : 'View results', action: () => { removeFloatingTab(); showModal(analyzedData, lastPreviewUrl, window.innerWidth - 20, 20); } },
+      { icon: '🙈', label: locale === 'zh' ? '隐藏标签' : 'Hide tab', action: () => { removeFloatingTab(); analyzedData = null; capturedBlob = null; } },
+    ];
+
+    items.forEach((item) => {
+      const el = document.createElement('div');
+      el.className = 'inspoclip-ctx-item';
+      el.innerHTML = `<span class="inspoclip-ctx-item-icon">${item.icon}</span><span>${item.label}</span>`;
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeContextMenu();
+        item.action();
+      });
+      menu.appendChild(el);
+    });
+
+    // Position: ensure menu stays within viewport
+    const menuW = 160;
+    const menuH = 80;
+    const finalX = Math.min(x, window.innerWidth - menuW - 10);
+    const finalY = Math.min(y, window.innerHeight - menuH - 10);
+    menu.style.left = finalX + 'px';
+    menu.style.top = finalY + 'px';
+
+    container.appendChild(menu);
+    currentCtxMenu = menu;
+
+    // Close on click outside
+    setTimeout(() => {
+      const closeHandler = (e) => {
+        if (!menu.contains(e.target)) {
+          removeContextMenu();
+          document.removeEventListener('mousedown', closeHandler);
+        }
+      };
+      document.addEventListener('mousedown', closeHandler);
+    }, 50);
+  }
+
+  function removeContextMenu() {
+    if (currentCtxMenu) {
+      currentCtxMenu.remove();
+      currentCtxMenu = null;
     }
   }
 
@@ -851,23 +912,22 @@
       /* Floating Tab */
       .inspoclip-tab {
         position: fixed;
-        right: -4px;
+        right: 0;
         top: 50%;
-        transform: translateY(-50%) translateX(100%);
+        transform: translateY(-50%) translateX(calc(100% - 28px));
         z-index: 2147483646;
         display: flex;
         align-items: center;
         gap: 4px;
-        padding: 10px 8px 10px 12px;
+        padding: 10px 10px 10px 10px;
         background: #c0784a;
         color: white;
         border-radius: 10px 0 0 10px;
         cursor: pointer;
         box-shadow: -2px 2px 12px rgba(0,0,0,0.15);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), right 0.2s ease;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         user-select: none;
         pointer-events: auto;
-        writing-mode: horizontal-tb;
       }
 
       .inspoclip-tab-visible {
@@ -875,12 +935,13 @@
       }
 
       .inspoclip-tab:hover {
-        right: 0;
+        transform: translateY(-50%) translateX(0);
       }
 
       .inspoclip-tab-arrow {
         font-size: 14px;
         line-height: 1;
+        flex-shrink: 0;
         transition: transform 0.2s;
       }
 
@@ -893,6 +954,50 @@
         font-weight: 600;
         letter-spacing: 0.3px;
         white-space: nowrap;
+        overflow: hidden;
+        max-width: 0;
+        opacity: 0;
+        transition: max-width 0.3s ease, opacity 0.2s ease;
+      }
+
+      .inspoclip-tab:hover .inspoclip-tab-label {
+        max-width: 80px;
+        opacity: 1;
+      }
+
+      /* Context Menu */
+      .inspoclip-ctx-menu {
+        position: fixed;
+        z-index: 2147483647;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        padding: 4px;
+        pointer-events: auto;
+        animation: inspoclip-fade-in 0.15s ease;
+      }
+
+      .inspoclip-ctx-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        font-size: 12px;
+        color: #4a3028;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: background 0.15s;
+        white-space: nowrap;
+      }
+
+      .inspoclip-ctx-item:hover {
+        background: #f0e6d6;
+      }
+
+      .inspoclip-ctx-item-icon {
+        font-size: 13px;
+        width: 16px;
+        text-align: center;
       }
     `;
   }
