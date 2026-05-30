@@ -30,6 +30,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Test connection on load
   testServerConnection();
 
+  // Check for pending analyze action from context menu
+  const { pendingAction } = await chrome.storage.local.get(['pendingAction']);
+  if (pendingAction === 'analyze') {
+    await chrome.storage.local.remove(['pendingAction']);
+    // Trigger analyze after a short delay to let UI render
+    setTimeout(() => analyzeBtn.click(), 300);
+  }
+
   // Test connection button
   testConnection.addEventListener('click', testServerConnection);
 
@@ -178,21 +186,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Test server connection
 async function testServerConnection() {
   const status = document.getElementById('connectionStatus');
+  const testBtn = document.getElementById('testConnection');
   status.className = 'connection-status';
   status.title = 'Testing...';
+  testBtn.disabled = true;
+  testBtn.textContent = 'Testing...';
+  showStatus('Testing connection...', 'loading');
 
   try {
     const res = await fetch(`${serverUrl}/api/health`, { signal: AbortSignal.timeout(3000) });
     if (res.ok) {
       status.className = 'connection-status connected';
-      status.title = 'Connected to server';
+      status.title = 'Connected';
+      showStatus('✓ Connected to server', 'success');
     } else {
       status.className = 'connection-status error';
       status.title = 'Server error';
+      showStatus('✗ Server returned an error', 'error');
     }
   } catch {
     status.className = 'connection-status error';
-    status.title = 'Cannot connect to server';
+    status.title = 'Cannot connect';
+    showStatus('✗ Cannot connect to server', 'error');
+  } finally {
+    testBtn.disabled = false;
+    testBtn.textContent = 'Test';
+    setTimeout(() => hideStatus(), 3000);
   }
 }
 

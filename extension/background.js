@@ -6,9 +6,22 @@ chrome.runtime.onInstalled.addListener(() => {
     title: 'Save to InspoClip',
     contexts: ['image', 'page']
   });
+  chrome.contextMenus.create({
+    id: 'inspoclip-analyze',
+    title: 'Analyze with InspoClip',
+    contexts: ['image', 'page']
+  });
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'inspoclip-analyze') {
+    // Store action so popup can pick it up
+    await chrome.storage.local.set({ pendingAction: 'analyze' });
+    // Open the popup programmatically
+    try { await chrome.action.openPopup(); } catch { /* popup may already be open */ }
+    return;
+  }
+
   if (info.menuItemId !== 'inspoclip-save') return;
 
   try {
