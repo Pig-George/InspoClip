@@ -423,8 +423,12 @@
     menu.className = 'inspoclip-ctx-menu';
 
     const items = [
-      { icon: '👁', label: locale === 'zh' ? '查看分析结果' : 'View results', action: () => { removeFloatingTab(); showModal(analyzedData, lastPreviewUrl, window.innerWidth - 20, 20); } },
-      { icon: '🙈', label: locale === 'zh' ? '隐藏标签' : 'Hide tab', action: () => { removeFloatingTab(); analyzedData = null; capturedBlob = null; } },
+      { icon: '👁', label: locale === 'zh' ? '查看分析结果' : 'View results', action: () => {
+        if (!analyzedData) { removeFloatingTab(); return; }
+        removeFloatingTab();
+        showModal(analyzedData, lastPreviewUrl, window.innerWidth - 20, 20);
+      }},
+      { icon: '🙈', label: locale === 'zh' ? '隐藏标签' : 'Hide tab', action: () => { removeFloatingTab(); analyzedData = null; capturedBlob = null; lastPreviewUrl = null; } },
     ];
 
     items.forEach((item) => {
@@ -476,6 +480,7 @@
     const el = currentModal?.querySelector('#inspoclip-terms');
     if (!el) return;
     el.innerHTML = '';
+    if (!terms) return;
     terms.forEach((term) => {
       const tag = document.createElement('span');
       tag.className = 'inspoclip-term';
