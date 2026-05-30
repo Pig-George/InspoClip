@@ -23,11 +23,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   serverInput.value = serverUrl;
   appUrlInput.value = appUrl;
 
-  // Open app link
+  // Open app link — switch to existing tab if already open, otherwise create new
   openAppLink.href = appUrl;
-  openAppLink.addEventListener('click', (e) => {
+  openAppLink.addEventListener('click', async (e) => {
     e.preventDefault();
-    chrome.tabs.create({ url: appUrl });
+    const appOrigin = new URL(appUrl).origin;
+    const tabs = await chrome.tabs.query({});
+    const existing = tabs.find((t) => t.url && t.url.startsWith(appOrigin));
+    if (existing) {
+      await chrome.tabs.update(existing.id, { active: true });
+      await chrome.windows.update(existing.windowId, { focused: true });
+    } else {
+      chrome.tabs.create({ url: appUrl });
+    }
   });
 
   // Test connection on load
