@@ -460,15 +460,21 @@
     container.appendChild(modal);
     currentModal = modal;
 
-    // Load similar image thumbnails
+    // Load similar image thumbnails via background script to avoid CORS
     if (data.similarImages?.length > 0) {
       data.similarImages.slice(0, 4).forEach((img) => {
         const thumbEl = modal.querySelector(`img[data-fp="${img.filePath}"]`);
         if (!thumbEl) return;
-        fetch(`${serverUrl}/api/uploads/${img.filePath}`)
-          .then((res) => { if (!res.ok) throw new Error(); return res.blob(); })
-          .then((blob) => { if (blob.size > 0) thumbEl.src = URL.createObjectURL(blob); })
-          .catch(() => { thumbEl.style.display = 'none'; });
+        chrome.runtime.sendMessage(
+          { type: 'FETCH_IMAGE', url: `${serverUrl}/api/uploads/${img.filePath}` },
+          (response) => {
+            if (response?.dataUrl) {
+              thumbEl.src = response.dataUrl;
+            } else {
+              thumbEl.style.display = 'none';
+            }
+          }
+        );
       });
     }
 
@@ -631,10 +637,16 @@
           sims.slice(0, 4).forEach((img) => {
             const thumbEl = previews.querySelector(`img[data-fp="${img.filePath}"]`);
             if (!thumbEl) return;
-            fetch(`${serverUrl}/api/uploads/${img.filePath}`)
-              .then((res) => { if (!res.ok) throw new Error(); return res.blob(); })
-              .then((blob) => { if (blob.size > 0) thumbEl.src = URL.createObjectURL(blob); })
-              .catch(() => { thumbEl.style.display = 'none'; });
+            chrome.runtime.sendMessage(
+              { type: 'FETCH_IMAGE', url: `${serverUrl}/api/uploads/${img.filePath}` },
+              (response) => {
+                if (response?.dataUrl) {
+                  thumbEl.src = response.dataUrl;
+                } else {
+                  thumbEl.style.display = 'none';
+                }
+              }
+            );
           });
         }
       } else {

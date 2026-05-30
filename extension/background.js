@@ -77,6 +77,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // Fetch image as data URL (for content script to avoid CORS)
+  if (message.type === 'FETCH_IMAGE') {
+    fetch(message.url)
+      .then((res) => {
+        if (!res.ok) throw new Error('Not found');
+        return res.blob();
+      })
+      .then((blob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => sendResponse({ dataUrl: reader.result });
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => sendResponse({ dataUrl: null }));
+    return true; // async
+  }
+
   // Popup triggers analyze on current tab
   if (message.type === 'TRIGGER_ANALYZE') {
     const imageUrl = message.imageUrl || null;
