@@ -43,8 +43,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       imageBlob = dataUrlToBlob(dataUrl);
     }
 
+    const ext = imageBlob.type === 'image/png' ? '.png' : '.jpg';
     const formData = new FormData();
-    formData.append('image', imageBlob, 'screenshot.jpg');
+    formData.append('image', imageBlob, 'screenshot' + ext);
     formData.append('weekId', weekId);
     formData.append('dayOfWeek', String(dayOfWeek));
 
@@ -102,8 +103,9 @@ async function captureAndUpload(serverUrl, dayOfWeek) {
   const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
   const blob = dataUrlToBlob(dataUrl);
 
+  const ext = blob.type === 'image/png' ? '.png' : '.jpg';
   const formData = new FormData();
-  formData.append('image', blob, 'screenshot.jpg');
+  formData.append('image', blob, 'screenshot' + ext);
   formData.append('weekId', weekData.week.id);
   formData.append('dayOfWeek', String(actualDayOfWeek));
 
