@@ -43,6 +43,41 @@ router.post('/check-similarity', upload.single('image'), async (req: Request, re
   }
 });
 
+// POST /api/images/analyze — analyze image without saving
+router.post('/analyze', upload.single('image'), async (req: Request, res: Response) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: 'No image file provided' });
+      return;
+    }
+
+    // Run all analyses in parallel
+    const [terms, colors] = await Promise.all([
+      generateTerms(file.path).catch(() => ['design element']),
+      extractColors(file.path).catch(() => []),
+    ]);
+
+    // Generate prompt
+    let prompt = { en: '', zh: '' };
+    try {
+      prompt = await generateDesignPrompt(file.path);
+    } catch { /* ignore */ }
+
+    // Clean up temp file
+    const fs = await import('fs/promises');
+    await fs.unlink(file.path).catch(() => {});
+
+    res.json({
+      terms,
+      colors,
+      prompt,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/', upload.single('image'), async (req: Request, res: Response) => {
   try {
     const file = req.file;

@@ -6,27 +6,88 @@
 </head>
 <body>
   <div class="container">
+    <!-- Header -->
     <div class="header">
-      <h1>InspoClip</h1>
-      <p class="subtitle">Save design inspiration</p>
+      <div class="logo-row">
+        <img src="icons/icon48.png" alt="Logo" class="logo" />
+        <div>
+          <h1>InspoClip</h1>
+          <p class="subtitle">Design Inspiration Saver</p>
+        </div>
+      </div>
+      <div class="connection-status" id="connectionStatus" title="Server status">
+        <span class="dot"></span>
+      </div>
     </div>
 
+    <!-- Status message -->
     <div class="status" id="status"></div>
 
+    <!-- Main actions -->
     <div class="actions">
-      <button id="captureBtn" class="btn btn-primary">
-        📸 Capture This Page
+      <button id="analyzeBtn" class="btn btn-primary">
+        <span class="btn-icon">🔍</span>
+        <span>Analyze Page</span>
+      </button>
+      <button id="captureBtn" class="btn btn-secondary">
+        <span class="btn-icon">📸</span>
+        <span>Quick Save</span>
       </button>
     </div>
 
-    <div class="settings">
-      <label for="serverUrl">Server URL</label>
-      <input type="text" id="serverUrl" placeholder="http://localhost:3001" />
-      <button id="saveSettings" class="btn btn-small">Save</button>
+    <!-- Analysis results (hidden by default) -->
+    <div class="analysis-panel" id="analysisPanel" style="display: none;">
+      <div class="analysis-header">
+        <h3>Analysis Result</h3>
+        <button id="closeAnalysis" class="icon-btn">✕</button>
+      </div>
+
+      <!-- Preview -->
+      <div class="preview-container">
+        <img id="previewImage" alt="Preview" />
+      </div>
+
+      <!-- Terms -->
+      <div class="section">
+        <h4>Design Terms</h4>
+        <div class="terms-list" id="termsList"></div>
+      </div>
+
+      <!-- Colors -->
+      <div class="section">
+        <h4>Color Palette</h4>
+        <div class="colors-list" id="colorsList"></div>
+      </div>
+
+      <!-- Prompt -->
+      <div class="section">
+        <h4>AI Prompt</h4>
+        <div class="prompt-text" id="promptText"></div>
+      </div>
+
+      <!-- Upload button -->
+      <button id="uploadAnalyzed" class="btn btn-primary btn-full">
+        <span class="btn-icon">⬆️</span>
+        <span>Save to InspoClip</span>
+      </button>
     </div>
 
+    <!-- Settings (collapsed by default) -->
+    <details class="settings-section">
+      <summary>Settings</summary>
+      <div class="settings-body">
+        <label for="serverUrl">Server URL</label>
+        <div class="input-row">
+          <input type="text" id="serverUrl" placeholder="http://localhost:3001" />
+          <button id="testConnection" class="btn btn-small">Test</button>
+        </div>
+        <button id="saveSettings" class="btn btn-small btn-full">Save Settings</button>
+      </div>
+    </details>
+
+    <!-- Footer -->
     <div class="footer">
-      <a href="#" id="openApp">Open InspoClip</a>
+      <a href="#" id="openApp">Open InspoClip →</a>
     </div>
   </div>
 
