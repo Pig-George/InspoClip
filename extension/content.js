@@ -435,8 +435,9 @@
       const el = document.createElement('div');
       el.className = 'inspoclip-ctx-item';
       el.innerHTML = `<span class="inspoclip-ctx-item-icon">${item.icon}</span><span>${item.label}</span>`;
-      el.addEventListener('click', (e) => {
+      el.addEventListener('mousedown', (e) => {
         e.stopPropagation();
+        e.preventDefault();
         removeContextMenu();
         item.action();
       });
@@ -455,16 +456,15 @@
     currentCtxMenu = menu;
 
     // Close on click outside (use composedPath for shadow DOM)
-    setTimeout(() => {
-      const closeHandler = (e) => {
-        const path = e.composedPath();
-        if (!path.includes(menu)) {
-          removeContextMenu();
-          root.shadowRoot.removeEventListener('mousedown', closeHandler);
-        }
-      };
-      root.shadowRoot.addEventListener('mousedown', closeHandler);
-    }, 50);
+    const closeHandler = (e) => {
+      const path = e.composedPath();
+      if (!path.includes(menu)) {
+        removeContextMenu();
+        root.shadowRoot.removeEventListener('mousedown', closeHandler);
+      }
+    };
+    // Delay to avoid the opening right-click from immediately closing the menu
+    setTimeout(() => root.shadowRoot.addEventListener('mousedown', closeHandler), 100);
   }
 
   function removeContextMenu() {
