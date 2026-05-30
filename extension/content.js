@@ -125,7 +125,7 @@
     }
   }
 
-  function showSaveConfirmDialog(blob, similar) {
+  function showSaveConfirmDialog(blob, similar, onConfirm) {
     const dialog = document.createElement('div');
     dialog.className = 'inspoclip-confirm-overlay';
 
@@ -188,7 +188,11 @@
     dialog.querySelector('.inspoclip-confirm-ok').addEventListener('click', async () => {
       dialog.querySelector('.inspoclip-confirm').classList.remove('inspoclip-confirm-visible');
       setTimeout(() => dialog.remove(), 300);
-      await doUpload(blob);
+      if (onConfirm) {
+        await onConfirm();
+      } else {
+        await doUpload(blob);
+      }
     });
 
     dialog.addEventListener('click', (e) => {
@@ -530,9 +534,20 @@
       });
     });
 
-    // Upload button
+    // Upload button — check similar images first
     modal.querySelector('.inspoclip-upload-btn').addEventListener('click', async () => {
-      const btn = modal.querySelector('.inspoclip-upload-btn');
+      if (data.similarImages?.length > 0) {
+        // Show confirmation dialog before saving
+        showSaveConfirmDialog(capturedBlob, data.similarImages, async () => {
+          await doModalUpload(modal);
+        });
+      } else {
+        await doModalUpload(modal);
+      }
+    });
+
+    async function doModalUpload(modalEl) {
+      const btn = modalEl.querySelector('.inspoclip-upload-btn');
       btn.disabled = true;
       btn.textContent = locale === 'zh' ? '保存中...' : 'Saving...';
 
@@ -568,7 +583,7 @@
           btn.style.background = '';
         }, 2000);
       }
-    });
+    }
 
     // ESC to close
     const escHandler = (e) => {
