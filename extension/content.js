@@ -409,8 +409,9 @@
 
   function removeFloatingTab() {
     if (currentTab) {
-      currentTab.classList.remove('inspoclip-tab-visible');
-      setTimeout(() => currentTab?.remove(), 300);
+      const tab = currentTab;
+      tab.classList.remove('inspoclip-tab-visible');
+      setTimeout(() => tab.remove(), 300);
       currentTab = null;
     }
     removeContextMenu();
