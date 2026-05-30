@@ -41,66 +41,6 @@
       </button>
     </div>
 
-    <!-- Analysis results (hidden by default) -->
-    <div class="analysis-panel" id="analysisPanel" style="display: none;">
-      <div class="analysis-header">
-        <h3 data-i18n="analysisResult">Analysis Result</h3>
-        <button id="closeAnalysis" class="icon-btn">✕</button>
-      </div>
-
-      <!-- Preview -->
-      <div class="preview-container">
-        <img id="previewImage" alt="Preview" />
-      </div>
-
-      <!-- Terms -->
-      <div class="section">
-        <div class="section-header">
-          <h4 data-i18n="designTerms">Design Terms</h4>
-          <button class="icon-btn copy-section-btn" data-copy="terms" title="Copy all">
-            <span>📋</span>
-          </button>
-        </div>
-        <div class="terms-list" id="termsList"></div>
-      </div>
-
-      <!-- Colors -->
-      <div class="section">
-        <div class="section-header">
-          <h4 data-i18n="colorPalette">Color Palette</h4>
-          <button class="icon-btn copy-section-btn" data-copy="colors" title="Copy all">
-            <span>📋</span>
-          </button>
-        </div>
-        <div class="colors-list" id="colorsList"></div>
-      </div>
-
-      <!-- Prompt -->
-      <div class="section">
-        <div class="section-header">
-          <h4>AI Prompt</h4>
-          <div class="prompt-controls">
-            <div class="lang-toggle-group" id="promptLangGroup">
-              <button class="lang-btn active" data-lang="auto">Auto</button>
-              <button class="lang-btn" data-lang="en">EN</button>
-              <button class="lang-btn" data-lang="zh">中</button>
-              <button class="lang-btn" data-lang="both">EN/中</button>
-            </div>
-            <button class="icon-btn copy-section-btn" data-copy="prompt" title="Copy">
-              <span>📋</span>
-            </button>
-          </div>
-        </div>
-        <div class="prompt-text" id="promptText"></div>
-      </div>
-
-      <!-- Upload button -->
-      <button id="uploadAnalyzed" class="btn btn-primary btn-full">
-        <span class="btn-icon">⬆️</span>
-        <span data-i18n="saveToInspoClip">Save to InspoClip</span>
-      </button>
-    </div>
-
     <!-- Settings (collapsed by default) -->
     <details class="settings-section">
       <summary data-i18n="settings">Settings</summary>

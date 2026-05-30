@@ -1,7 +1,6 @@
 const DEFAULT_SERVER = 'http://localhost:3001';
 
 chrome.runtime.onInstalled.addListener(() => {
-  // Save — image-specific and page-level
   chrome.contextMenus.create({
     id: 'inspoclip-save-image',
     title: 'Save Image to InspoClip',
@@ -12,7 +11,6 @@ chrome.runtime.onInstalled.addListener(() => {
     title: 'Save Page to InspoClip',
     contexts: ['page']
   });
-  // Analyze — image-specific and page-level
   chrome.contextMenus.create({
     id: 'inspoclip-analyze-image',
     title: 'Analyze Image with InspoClip',
@@ -26,14 +24,16 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  // Analyze actions
+  // Analyze — send message to content script
   if (info.menuItemId === 'inspoclip-analyze-image' || info.menuItemId === 'inspoclip-analyze-page') {
-    const payload = { pendingAction: 'analyze' };
-    if (info.mediaType === 'image' && info.srcUrl) {
-      payload.imageUrl = info.srcUrl;
+    try {
+      await chrome.tabs.sendMessage(tab.id, {
+        type: info.mediaType === 'image' ? 'ANALYZE_IMAGE' : 'ANALYZE_PAGE',
+        imageUrl: info.srcUrl || null,
+      });
+    } catch (err) {
+      console.error('Failed to send analyze message:', err);
     }
-    await chrome.storage.local.set(payload);
-    try { await chrome.action.openPopup(); } catch { /* popup may already be open */ }
     return;
   }
 
@@ -56,18 +56,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     let imageBlob;
 
     if (info.mediaType === 'image' && info.srcUrl) {
-      // Right-clicked on an image: try to fetch it directly
       try {
         const response = await fetch(info.srcUrl);
         imageBlob = await response.blob();
-      } catch (e) {
-        // If direct fetch fails (CORS), capture the visible tab instead
-        console.log('Direct fetch failed, capturing tab instead:', e.message);
+      } catch {
         const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
         imageBlob = dataUrlToBlob(dataUrl);
       }
     } else {
-      // Right-clicked on page: capture visible tab
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
       imageBlob = dataUrlToBlob(dataUrl);
     }
@@ -78,11 +74,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     formData.append('weekId', weekId);
     formData.append('dayOfWeek', String(dayOfWeek));
 
-    const uploadRes = await fetch(`${server}/api/images`, {
-      method: 'POST',
-      body: formData,
-    });
-
+    const uploadRes = await fetch(`${server}/api/images`, { method: 'POST', body: formData });
     if (!uploadRes.ok) {
       const err = await uploadRes.text();
       throw new Error(`Upload failed: ${err}`);
@@ -94,7 +86,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       title: 'InspoClip',
       message: 'Inspiration saved successfully!',
     });
-
   } catch (err) {
     console.error('InspoClip save failed:', err);
     chrome.notifications?.create({
@@ -106,11 +97,48 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 });
 
+// Handle messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Content script requests a tab capture
+  if (message.type === 'CAPTURE_TAB') {
+    const tabId = sender.tab?.id;
+    if (tabId) {
+      chrome.tabs.get(tabId, async (tab) => {
+        try {
+          const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
+          sendResponse({ dataUrl });
+        } catch (err) {
+          sendResponse({ error: err.message });
+        }
+      });
+      return true; // async response
+    }
+  }
+
+  // Popup requests capture and upload
   if (message.type === 'CAPTURE_AND_UPLOAD') {
     captureAndUpload(message.serverUrl, message.dayOfWeek)
       .then((result) => sendResponse({ success: true, ...result }))
       .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  // Popup triggers analyze on current tab
+  if (message.type === 'TRIGGER_ANALYZE') {
+    const imageUrl = message.imageUrl || null;
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      if (tabs[0]) {
+        try {
+          await chrome.tabs.sendMessage(tabs[0].id, {
+            type: imageUrl ? 'ANALYZE_IMAGE' : 'ANALYZE_PAGE',
+            imageUrl,
+          });
+          sendResponse({ ok: true });
+        } catch (err) {
+          sendResponse({ error: err.message });
+        }
+      }
+    });
     return true;
   }
 });
@@ -138,26 +166,17 @@ async function captureAndUpload(serverUrl, dayOfWeek) {
   formData.append('weekId', weekData.week.id);
   formData.append('dayOfWeek', String(actualDayOfWeek));
 
-  const uploadRes = await fetch(`${serverUrl}/api/images`, {
-    method: 'POST',
-    body: formData,
-  });
-
+  const uploadRes = await fetch(`${serverUrl}/api/images`, { method: 'POST', body: formData });
   if (!uploadRes.ok) throw new Error('Upload failed');
   return uploadRes.json();
 }
 
-/**
- * Convert a data URL to a Blob (works in service worker context)
- */
 function dataUrlToBlob(dataUrl) {
   const parts = dataUrl.split(',');
   const mime = parts[0].match(/:(.*?);/)[1];
   const binaryStr = atob(parts[1]);
   const bytes = new Uint8Array(binaryStr.length);
-  for (let i = 0; i < binaryStr.length; i++) {
-    bytes[i] = binaryStr.charCodeAt(i);
-  }
+  for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
   return new Blob([bytes], { type: mime });
 }
 

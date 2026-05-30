@@ -1,0 +1,764 @@
+// InspoClip Content Script — injected into web pages
+// Shows analysis notification and result modal on the page itself
+
+(() => {
+  const INSPOCLIP_ID = 'inspoclip-root';
+  if (document.getElementById(INSPOCLIP_ID)) return; // already injected
+
+  // Create isolated container
+  const root = document.createElement('div');
+  root.id = INSPOCLIP_ID;
+  root.attachShadow({ mode: 'open' });
+
+  // Inject styles
+  const style = document.createElement('style');
+  style.textContent = getStyles();
+  root.shadowRoot.appendChild(style);
+
+  // Container for dynamic elements
+  const container = document.createElement('div');
+  container.className = 'inspoclip-container';
+  root.shadowRoot.appendChild(container);
+
+  document.body.appendChild(root);
+
+  // State
+  let currentToast = null;
+  let currentModal = null;
+  let analyzedData = null;
+  let capturedBlob = null;
+  let serverUrl = 'http://localhost:3001';
+  let locale = (navigator.language || 'en').startsWith('zh') ? 'zh' : 'en';
+  let promptLangMode = 'auto';
+
+  // Load server URL
+  chrome.storage.sync.get(['serverUrl', 'lang'], (result) => {
+    if (result.serverUrl) serverUrl = result.serverUrl;
+    if (result.lang) locale = result.lang;
+  });
+
+  // Listen for messages from background/popup
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === 'ANALYZE_IMAGE') {
+      doAnalyze(msg.imageUrl);
+      sendResponse({ ok: true });
+    }
+    if (msg.type === 'ANALYZE_PAGE') {
+      doAnalyze(null);
+      sendResponse({ ok: true });
+    }
+  });
+
+  // ---- Analysis Flow ----
+
+  async function doAnalyze(imageUrl) {
+    // Phase 1: Show toast
+    showToast(locale === 'zh' ? '正在分析...' : 'Analyzing...');
+
+    try {
+      // Get image blob
+      if (imageUrl) {
+        try {
+          const res = await fetch(imageUrl);
+          capturedBlob = await res.blob();
+        } catch {
+          capturedBlob = await captureTabAsBlob();
+        }
+      } else {
+        capturedBlob = await captureTabAsBlob();
+      }
+
+      // Send to server
+      const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
+      const formData = new FormData();
+      formData.append('image', capturedBlob, 'analyze' + ext);
+
+      const res = await fetch(`${serverUrl}/api/images/analyze`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error('Analysis failed');
+      analyzedData = await res.json();
+
+      // Phase 2: Transition toast → modal
+      transitionToModal(analyzedData, imageUrl ? URL.createObjectURL(capturedBlob) : null);
+    } catch (err) {
+      showToast(locale === 'zh' ? `分析失败: ${err.message}` : `Analysis failed: ${err.message}`, 'error');
+      setTimeout(() => removeToast(), 3000);
+    }
+  }
+
+  async function captureTabAsBlob() {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' }, (response) => {
+        if (response?.dataUrl) {
+          resolve(dataUrlToBlob(response.dataUrl));
+        }
+      });
+    });
+  }
+
+  // ---- Toast ----
+
+  function showToast(message, type = 'loading') {
+    removeToast();
+    const toast = document.createElement('div');
+    toast.className = `inspoclip-toast inspoclip-toast-${type}`;
+    toast.innerHTML = `
+      <div class="inspoclip-toast-icon">${type === 'loading' ? '<div class="inspoclip-spinner"></div>' : type === 'error' ? '✗' : '✓'}</div>
+      <span class="inspoclip-toast-text">${message}</span>
+    `;
+    container.appendChild(toast);
+    currentToast = toast;
+
+    // Trigger animation
+    requestAnimationFrame(() => toast.classList.add('inspoclip-toast-visible'));
+  }
+
+  function removeToast() {
+    if (currentToast) {
+      currentToast.classList.remove('inspoclip-toast-visible');
+      setTimeout(() => currentToast?.remove(), 300);
+      currentToast = null;
+    }
+  }
+
+  // ---- Transition Toast → Modal ----
+
+  function transitionToModal(data, previewUrl) {
+    if (!currentToast) return;
+
+    // Get toast position for origin of animation
+    const toastRect = currentToast.getBoundingClientRect();
+    const originX = toastRect.right;
+    const originY = toastRect.top;
+
+    // Fade out toast
+    currentToast.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+    currentToast.style.opacity = '0';
+    currentToast.style.transform = 'translateX(20px) scale(0.8)';
+
+    // After toast fades, show modal with expand animation from toast position
+    setTimeout(() => {
+      removeToast();
+      showModal(data, previewUrl, originX, originY);
+    }, 300);
+  }
+
+  // ---- Modal ----
+
+  function showModal(data, previewUrl, originX, originY) {
+    removeModal();
+
+    const modal = document.createElement('div');
+    modal.className = 'inspoclip-modal-overlay';
+
+    // Calculate initial position (from toast origin)
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const modalW = 380;
+    const modalH = Math.min(vh - 80, 560);
+    const targetX = vw - modalW - 20;
+    const targetY = 20;
+
+    modal.innerHTML = `
+      <div class="inspoclip-modal" style="
+        --origin-x: ${originX}px;
+        --origin-y: ${originY}px;
+        --target-x: ${targetX}px;
+        --target-y: ${targetY}px;
+      ">
+        <div class="inspoclip-modal-header">
+          <h3>${locale === 'zh' ? '分析结果' : 'Analysis Result'}</h3>
+          <div class="inspoclip-modal-actions">
+            <button class="inspoclip-modal-close">✕</button>
+          </div>
+        </div>
+
+        ${previewUrl ? `<div class="inspoclip-preview"><img src="${previewUrl}" /></div>` : ''}
+
+        <div class="inspoclip-modal-body">
+          <!-- Terms -->
+          <div class="inspoclip-section">
+            <div class="inspoclip-section-header">
+              <span class="inspoclip-section-title">${locale === 'zh' ? '设计术语' : 'Design Terms'}</span>
+              <button class="inspoclip-copy-all" data-type="terms">📋</button>
+            </div>
+            <div class="inspoclip-terms" id="inspoclip-terms"></div>
+          </div>
+
+          <!-- Colors -->
+          <div class="inspoclip-section">
+            <div class="inspoclip-section-header">
+              <span class="inspoclip-section-title">${locale === 'zh' ? '配色方案' : 'Color Palette'}</span>
+              <button class="inspoclip-copy-all" data-type="colors">📋</button>
+            </div>
+            <div class="inspoclip-colors" id="inspoclip-colors"></div>
+          </div>
+
+          <!-- Prompt -->
+          <div class="inspoclip-section">
+            <div class="inspoclip-section-header">
+              <span class="inspoclip-section-title">AI Prompt</span>
+              <div class="inspoclip-prompt-controls">
+                <div class="inspoclip-lang-group">
+                  <button class="inspoclip-lang-btn active" data-lang="auto">Auto</button>
+                  <button class="inspoclip-lang-btn" data-lang="en">EN</button>
+                  <button class="inspoclip-lang-btn" data-lang="zh">中</button>
+                  <button class="inspoclip-lang-btn" data-lang="both">EN/中</button>
+                </div>
+                <button class="inspoclip-copy-all" data-type="prompt">📋</button>
+              </div>
+            </div>
+            <div class="inspoclip-prompt" id="inspoclip-prompt"></div>
+          </div>
+        </div>
+
+        <div class="inspoclip-modal-footer">
+          <button class="inspoclip-btn inspoclip-btn-secondary inspoclip-close-btn">${locale === 'zh' ? '关闭' : 'Close'}</button>
+          <button class="inspoclip-btn inspoclip-btn-primary inspoclip-upload-btn">
+            ${locale === 'zh' ? '保存到 InspoClip' : 'Save to InspoClip'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(modal);
+    currentModal = modal;
+
+    // Trigger expand animation
+    requestAnimationFrame(() => {
+      modal.querySelector('.inspoclip-modal').classList.add('inspoclip-modal-visible');
+    });
+
+    // Render content
+    renderTerms(data.terms || []);
+    renderColors(data.colors || []);
+    renderPrompt(data.prompt);
+
+    // Bind events
+    modal.querySelector('.inspoclip-modal-close').addEventListener('click', removeModal);
+    modal.querySelector('.inspoclip-close-btn').addEventListener('click', removeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) removeModal(); });
+
+    // Copy all buttons
+    modal.querySelectorAll('.inspoclip-copy-all').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const type = btn.dataset.type;
+        let text = '';
+        if (type === 'terms') text = (data.terms || []).join('\n');
+        else if (type === 'colors') text = (data.colors || []).map((c) => c.toUpperCase()).join('\n');
+        else if (type === 'prompt') text = getPromptText(data.prompt);
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          btn.textContent = '✓';
+          setTimeout(() => btn.textContent = '📋', 1500);
+        } catch {}
+      });
+    });
+
+    // Prompt language toggle
+    modal.querySelectorAll('.inspoclip-lang-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        promptLangMode = btn.dataset.lang;
+        modal.querySelectorAll('.inspoclip-lang-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderPrompt(data.prompt);
+      });
+    });
+
+    // Upload button
+    modal.querySelector('.inspoclip-upload-btn').addEventListener('click', async () => {
+      const btn = modal.querySelector('.inspoclip-upload-btn');
+      btn.disabled = true;
+      btn.textContent = locale === 'zh' ? '保存中...' : 'Saving...';
+
+      try {
+        const now = new Date();
+        const dow = now.getDay();
+        const dayOfWeek = dow === 0 ? 6 : dow - 1;
+        const monday = getMonday(now);
+        const dateStr = formatDate(monday);
+
+        const weekRes = await fetch(`${serverUrl}/api/weeks/${dateStr}`);
+        if (!weekRes.ok) throw new Error('Failed to get week');
+        const weekData = await weekRes.json();
+
+        const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
+        const formData = new FormData();
+        formData.append('image', capturedBlob, 'screenshot' + ext);
+        formData.append('weekId', weekData.week.id);
+        formData.append('dayOfWeek', String(dayOfWeek));
+
+        const uploadRes = await fetch(`${serverUrl}/api/images`, { method: 'POST', body: formData });
+        if (!uploadRes.ok) throw new Error('Upload failed');
+
+        btn.textContent = locale === 'zh' ? '✓ 已保存' : '✓ Saved';
+        btn.style.background = '#4caf50';
+        setTimeout(removeModal, 1200);
+      } catch (err) {
+        btn.textContent = locale === 'zh' ? '保存失败' : 'Save failed';
+        btn.style.background = '#f44336';
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = locale === 'zh' ? '保存到 InspoClip' : 'Save to InspoClip';
+          btn.style.background = '';
+        }, 2000);
+      }
+    });
+
+    // ESC to close
+    const escHandler = (e) => {
+      if (e.key === 'Escape') { removeModal(); document.removeEventListener('keydown', escHandler); }
+    };
+    document.addEventListener('keydown', escHandler);
+  }
+
+  function removeModal() {
+    if (currentModal) {
+      const modal = currentModal.querySelector('.inspoclip-modal');
+      if (modal) modal.classList.remove('inspoclip-modal-visible');
+      setTimeout(() => currentModal?.remove(), 350);
+      currentModal = null;
+    }
+    analyzedData = null;
+    capturedBlob = null;
+  }
+
+  // ---- Render Functions ----
+
+  function renderTerms(terms) {
+    const el = currentModal?.querySelector('#inspoclip-terms');
+    if (!el) return;
+    el.innerHTML = '';
+    terms.forEach((term) => {
+      const tag = document.createElement('span');
+      tag.className = 'inspoclip-term';
+
+      const idx = term.indexOf(' / ');
+      const en = idx === -1 ? term : term.slice(0, idx);
+      const zh = idx === -1 ? null : term.slice(idx + 3);
+
+      const enSpan = document.createElement('span');
+      enSpan.className = 'inspoclip-term-part';
+      enSpan.textContent = en;
+      enSpan.addEventListener('click', () => copyText(enSpan, en));
+      tag.appendChild(enSpan);
+
+      if (zh && en !== zh) {
+        const sep = document.createElement('span');
+        sep.className = 'inspoclip-term-sep';
+        sep.textContent = '/';
+        tag.appendChild(sep);
+
+        const zhSpan = document.createElement('span');
+        zhSpan.className = 'inspoclip-term-part';
+        zhSpan.textContent = zh;
+        zhSpan.addEventListener('click', () => copyText(zhSpan, zh));
+        tag.appendChild(zhSpan);
+      }
+
+      el.appendChild(tag);
+    });
+  }
+
+  function renderColors(colors) {
+    const el = currentModal?.querySelector('#inspoclip-colors');
+    if (!el) return;
+    el.innerHTML = '';
+    colors.forEach((hex) => {
+      const swatch = document.createElement('div');
+      swatch.className = 'inspoclip-color';
+      swatch.innerHTML = `<span class="inspoclip-color-dot" style="background:${hex}"></span><span>${hex.toUpperCase()}</span>`;
+      swatch.addEventListener('click', () => copyText(swatch, hex.toUpperCase()));
+      el.appendChild(swatch);
+    });
+  }
+
+  function getPromptText(prompt) {
+    if (!prompt || (!prompt.en && !prompt.zh)) return '';
+    const effective = promptLangMode === 'auto' ? locale : promptLangMode;
+    if (effective === 'en') return prompt.en || prompt.zh;
+    if (effective === 'zh') return prompt.zh || prompt.en;
+    return [prompt.en, prompt.zh].filter(Boolean).join('\n\n');
+  }
+
+  function renderPrompt(prompt) {
+    const el = currentModal?.querySelector('#inspoclip-prompt');
+    if (!el) return;
+    const text = getPromptText(prompt);
+    el.textContent = text || (locale === 'zh' ? '暂无 Prompt' : 'No prompt');
+  }
+
+  async function copyText(el, text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      const original = el.textContent;
+      el.textContent = '✓';
+      el.classList.add('inspoclip-copied');
+      setTimeout(() => {
+        el.textContent = original;
+        el.classList.remove('inspoclip-copied');
+      }, 1000);
+    } catch {}
+  }
+
+  // ---- Helpers ----
+
+  function dataUrlToBlob(dataUrl) {
+    const parts = dataUrl.split(',');
+    const mime = parts[0].match(/:(.*?);/)[1];
+    const binaryStr = atob(parts[1]);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  }
+
+  function getMonday(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    return d;
+  }
+
+  function formatDate(date) {
+    return date.toISOString().split('T')[0];
+  }
+
+  // ---- Styles ----
+
+  function getStyles() {
+    return `
+      :host { all: initial; }
+
+      .inspoclip-container {
+        position: fixed;
+        top: 0;
+        right: 0;
+        z-index: 2147483647;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        color: #4a3028;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      /* Toast */
+      .inspoclip-toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 18px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
+        opacity: 0;
+        transform: translateX(30px);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: auto;
+      }
+
+      .inspoclip-toast-visible {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      .inspoclip-toast-error {
+        border-left: 3px solid #f44336;
+      }
+
+      .inspoclip-toast-icon {
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .inspoclip-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid #e0d0c0;
+        border-top-color: #c0784a;
+        border-radius: 50%;
+        animation: inspoclip-spin 0.7s linear infinite;
+      }
+
+      @keyframes inspoclip-spin { to { transform: rotate(360deg); } }
+
+      .inspoclip-toast-text {
+        font-size: 13px;
+        font-weight: 500;
+        color: #4a3028;
+        white-space: nowrap;
+      }
+
+      /* Modal Overlay */
+      .inspoclip-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 2147483647;
+        pointer-events: auto;
+        animation: inspoclip-fade-in 0.3s ease;
+      }
+
+      @keyframes inspoclip-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      /* Modal */
+      .inspoclip-modal {
+        position: fixed;
+        top: var(--target-y);
+        right: 20px;
+        width: 380px;
+        max-height: calc(100vh - 40px);
+        background: #faf3e6;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        /* Start from toast position */
+        opacity: 0;
+        transform: scale(0.6) translate(calc(var(--origin-x) - var(--target-x)), calc(var(--origin-y) - var(--target-y)));
+        transform-origin: top right;
+        transition: all 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+
+      .inspoclip-modal-visible {
+        opacity: 1;
+        transform: scale(1) translate(0, 0);
+      }
+
+      .inspoclip-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        border-bottom: 1px dashed #e8d5b0;
+        flex-shrink: 0;
+      }
+
+      .inspoclip-modal-header h3 {
+        font-size: 15px;
+        font-weight: 700;
+        color: #c0784a;
+        margin: 0;
+      }
+
+      .inspoclip-modal-close {
+        background: none;
+        border: none;
+        font-size: 16px;
+        color: #8a7060;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 6px;
+        transition: background 0.2s;
+      }
+
+      .inspoclip-modal-close:hover { background: #e8d5b0; }
+
+      /* Preview */
+      .inspoclip-preview {
+        max-height: 140px;
+        overflow: hidden;
+        background: #f0e6d6;
+      }
+
+      .inspoclip-preview img {
+        width: 100%;
+        height: auto;
+        max-height: 140px;
+        object-fit: cover;
+        display: block;
+      }
+
+      /* Body */
+      .inspoclip-modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 14px 18px;
+      }
+
+      .inspoclip-modal-body::-webkit-scrollbar { width: 4px; }
+      .inspoclip-modal-body::-webkit-scrollbar-thumb { background: #d4c4b0; border-radius: 2px; }
+
+      /* Sections */
+      .inspoclip-section {
+        margin-bottom: 14px;
+      }
+
+      .inspoclip-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+
+      .inspoclip-section-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: #8a7060;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .inspoclip-copy-all {
+        background: none;
+        border: none;
+        font-size: 12px;
+        cursor: pointer;
+        padding: 2px 4px;
+        opacity: 0.4;
+        transition: opacity 0.2s;
+      }
+
+      .inspoclip-copy-all:hover { opacity: 1; }
+
+      /* Terms */
+      .inspoclip-terms {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+
+      .inspoclip-term {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 4px 8px;
+        background: #c0784a12;
+        color: #c0784a;
+        border-radius: 14px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+
+      .inspoclip-term-part {
+        cursor: pointer;
+        padding: 0 2px;
+        border-radius: 4px;
+        transition: all 0.2s;
+      }
+
+      .inspoclip-term-part:hover { background: #c0784a20; text-decoration: underline; }
+      .inspoclip-copied { background: #4caf5020 !important; color: #4caf50 !important; text-decoration: none !important; }
+      .inspoclip-term-sep { opacity: 0.35; user-select: none; }
+
+      /* Colors */
+      .inspoclip-colors {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .inspoclip-color {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px 4px 5px;
+        background: white;
+        border: 1px solid #e8d5b0;
+        border-radius: 8px;
+        font-size: 11px;
+        font-family: 'SF Mono', 'Consolas', monospace;
+        cursor: pointer;
+        transition: border-color 0.2s;
+      }
+
+      .inspoclip-color:hover { border-color: #c0784a; }
+
+      .inspoclip-color-dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 5px;
+        border: 1px solid rgba(0,0,0,0.1);
+        flex-shrink: 0;
+      }
+
+      /* Prompt */
+      .inspoclip-prompt-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .inspoclip-lang-group {
+        display: flex;
+        background: #f0e6d6;
+        border-radius: 6px;
+        padding: 2px;
+        gap: 1px;
+      }
+
+      .inspoclip-lang-btn {
+        padding: 2px 6px;
+        border: none;
+        background: transparent;
+        font-size: 10px;
+        font-weight: 600;
+        color: #8a7060;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s;
+      }
+
+      .inspoclip-lang-btn.active {
+        background: white;
+        color: #c0784a;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+
+      .inspoclip-prompt {
+        font-size: 12px;
+        line-height: 1.6;
+        color: #4a3028;
+        background: white;
+        padding: 10px 12px;
+        border-radius: 10px;
+        max-height: 100px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+
+      /* Footer */
+      .inspoclip-modal-footer {
+        display: flex;
+        gap: 8px;
+        padding: 14px 18px;
+        border-top: 1px dashed #e8d5b0;
+        flex-shrink: 0;
+      }
+
+      .inspoclip-btn {
+        flex: 1;
+        padding: 10px 16px;
+        border: none;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .inspoclip-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+      .inspoclip-btn:active { transform: translateY(0); }
+      .inspoclip-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+      .inspoclip-btn-primary { background: #c0784a; color: white; }
+      .inspoclip-btn-secondary { background: #e8d5b0; color: #4a3028; }
+    `;
+  }
+})();
