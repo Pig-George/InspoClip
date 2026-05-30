@@ -33,7 +33,7 @@ router.get('/:date', async (req: Request, res: Response) => {
       .select()
       .from(images)
       .where(eq(images.weekId, weekId))
-      .orderBy(images.createdAt);
+      .orderBy(images.sortOrder, images.createdAt);
 
     const imageIds = weekImages.map((img) => img.id);
     let allTerms: any[] = [];
