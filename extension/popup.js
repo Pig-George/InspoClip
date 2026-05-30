@@ -126,26 +126,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Quick save button
+  // Quick save button — delegate to content script for similarity check
   captureBtn.addEventListener('click', async () => {
     captureBtn.disabled = true;
     captureBtn.innerHTML = `<span class="spinner"></span> <span>${t('saving')}</span>`;
 
     try {
-      const response = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: 'CAPTURE_AND_UPLOAD', serverUrl }, resolve);
-      });
-
-      if (response.success) {
-        showStatus(t('saved'), 'success');
-      } else {
-        showStatus(`Error: ${response.error}`, 'error');
-      }
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      await chrome.tabs.sendMessage(tab.id, { type: 'SAVE_IMAGE', imageUrl: null, isImage: false });
+      setTimeout(() => window.close(), 200);
     } catch (err) {
-      showStatus(`Error: ${err.message}`, 'error');
-    } finally {
-      captureBtn.disabled = false;
-      captureBtn.innerHTML = `<span class="btn-icon">📸</span> <span>${t('quickSave')}</span>`;
+      // Content script might not be injected
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+        setTimeout(async () => {
+          try {
+            await chrome.tabs.sendMessage(tab.id, { type: 'SAVE_IMAGE', imageUrl: null, isImage: false });
+            window.close();
+          } catch {
+            showStatus('Failed to start save', 'error');
+            captureBtn.disabled = false;
+            captureBtn.innerHTML = `<span class="btn-icon">📸</span> <span>${t('quickSave')}</span>`;
+          }
+        }, 500);
+      } catch {
+        showStatus('Cannot inject script on this page', 'error');
+        captureBtn.disabled = false;
+        captureBtn.innerHTML = `<span class="btn-icon">📸</span> <span>${t('quickSave')}</span>`;
+      }
     }
   });
 });

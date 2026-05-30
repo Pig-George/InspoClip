@@ -37,63 +37,17 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
-  // Save actions
+  // Save actions — delegate to content script for similarity check + UI
   if (info.menuItemId !== 'inspoclip-save-image' && info.menuItemId !== 'inspoclip-save-page') return;
 
   try {
-    const server = await getServerUrl();
-    const now = new Date();
-    const dow = now.getDay();
-    const dayOfWeek = dow === 0 ? 6 : dow - 1;
-    const monday = getMonday(now);
-    const dateStr = formatDate(monday);
-
-    const weekRes = await fetch(`${server}/api/weeks/${dateStr}`);
-    if (!weekRes.ok) throw new Error('Failed to get week');
-    const weekData = await weekRes.json();
-    const weekId = weekData.week.id;
-
-    let imageBlob;
-
-    if (info.mediaType === 'image' && info.srcUrl) {
-      try {
-        const response = await fetch(info.srcUrl);
-        imageBlob = await response.blob();
-      } catch {
-        const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
-        imageBlob = dataUrlToBlob(dataUrl);
-      }
-    } else {
-      const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
-      imageBlob = dataUrlToBlob(dataUrl);
-    }
-
-    const ext = imageBlob.type === 'image/png' ? '.png' : '.jpg';
-    const formData = new FormData();
-    formData.append('image', imageBlob, 'screenshot' + ext);
-    formData.append('weekId', weekId);
-    formData.append('dayOfWeek', String(dayOfWeek));
-
-    const uploadRes = await fetch(`${server}/api/images`, { method: 'POST', body: formData });
-    if (!uploadRes.ok) {
-      const err = await uploadRes.text();
-      throw new Error(`Upload failed: ${err}`);
-    }
-
-    chrome.notifications?.create({
-      type: 'basic',
-      iconUrl: 'icons/icon48.png',
-      title: 'InspoClip',
-      message: 'Inspiration saved successfully!',
+    await chrome.tabs.sendMessage(tab.id, {
+      type: 'SAVE_IMAGE',
+      imageUrl: info.srcUrl || null,
+      isImage: info.mediaType === 'image',
     });
   } catch (err) {
-    console.error('InspoClip save failed:', err);
-    chrome.notifications?.create({
-      type: 'basic',
-      iconUrl: 'icons/icon48.png',
-      title: 'InspoClip',
-      message: `Failed to save: ${err.message}`,
-    });
+    console.error('Failed to send save message:', err);
   }
 });
 

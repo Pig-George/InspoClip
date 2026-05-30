@@ -55,7 +55,151 @@
       doAnalyze(null);
       sendResponse({ ok: true });
     }
+    if (msg.type === 'SAVE_IMAGE') {
+      handleSave(msg.imageUrl, msg.isImage);
+      sendResponse({ ok: true });
+    }
   });
+
+  // ---- Analysis Flow ----
+
+  // ---- Save Flow ----
+
+  async function handleSave(imageUrl, isImage) {
+    showToast(locale === 'zh' ? '正在检查...' : 'Checking...');
+
+    try {
+      // Get image blob
+      let blob;
+      if (imageUrl && isImage) {
+        try {
+          const res = await fetch(imageUrl);
+          blob = await res.blob();
+        } catch {
+          blob = await captureTabAsBlob();
+        }
+      } else {
+        blob = await captureTabAsBlob();
+      }
+
+      // Check similarity
+      const ext = blob.type === 'image/png' ? '.png' : '.jpg';
+      const checkForm = new FormData();
+      checkForm.append('image', blob, 'check' + ext);
+
+      const checkRes = await fetch(`${serverUrl}/api/images/check-similarity`, {
+        method: 'POST',
+        body: checkForm,
+      });
+
+      let similar = [];
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        similar = checkData.similar || [];
+      }
+
+      if (similar.length > 0) {
+        // Show confirmation dialog
+        removeToast();
+        showSaveConfirmDialog(blob, similar);
+      } else {
+        // No similar, proceed with upload
+        await doUpload(blob);
+      }
+    } catch (err) {
+      // If check fails, proceed with upload anyway
+      showToast(locale === 'zh' ? '检查失败，直接保存...' : 'Check failed, saving...');
+      try {
+        let blob;
+        if (imageUrl && isImage) {
+          try { const res = await fetch(imageUrl); blob = await res.blob(); } catch { blob = await captureTabAsBlob(); }
+        } else {
+          blob = await captureTabAsBlob();
+        }
+        await doUpload(blob);
+      } catch (uploadErr) {
+        showToast(locale === 'zh' ? `保存失败: ${uploadErr.message}` : `Save failed: ${uploadErr.message}`, 'error');
+        setTimeout(removeToast, 3000);
+      }
+    }
+  }
+
+  function showSaveConfirmDialog(blob, similar) {
+    const dialog = document.createElement('div');
+    dialog.className = 'inspoclip-confirm-overlay';
+
+    const vw = window.innerWidth;
+    const targetX = vw - 360 - 20;
+
+    dialog.innerHTML = `
+      <div class="inspoclip-confirm" style="--target-x: ${targetX}px;">
+        <div class="inspoclip-confirm-header">
+          <span class="inspoclip-confirm-icon">⚠️</span>
+          <h3>${locale === 'zh' ? '发现相似图片' : 'Similar images found'}</h3>
+        </div>
+        <p class="inspoclip-confirm-desc">${locale === 'zh' ? '你可能已经收集过类似的灵感，确定要继续保存吗？' : 'You may have already collected similar inspiration. Continue saving?'}</p>
+        <div class="inspoclip-confirm-previews">
+          ${similar.slice(0, 3).map((img) => `<img src="${serverUrl}/api/uploads/${img.filePath}" />`).join('')}
+        </div>
+        <div class="inspoclip-confirm-actions">
+          <button class="inspoclip-btn inspoclip-btn-secondary inspoclip-confirm-cancel">${locale === 'zh' ? '取消' : 'Cancel'}</button>
+          <button class="inspoclip-btn inspoclip-btn-primary inspoclip-confirm-ok">${locale === 'zh' ? '继续保存' : 'Save anyway'}</button>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(dialog);
+    requestAnimationFrame(() => dialog.querySelector('.inspoclip-confirm').classList.add('inspoclip-confirm-visible'));
+
+    dialog.querySelector('.inspoclip-confirm-cancel').addEventListener('click', () => {
+      dialog.querySelector('.inspoclip-confirm').classList.remove('inspoclip-confirm-visible');
+      setTimeout(() => dialog.remove(), 300);
+    });
+
+    dialog.querySelector('.inspoclip-confirm-ok').addEventListener('click', async () => {
+      dialog.querySelector('.inspoclip-confirm').classList.remove('inspoclip-confirm-visible');
+      setTimeout(() => dialog.remove(), 300);
+      await doUpload(blob);
+    });
+
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        dialog.querySelector('.inspoclip-confirm').classList.remove('inspoclip-confirm-visible');
+        setTimeout(() => dialog.remove(), 300);
+      }
+    });
+  }
+
+  async function doUpload(blob) {
+    showToast(locale === 'zh' ? '正在保存...' : 'Saving...');
+
+    try {
+      const now = new Date();
+      const dow = now.getDay();
+      const dayOfWeek = dow === 0 ? 6 : dow - 1;
+      const monday = getMonday(now);
+      const dateStr = formatDate(monday);
+
+      const weekRes = await fetch(`${serverUrl}/api/weeks/${dateStr}`);
+      if (!weekRes.ok) throw new Error('Failed to get week');
+      const weekData = await weekRes.json();
+
+      const ext = blob.type === 'image/png' ? '.png' : '.jpg';
+      const formData = new FormData();
+      formData.append('image', blob, 'screenshot' + ext);
+      formData.append('weekId', weekData.week.id);
+      formData.append('dayOfWeek', String(dayOfWeek));
+
+      const uploadRes = await fetch(`${serverUrl}/api/images`, { method: 'POST', body: formData });
+      if (!uploadRes.ok) throw new Error('Upload failed');
+
+      showToast(locale === 'zh' ? '✓ 已保存到 InspoClip' : '✓ Saved to InspoClip', 'success');
+      setTimeout(removeToast, 2500);
+    } catch (err) {
+      showToast(locale === 'zh' ? `保存失败: ${err.message}` : `Save failed: ${err.message}`, 'error');
+      setTimeout(removeToast, 3000);
+    }
+  }
 
   // ---- Analysis Flow ----
 
@@ -1013,6 +1157,79 @@
 
       .inspoclip-btn-primary { background: #c0784a; color: white; }
       .inspoclip-btn-secondary { background: #e8d5b0; color: #4a3028; }
+
+      /* Confirm Dialog */
+      .inspoclip-confirm-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 2147483647;
+        pointer-events: auto;
+        animation: inspoclip-fade-in 0.2s ease;
+      }
+
+      .inspoclip-confirm {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        width: 340px;
+        background: #faf3e6;
+        border-radius: 14px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+        padding: 18px;
+        opacity: 0;
+        transform: scale(0.9) translateY(-10px);
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+
+      .inspoclip-confirm-visible {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+
+      .inspoclip-confirm-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .inspoclip-confirm-icon { font-size: 18px; }
+
+      .inspoclip-confirm-header h3 {
+        font-size: 14px;
+        font-weight: 700;
+        color: #4a3028;
+        margin: 0;
+      }
+
+      .inspoclip-confirm-desc {
+        font-size: 12px;
+        color: #8a7060;
+        margin: 0 0 12px 0;
+        line-height: 1.5;
+      }
+
+      .inspoclip-confirm-previews {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 14px;
+      }
+
+      .inspoclip-confirm-previews img {
+        width: 56px;
+        height: 56px;
+        object-fit: cover;
+        border-radius: 8px;
+        border: 1px solid #e8d5b0;
+      }
+
+      .inspoclip-confirm-actions {
+        display: flex;
+        gap: 8px;
+      }
 
       /* Floating Tab */
       .inspoclip-tab {
