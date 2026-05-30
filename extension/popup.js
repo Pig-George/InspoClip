@@ -12,19 +12,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   const testConnection = document.getElementById('testConnection');
   const saveSettings = document.getElementById('saveSettings');
   const serverInput = document.getElementById('serverUrl');
+  const appUrlInput = document.getElementById('appUrl');
   const connectionStatus = document.getElementById('connectionStatus');
   const openAppLink = document.getElementById('openApp');
 
   // Load saved settings
-  const result = await chrome.storage.sync.get(['serverUrl']);
+  const result = await chrome.storage.sync.get(['serverUrl', 'appUrl']);
   serverUrl = result.serverUrl || DEFAULT_SERVER;
+  const appUrl = result.appUrl || serverUrl.replace(/:3001$/, ':8080');
   serverInput.value = serverUrl;
+  appUrlInput.value = appUrl;
 
   // Open app link
-  openAppLink.href = serverUrl;
+  openAppLink.href = appUrl;
   openAppLink.addEventListener('click', (e) => {
     e.preventDefault();
-    chrome.tabs.create({ url: serverUrl });
+    chrome.tabs.create({ url: appUrl });
   });
 
   // Test connection on load
@@ -47,7 +50,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Save settings
   saveSettings.addEventListener('click', async () => {
     serverUrl = serverInput.value.trim().replace(/\/$/, '') || DEFAULT_SERVER;
-    await chrome.storage.sync.set({ serverUrl });
+    const newAppUrl = appUrlInput.value.trim().replace(/\/$/, '') || serverUrl.replace(/:3001$/, ':8080');
+    await chrome.storage.sync.set({ serverUrl, appUrl: newAppUrl });
+    openAppLink.href = newAppUrl;
     showStatus('Settings saved!', 'success');
     testServerConnection();
     setTimeout(() => hideStatus(), 2000);
