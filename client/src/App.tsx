@@ -6,10 +6,12 @@ import { DayView } from '@/components/DayView';
 import { WeekView } from '@/components/WeekView';
 import { TimelineView } from '@/components/TimelineView';
 import { ToastContainer, toast } from '@/components/Toast';
-import { fetchWeek, uploadImage } from '@/lib/api';
+import { fetchWeek, uploadImage, checkSimilarity } from '@/lib/api';
+import type { SimilarImage } from '@/lib/api';
 import { setLastUploadedImageId } from '@/lib/events';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useLanguage } from '@/context/LanguageContext';
+import { SimilarityConfirmDialog } from '@/components/SimilarityConfirmDialog';
 import { getMonday, formatISODate } from '@/lib/utils';
 import type { WeekData, ViewMode } from '@/types';
 
@@ -22,6 +24,9 @@ function AppInner() {
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [searchOpen, setSearchOpen] = useState(false);
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
+  const [pasteSimilarOpen, setPasteSimilarOpen] = useState(false);
+  const [pasteSimilarImages, setPasteSimilarImages] = useState<SimilarImage[]>([]);
+  const pendingPasteRef = useState<{ file: File; weekId: string; dayOfWeek: number } | null>(null);
   const { locale } = useLanguage();
 
   const loadWeek = useCallback(async (monday: Date) => {
@@ -40,14 +45,36 @@ function AppInner() {
     loadWeek(currentMonday);
   }, [currentMonday, loadWeek]);
 
-  // Global paste handler — paste image anywhere uploads to today
+  // Helper: perform the actual upload
+  const doPasteUpload = useCallback(async (file: File) => {
+    setUploading(true);
+    try {
+      const now = new Date();
+      const dow = now.getDay();
+      const dayOfWeek = dow === 0 ? 6 : dow - 1;
+      const todayMonday = getMonday(now);
+      const weekData = await fetchWeek(formatISODate(todayMonday));
+      const result = await uploadImage(file, weekData.week.id, dayOfWeek);
+      if (result?.id) setLastUploadedImageId(result.id);
+      setCurrentMonday(todayMonday);
+      setUploadTick((t) => t + 1);
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.includes('413') || msg.includes('too large') || msg.includes('size')) {
+        toast('error', '图片过大，请压缩后再试');
+      } else {
+        toast('error', `上传失败: ${msg}`);
+      }
+    } finally {
+      setUploading(false);
+    }
+  }, []);
+
+  // Global paste handler — check similarity before upload
   useEffect(() => {
     const handler = async (e: ClipboardEvent) => {
-      // Don't intercept when pasting into inputs/textareas
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return;
-      }
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
 
       const items = e.clipboardData?.items;
       if (!items) return;
@@ -62,39 +89,58 @@ function AppInner() {
       if (!file) return;
 
       e.preventDefault();
-      setUploading(true);
 
+      // Check similarity first
       try {
-        // Compute today's dayOfWeek (0=Mon...6=Sun)
-        const now = new Date();
-        const dow = now.getDay();
-        const dayOfWeek = dow === 0 ? 6 : dow - 1;
-
-        // Get today's week
-        const todayMonday = getMonday(now);
-        const weekData = await fetchWeek(formatISODate(todayMonday));
-        const result = await uploadImage(file, weekData.week.id, dayOfWeek);
-
-        // Set last uploaded ID for auto-open detail modal
-        if (result?.id) setLastUploadedImageId(result.id);
-
-        // Navigate to today's week and force DayView refresh
-        setCurrentMonday(todayMonday);
-        setUploadTick((t) => t + 1);
-      } catch (err: any) {
-        const msg = err?.message || String(err);
-        if (msg.includes('413') || msg.includes('too large') || msg.includes('size')) {
-          toast('error', '图片过大，请压缩后再试');
-        } else {
-          toast('error', `上传失败: ${msg}`);
+        const similar = await checkSimilarity(file);
+        if (similar.length > 0) {
+          // Store pending file and show confirmation
+          const now = new Date();
+          const dow = now.getDay();
+          const dayOfWeek = dow === 0 ? 6 : dow - 1;
+          const todayMonday = getMonday(now);
+          const weekData = await fetchWeek(formatISODate(todayMonday));
+          pendingPasteRef.current = { file, weekId: weekData.week.id, dayOfWeek };
+          setPasteSimilarImages(similar);
+          setPasteSimilarOpen(true);
+          return;
         }
-      } finally {
-        setUploading(false);
+      } catch {
+        // If check fails, proceed with upload
       }
+
+      doPasteUpload(file);
     };
 
     document.addEventListener('paste', handler);
     return () => document.removeEventListener('paste', handler);
+  }, [doPasteUpload]);
+
+  // Similarity confirm/cancel for paste
+  const handlePasteConfirm = useCallback(async () => {
+    setPasteSimilarOpen(false);
+    setPasteSimilarImages([]);
+    const pending = pendingPasteRef.current;
+    pendingPasteRef.current = null;
+    if (!pending) return;
+
+    setUploading(true);
+    try {
+      const result = await uploadImage(pending.file, pending.weekId, pending.dayOfWeek);
+      if (result?.id) setLastUploadedImageId(result.id);
+      setCurrentMonday(getMonday(new Date()));
+      setUploadTick((t) => t + 1);
+    } catch (err: any) {
+      toast('error', `上传失败: ${err?.message || err}`);
+    } finally {
+      setUploading(false);
+    }
+  }, []);
+
+  const handlePasteCancel = useCallback(() => {
+    setPasteSimilarOpen(false);
+    setPasteSimilarImages([]);
+    pendingPasteRef.current = null;
   }, []);
 
   const goToPrevWeek = () => {
@@ -204,6 +250,14 @@ function AppInner() {
           Uploading to today...
         </div>
       )}
+
+      {/* Similarity confirmation for paste upload */}
+      <SimilarityConfirmDialog
+        open={pasteSimilarOpen}
+        similarImages={pasteSimilarImages}
+        onConfirm={handlePasteConfirm}
+        onCancel={handlePasteCancel}
+      />
     </div>
   );
 }
