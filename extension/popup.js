@@ -41,6 +41,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Test connection button
   testConnection.addEventListener('click', testServerConnection);
 
+  // Click on connection status dot also tests
+  connectionStatus.addEventListener('click', testServerConnection);
+
   // Save settings
   saveSettings.addEventListener('click', async () => {
     serverUrl = serverInput.value.trim().replace(/\/$/, '') || DEFAULT_SERVER;
@@ -185,33 +188,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Test server connection
 async function testServerConnection() {
-  const status = document.getElementById('connectionStatus');
+  const statusEl = document.getElementById('connectionStatus');
+  const labelEl = document.getElementById('connectionLabel');
   const testBtn = document.getElementById('testConnection');
-  status.className = 'connection-status';
-  status.title = 'Testing...';
+
+  // Start testing state
+  statusEl.className = 'connection-status testing';
+  labelEl.textContent = '...';
   testBtn.disabled = true;
-  testBtn.textContent = 'Testing...';
-  showStatus('Testing connection...', 'loading');
 
   try {
     const res = await fetch(`${serverUrl}/api/health`, { signal: AbortSignal.timeout(3000) });
     if (res.ok) {
-      status.className = 'connection-status connected';
-      status.title = 'Connected';
-      showStatus('✓ Connected to server', 'success');
+      statusEl.className = 'connection-status connected';
+      statusEl.title = 'Connected';
+      labelEl.textContent = 'Connected';
+      // Auto-hide label after 3s
+      setTimeout(() => {
+        labelEl.textContent = '';
+        statusEl.className = 'connection-status connected';
+      }, 3000);
     } else {
-      status.className = 'connection-status error';
-      status.title = 'Server error';
-      showStatus('✗ Server returned an error', 'error');
+      statusEl.className = 'connection-status error';
+      statusEl.title = 'Server error';
+      labelEl.textContent = 'Error';
     }
   } catch {
-    status.className = 'connection-status error';
-    status.title = 'Cannot connect';
-    showStatus('✗ Cannot connect to server', 'error');
+    statusEl.className = 'connection-status error';
+    statusEl.title = 'Cannot connect';
+    labelEl.textContent = 'Offline';
   } finally {
     testBtn.disabled = false;
-    testBtn.textContent = 'Test';
-    setTimeout(() => hideStatus(), 3000);
   }
 }
 
