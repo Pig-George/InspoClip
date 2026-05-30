@@ -26,8 +26,10 @@
   // State
   let currentToast = null;
   let currentModal = null;
+  let currentTab = null;
   let analyzedData = null;
   let capturedBlob = null;
+  let lastPreviewUrl = null;
   let serverUrl = 'http://localhost:3001';
   let locale = (navigator.language || 'en').startsWith('zh') ? 'zh' : 'en';
   let promptLangMode = 'auto';
@@ -53,6 +55,11 @@
   // ---- Analysis Flow ----
 
   async function doAnalyze(imageUrl) {
+    // Remove any existing floating tab
+    removeFloatingTab();
+    analyzedData = null;
+    capturedBlob = null;
+
     // Phase 1: Show toast
     showToast(locale === 'zh' ? '正在分析...' : 'Analyzing...');
 
@@ -83,7 +90,8 @@
       analyzedData = await res.json();
 
       // Phase 2: Transition toast → modal
-      transitionToModal(analyzedData, imageUrl ? URL.createObjectURL(capturedBlob) : null);
+      lastPreviewUrl = imageUrl ? URL.createObjectURL(capturedBlob) : null;
+      transitionToModal(analyzedData, lastPreviewUrl);
     } catch (err) {
       showToast(locale === 'zh' ? `分析失败: ${err.message}` : `Analysis failed: ${err.message}`, 'error');
       setTimeout(() => removeToast(), 3000);
@@ -322,11 +330,81 @@
       const overlay = currentModal;
       const modal = overlay.querySelector('.inspoclip-modal');
       if (modal) modal.classList.remove('inspoclip-modal-visible');
-      setTimeout(() => overlay.remove(), 350);
+      setTimeout(() => {
+        overlay.remove();
+        // Show floating tab after modal is gone, if we have data
+        if (analyzedData) showFloatingTab();
+      }, 350);
       currentModal = null;
     }
-    analyzedData = null;
-    capturedBlob = null;
+  }
+
+  function showFloatingTab() {
+    removeFloatingTab();
+
+    const tab = document.createElement('div');
+    tab.className = 'inspoclip-tab';
+    tab.innerHTML = `<span class="inspoclip-tab-arrow">◂</span><span class="inspoclip-tab-label">InspoClip</span>`;
+
+    // Restore last position
+    const savedTop = localStorage.getItem('inspoclip-tab-top');
+    if (savedTop) tab.style.top = savedTop + 'px';
+
+    container.appendChild(tab);
+    currentTab = tab;
+
+    // Animate in
+    requestAnimationFrame(() => tab.classList.add('inspoclip-tab-visible'));
+
+    // Click to reopen modal
+    tab.addEventListener('click', (e) => {
+      if (tab._dragging) return;
+      removeFloatingTab();
+      showModal(analyzedData, lastPreviewUrl, window.innerWidth - 20, 20);
+    });
+
+    // Drag to reposition
+    let dragStartY = 0;
+    let startTop = 0;
+    let isDragging = false;
+
+    tab.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isDragging = false;
+      dragStartY = e.clientY;
+      startTop = tab.getBoundingClientRect().top;
+      tab._dragging = false;
+
+      const onMove = (ev) => {
+        const dy = ev.clientY - dragStartY;
+        if (Math.abs(dy) > 3) {
+          isDragging = true;
+          tab._dragging = true;
+          const newTop = Math.max(0, Math.min(window.innerHeight - 40, startTop + dy));
+          tab.style.top = newTop + 'px';
+        }
+      };
+
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        // Save position
+        localStorage.setItem('inspoclip-tab-top', parseInt(tab.style.top));
+        // Reset dragging flag after a tick (so click handler can check it)
+        setTimeout(() => { tab._dragging = false; }, 50);
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  function removeFloatingTab() {
+    if (currentTab) {
+      currentTab.classList.remove('inspoclip-tab-visible');
+      setTimeout(() => currentTab?.remove(), 300);
+      currentTab = null;
+    }
   }
 
   // ---- Render Functions ----
@@ -769,6 +847,53 @@
 
       .inspoclip-btn-primary { background: #c0784a; color: white; }
       .inspoclip-btn-secondary { background: #e8d5b0; color: #4a3028; }
+
+      /* Floating Tab */
+      .inspoclip-tab {
+        position: fixed;
+        right: -4px;
+        top: 50%;
+        transform: translateY(-50%) translateX(100%);
+        z-index: 2147483646;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 10px 8px 10px 12px;
+        background: #c0784a;
+        color: white;
+        border-radius: 10px 0 0 10px;
+        cursor: pointer;
+        box-shadow: -2px 2px 12px rgba(0,0,0,0.15);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), right 0.2s ease;
+        user-select: none;
+        pointer-events: auto;
+        writing-mode: horizontal-tb;
+      }
+
+      .inspoclip-tab-visible {
+        transform: translateY(-50%) translateX(0);
+      }
+
+      .inspoclip-tab:hover {
+        right: 0;
+      }
+
+      .inspoclip-tab-arrow {
+        font-size: 14px;
+        line-height: 1;
+        transition: transform 0.2s;
+      }
+
+      .inspoclip-tab:hover .inspoclip-tab-arrow {
+        transform: translateX(-2px);
+      }
+
+      .inspoclip-tab-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        white-space: nowrap;
+      }
     `;
   }
 })();
