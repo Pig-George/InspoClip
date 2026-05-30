@@ -131,6 +131,12 @@
     const vw = window.innerWidth;
     const targetX = vw - 360 - 20;
 
+    // Build preview HTML with placeholder, load actual images async
+    const previewImgs = similar.slice(0, 3).map((img, i) => {
+      const imgEl = `<img data-idx="${i}" class="inspoclip-confirm-img" />`;
+      return imgEl;
+    }).join('');
+
     dialog.innerHTML = `
       <div class="inspoclip-confirm" style="--target-x: ${targetX}px;">
         <div class="inspoclip-confirm-header">
@@ -139,7 +145,7 @@
         </div>
         <p class="inspoclip-confirm-desc">${locale === 'zh' ? '你可能已经收集过类似的灵感，确定要继续保存吗？' : 'You may have already collected similar inspiration. Continue saving?'}</p>
         <div class="inspoclip-confirm-previews">
-          ${similar.slice(0, 3).map((img) => `<img src="${serverUrl}/api/uploads/${img.filePath}" />`).join('')}
+          ${previewImgs}
         </div>
         <div class="inspoclip-confirm-actions">
           <button class="inspoclip-btn inspoclip-btn-secondary inspoclip-confirm-cancel">${locale === 'zh' ? '取消' : 'Cancel'}</button>
@@ -149,6 +155,21 @@
     `;
 
     container.appendChild(dialog);
+
+    // Load preview images via fetch to avoid CORS/mixed-content issues
+    similar.slice(0, 3).forEach((img, i) => {
+      const imgEl = dialog.querySelector(`img[data-idx="${i}"]`);
+      if (!imgEl) return;
+      fetch(`${serverUrl}/api/uploads/${img.filePath}`)
+        .then((res) => res.blob())
+        .then((imgBlob) => {
+          imgEl.src = URL.createObjectURL(imgBlob);
+        })
+        .catch(() => {
+          imgEl.style.display = 'none';
+        });
+    });
+
     requestAnimationFrame(() => dialog.querySelector('.inspoclip-confirm').classList.add('inspoclip-confirm-visible'));
 
     dialog.querySelector('.inspoclip-confirm-cancel').addEventListener('click', () => {
