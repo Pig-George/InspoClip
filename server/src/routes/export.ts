@@ -7,7 +7,7 @@ import path from 'path';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const archiver = require('archiver');
+const { ZipArchive } = require('archiver');
 
 const router = Router();
 
@@ -102,7 +102,7 @@ router.get('/week/:date', async (req: Request, res: Response) => {
       res.setHeader('Content-Type', 'application/zip');
       res.setHeader('Content-Disposition', `attachment; filename="inspoclip-${mondayStr}.zip"`);
 
-      const archive = archiver('zip', { zlib: { level: 6 } });
+      const archive = new ZipArchive();
       archive.pipe(res);
 
       // Add metadata JSON
