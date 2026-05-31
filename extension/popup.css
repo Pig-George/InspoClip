@@ -254,42 +254,60 @@ body {
   animation: slideUp 0.35s ease 0.2s backwards;
 }
 
-.settings-section summary {
+.settings-toggle {
   font-size: 12px;
   color: #8a7060;
   cursor: pointer;
   padding: 6px 0;
   outline: none;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
   transition: color 0.2s;
-  list-style: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  font-family: inherit;
 }
 
-.settings-section summary::-webkit-details-marker { display: none; }
+.settings-toggle:hover { color: #c0784a; }
 
-.settings-section summary::before {
-  content: '▸';
-  display: inline-block;
-  transition: transform 0.25s ease;
-  font-size: 10px;
+.settings-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
 }
 
-.settings-section[open] summary::before {
+.settings-arrow.open {
   transform: rotate(90deg);
 }
 
-.settings-section summary:hover { color: #c0784a; }
-
-.settings-body {
-  padding-top: 8px;
-  animation: settingsExpand 0.3s ease;
+.settings-body-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes settingsExpand {
-  from { opacity: 0; max-height: 0; transform: translateY(-6px); }
-  to { opacity: 1; max-height: 300px; transform: translateY(0); }
+.settings-body-wrapper.open {
+  grid-template-rows: 1fr;
+}
+
+.settings-body {
+  overflow: hidden;
+  padding-top: 0;
+  opacity: 0;
+  transition: opacity 0.25s ease, padding 0.35s ease;
+}
+
+.settings-body-wrapper.open .settings-body {
+  padding-top: 8px;
+  opacity: 1;
 }
 
 .settings-body label {

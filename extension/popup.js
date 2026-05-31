@@ -75,6 +75,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Settings toggle
+  const settingsToggle = document.getElementById('settingsToggle');
+  const settingsArrow = document.getElementById('settingsArrow');
+  const settingsWrapper = document.getElementById('settingsWrapper');
+  let settingsOpen = false;
+  settingsToggle.addEventListener('click', () => {
+    settingsOpen = !settingsOpen;
+    settingsArrow.classList.toggle('open', settingsOpen);
+    settingsWrapper.classList.toggle('open', settingsOpen);
+  });
+
   // Test connection
   testServerConnection();
   testConnection.addEventListener('click', testServerConnection);

@@ -42,21 +42,26 @@
     </div>
 
     <!-- Settings (collapsed by default) -->
-    <details class="settings-section">
-      <summary data-i18n="settings">Settings</summary>
-      <div class="settings-body">
-        <label for="serverUrl">Server URL</label>
-        <div class="input-row">
-          <input type="text" id="serverUrl" placeholder="http://localhost:3001" />
-          <button id="testConnection" class="btn btn-small" data-i18n="test">Test</button>
+    <div class="settings-section">
+      <button class="settings-toggle" id="settingsToggle">
+        <span class="settings-arrow" id="settingsArrow">▸</span>
+        <span data-i18n="settings">Settings</span>
+      </button>
+      <div class="settings-body-wrapper" id="settingsWrapper">
+        <div class="settings-body">
+          <label for="serverUrl">Server URL</label>
+          <div class="input-row">
+            <input type="text" id="serverUrl" placeholder="http://localhost:3001" />
+            <button id="testConnection" class="btn btn-small" data-i18n="test">Test</button>
+          </div>
+          <label for="appUrl">Frontend URL</label>
+          <div class="input-row">
+            <input type="text" id="appUrl" placeholder="http://localhost:8080" />
+          </div>
+          <button id="saveSettings" class="btn btn-small btn-full" data-i18n="saveSettings">Save Settings</button>
         </div>
-        <label for="appUrl">Frontend URL</label>
-        <div class="input-row">
-          <input type="text" id="appUrl" placeholder="http://localhost:8080" />
-        </div>
-        <button id="saveSettings" class="btn btn-small btn-full" data-i18n="saveSettings">Save Settings</button>
       </div>
-    </details>
+    </div>
 
     <!-- Footer -->
     <div class="footer">
