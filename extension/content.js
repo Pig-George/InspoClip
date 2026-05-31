@@ -36,6 +36,7 @@
   // Analysis history
   let analysisHistory = []; // [{data, previewUrl, timestamp}]
   let historyIndex = -1;
+  let savedImageHashes = new Set(); // Track which analyses have been saved
   let serverUrl = 'http://localhost:3001';
   let locale = (navigator.language || 'en').startsWith('zh') ? 'zh' : 'en';
   let promptLangMode = 'auto';
@@ -587,7 +588,8 @@
 
       // Phase 2: Save to history and transition toast → modal
       lastPreviewUrl = imageUrl ? URL.createObjectURL(capturedBlob) : null;
-      analysisHistory.push({ data: analyzedData, previewUrl: lastPreviewUrl, timestamp: Date.now() });
+      const entryId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      analysisHistory.push({ id: entryId, data: analyzedData, previewUrl: lastPreviewUrl, timestamp: Date.now(), saved: false });
       historyIndex = analysisHistory.length - 1;
       transitionToModal(analyzedData, lastPreviewUrl);
     } catch (err) {
@@ -753,9 +755,11 @@
 
         <div class="inspoclip-modal-footer">
           <button class="inspoclip-btn inspoclip-btn-secondary inspoclip-close-btn">${locale === 'zh' ? '关闭' : 'Close'}</button>
-          <button class="inspoclip-btn inspoclip-btn-primary inspoclip-upload-btn">
-            ${locale === 'zh' ? '保存到 InspoClip' : 'Save to InspoClip'}
-          </button>
+          ${analysisHistory[historyIndex]?.saved ? '' : `
+            <button class="inspoclip-btn inspoclip-btn-primary inspoclip-upload-btn">
+              ${locale === 'zh' ? '保存到 InspoClip' : 'Save to InspoClip'}
+            </button>
+          `}
         </div>
       </div>
     `;
@@ -870,21 +874,27 @@
         const uploadRes = await fetch(`${serverUrl}/api/images`, { method: 'POST', body: formData });
         if (!uploadRes.ok) throw new Error('Upload failed');
 
+        // Mark current analysis as saved
+        if (historyIndex >= 0 && analysisHistory[historyIndex]) {
+          analysisHistory[historyIndex].saved = true;
+        }
+
         // Success — show saved text, then shrink and hide the button
         btn.textContent = locale === 'zh' ? '✓ 已保存' : '✓ Saved';
         btn.style.background = '#4caf50';
         btn.style.borderColor = '#4caf50';
+        btn.style.flex = 'none';
+        btn.style.whiteSpace = 'nowrap';
 
         setTimeout(() => {
-          btn.style.transition = 'max-width 0.35s ease, opacity 0.25s ease, padding 0.35s ease, margin 0.35s ease';
-          btn.style.overflow = 'hidden';
-          btn.style.maxWidth = btn.scrollWidth + 'px';
+          btn.style.transition = 'width 0.35s ease, opacity 0.25s ease, padding 0.35s ease, margin 0.35s ease';
+          btn.style.width = btn.offsetWidth + 'px';
           requestAnimationFrame(() => {
-            btn.style.maxWidth = '0';
+            btn.style.width = '0';
             btn.style.opacity = '0';
-            btn.style.paddingLeft = '0';
-            btn.style.paddingRight = '0';
-            btn.style.marginLeft = '0';
+            btn.style.padding = '0';
+            btn.style.margin = '0';
+            btn.style.borderWidth = '0';
           });
           setTimeout(() => btn.remove(), 400);
         }, 1000);
@@ -981,6 +991,29 @@
       } else {
         badge.style.display = 'none';
       }
+    }
+
+    // Update save button visibility based on saved state
+    const footer = currentModal?.querySelector('.inspoclip-modal-footer');
+    const existingBtn = footer?.querySelector('.inspoclip-upload-btn');
+    if (entry.saved) {
+      if (existingBtn) existingBtn.remove();
+    } else if (!existingBtn && footer) {
+      const closeBtn = footer.querySelector('.inspoclip-close-btn');
+      const newBtn = document.createElement('button');
+      newBtn.className = 'inspoclip-btn inspoclip-btn-primary inspoclip-upload-btn';
+      newBtn.textContent = locale === 'zh' ? '保存到 InspoClip' : 'Save to InspoClip';
+      newBtn.addEventListener('click', async () => {
+        if (analyzedData.similarImages?.length > 0) {
+          showSaveConfirmDialog(capturedBlob, analyzedData.similarImages, async () => {
+            await doModalUpload(currentModal);
+          });
+        } else {
+          await doModalUpload(currentModal);
+        }
+      });
+      if (closeBtn) closeBtn.after(newBtn);
+      else footer.appendChild(newBtn);
     }
   }
 
