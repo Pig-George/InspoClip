@@ -84,6 +84,7 @@ async function initDB() {
     );
     ALTER TABLE images ADD COLUMN IF NOT EXISTS phash TEXT;
     ALTER TABLE images ADD COLUMN IF NOT EXISTS ahash TEXT;
+    ALTER TABLE images ADD COLUMN IF NOT EXISTS colorhash TEXT;
     ALTER TABLE images ADD COLUMN IF NOT EXISTS thumbnail_path TEXT;
     ALTER TABLE images ADD COLUMN IF NOT EXISTS sort_order SMALLINT NOT NULL DEFAULT 0;
   `);

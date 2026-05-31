@@ -22,15 +22,16 @@ router.post('/check-similarity', upload.single('image'), async (req: Request, re
       return;
     }
 
-    const { phash, ahash } = await computeHashes(file.path);
+    const { phash, ahash, colorhash } = await computeHashes(file.path);
 
     const allImages = await db
-      .select({ id: images.id, phash: images.phash, ahash: images.ahash, filePath: images.filePath })
+      .select({ id: images.id, phash: images.phash, ahash: images.ahash, colorhash: images.colorhash, filePath: images.filePath })
       .from(images)
       .where(sql`${images.phash} IS NOT NULL`);
 
     const similar = allImages
-      .filter((img) => img.phash && img.ahash && areSimilar(phash, ahash, img.phash, img.ahash))
+      .filter((img) => img.phash && img.ahash && img.colorhash &&
+        areSimilar(phash, ahash, colorhash, img.phash, img.ahash, img.colorhash))
       .slice(0, 5)
       .map((img) => ({ id: img.id, filePath: img.filePath }));
 
@@ -52,11 +53,10 @@ router.post('/analyze', upload.single('image'), async (req: Request, res: Respon
       return;
     }
 
-    // Run all analyses in parallel, including similarity check
-    const [terms, colors, hashes] = await Promise.all([
+    // Run all analyses in parallel
+    const [terms, colors] = await Promise.all([
       generateTerms(file.path).catch(() => ['design element']),
       extractColors(file.path).catch(() => []),
-      computeHashes(file.path).catch(() => null),
     ]);
 
     // Generate prompt
@@ -64,22 +64,6 @@ router.post('/analyze', upload.single('image'), async (req: Request, res: Respon
     try {
       prompt = await generateDesignPrompt(file.path);
     } catch { /* ignore */ }
-
-    // Check for similar images
-    let similar: { id: string; filePath: string }[] = [];
-    if (hashes) {
-      try {
-        const allImages = await db
-          .select({ id: images.id, phash: images.phash, ahash: images.ahash, filePath: images.filePath })
-          .from(images)
-          .where(sql`${images.phash} IS NOT NULL`);
-
-        similar = allImages
-          .filter((img) => img.phash && img.ahash && areSimilar(hashes.phash, hashes.ahash, img.phash, img.ahash))
-          .slice(0, 5)
-          .map((img) => ({ id: img.id, filePath: img.filePath }));
-      } catch { /* ignore */ }
-    }
 
     // Clean up temp file
     const fs = await import('fs/promises');
@@ -89,7 +73,6 @@ router.post('/analyze', upload.single('image'), async (req: Request, res: Respon
       terms,
       colors,
       prompt,
-      similar,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -160,19 +143,20 @@ router.post('/', upload.single('image'), async (req: Request, res: Response) => 
       })
       .catch((err) => console.error('Color extraction failed:', err.message));
 
-    // Compute dual-hash and detect similar images
+    // Compute triple-hash and detect similar images
     let similarImages: any[] = [];
     try {
-      const { phash, ahash } = await computeHashes(file.path);
-      await db.update(images).set({ phash, ahash }).where(eq(images.id, image.id));
+      const { phash, ahash, colorhash } = await computeHashes(file.path);
+      await db.update(images).set({ phash, ahash, colorhash }).where(eq(images.id, image.id));
 
       const allImages = await db
-        .select({ id: images.id, phash: images.phash, ahash: images.ahash, filePath: images.filePath })
+        .select({ id: images.id, phash: images.phash, ahash: images.ahash, colorhash: images.colorhash, filePath: images.filePath })
         .from(images)
         .where(sql`${images.phash} IS NOT NULL AND ${images.id} != ${image.id}`);
 
       similarImages = allImages
-        .filter((img) => img.phash && img.ahash && areSimilar(phash, ahash, img.phash, img.ahash))
+        .filter((img) => img.phash && img.ahash && img.colorhash &&
+          areSimilar(phash, ahash, colorhash, img.phash, img.ahash, img.colorhash))
         .slice(0, 5)
         .map((img) => ({ id: img.id, filePath: img.filePath }));
     } catch (err: any) {

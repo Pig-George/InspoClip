@@ -5,15 +5,14 @@ import sharp from 'sharp';
  * Returns a 64-bit hash as a 16-char hex string.
  */
 export async function computePhash(imagePath: string): Promise<string> {
-  // Resize to 32x32 grayscale for DCT
   const { data } = await sharp(imagePath)
     .resize(32, 32, { fit: 'fill' })
     .grayscale()
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  // Apply simplified DCT: 8x8 block averages from top-left 8x8 of the 32x32 image
-  // (better than averaging the whole image — preserves frequency info)
+  // Compute 8x8 block averages from the 32x32 image
+  // Each block is 4x4 pixels
   const blockSize = 4;
   const blocks: number[] = [];
 
@@ -31,7 +30,7 @@ export async function computePhash(imagePath: string): Promise<string> {
     }
   }
 
-  // Use mean (not median) for more stable hash
+  // Use mean for hash threshold
   const mean = blocks.reduce((a, b) => a + b, 0) / blocks.length;
 
   let hash = 0n;
@@ -71,14 +70,49 @@ export async function computeAHash(imagePath: string): Promise<string> {
 }
 
 /**
- * Compute both hashes for an image.
+ * Compute color histogram hash — captures color distribution.
+ * Useful for distinguishing images with same structure but different colors.
  */
-export async function computeHashes(imagePath: string): Promise<{ phash: string; ahash: string }> {
-  const [phash, ahash] = await Promise.all([
+export async function computeColorHash(imagePath: string): Promise<string> {
+  const { data } = await sharp(imagePath)
+    .resize(16, 16, { fit: 'fill' })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  // Compute color distribution in 4 bins per channel (64 total bins)
+  const bins = new Uint32Array(64);
+  const binSize = 64; // 256 / 4
+
+  for (let i = 0; i < data.length; i += 3) {
+    const rBin = Math.min(3, Math.floor(data[i] / binSize));
+    const gBin = Math.min(3, Math.floor(data[i + 1] / binSize));
+    const bBin = Math.min(3, Math.floor(data[i + 2] / binSize));
+    bins[rBin * 16 + gBin * 4 + bBin]++;
+  }
+
+  // Normalize to 0-15 range and create a hash
+  const totalPixels = 16 * 16;
+  let hash = 0n;
+  for (let i = 0; i < 64; i++) {
+    const normalized = Math.floor((bins[i] / totalPixels) * 15);
+    if (normalized > 7) { // above average density
+      hash |= 1n << BigInt(i);
+    }
+  }
+
+  return hash.toString(16).padStart(16, '0');
+}
+
+/**
+ * Compute all hashes for an image.
+ */
+export async function computeHashes(imagePath: string): Promise<{ phash: string; ahash: string; colorhash: string }> {
+  const [phash, ahash, colorhash] = await Promise.all([
     computePhash(imagePath),
     computeAHash(imagePath),
+    computeColorHash(imagePath),
   ]);
-  return { phash, ahash };
+  return { phash, ahash, colorhash };
 }
 
 export function hammingDistance(hash1: string, hash2: string): number {
@@ -94,30 +128,35 @@ export function hammingDistance(hash1: string, hash2: string): number {
 }
 
 /**
- * Check if two images are similar using dual-hash verification.
+ * Check if two images are similar using triple-hash verification.
  *
  * Strategy:
- * - aHash distance <= 5: very likely same image (even with minor edits)
- * - pHash distance <= 8: similar visual structure
- * - Both must pass their respective thresholds
+ * - aHash: exact/near-exact duplicates (low threshold)
+ * - pHash: structural similarity (resized, cropped, slight edits)
+ * - colorHash: same visual content with color shifts
  *
- * For exact duplicates, aHash will be 0.
- * For resized/cropped versions, pHash catches structural similarity.
+ * Decision logic:
+ * - aHash ≤ 2: very likely same image (even with minor edits) → similar
+ * - aHash ≤ 5 AND pHash ≤ 6: similar structure with minor pixel diff → similar
+ * - pHash ≤ 4 AND colorHash ≤ 8: same layout, similar colors → similar
+ * - Otherwise: not similar
  */
 export function areSimilar(
-  phash1: string, ahash1: string,
-  phash2: string, ahash2: string,
-  pThreshold: number = 8,
-  aThreshold: number = 12
+  phash1: string, ahash1: string, colorhash1: string,
+  phash2: string, ahash2: string, colorhash2: string,
 ): boolean {
-  const pDist = hammingDistance(phash1, phash2);
   const aDist = hammingDistance(ahash1, ahash2);
+  const pDist = hammingDistance(phash1, phash2);
+  const cDist = hammingDistance(colorhash1, colorhash2);
 
-  // Exact or near-exact duplicate
-  if (aDist <= 3) return true;
+  // Near-exact duplicate
+  if (aDist <= 2) return true;
 
-  // Structural similarity (resized, slightly different crop)
-  if (pDist <= pThreshold && aDist <= aThreshold) return true;
+  // Same structure with minor pixel differences
+  if (aDist <= 5 && pDist <= 6) return true;
+
+  // Same layout, similar color distribution
+  if (pDist <= 4 && cDist <= 8) return true;
 
   return false;
 }
