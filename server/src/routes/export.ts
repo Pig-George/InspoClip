@@ -4,7 +4,10 @@ import { weeks, images, terms as termsTable } from '../db/schema.js';
 import { eq, inArray } from 'drizzle-orm';
 import fs from 'fs/promises';
 import path from 'path';
-import archiver from 'archiver';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const archiver = require('archiver');
 
 const router = Router();
 
