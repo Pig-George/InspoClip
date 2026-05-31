@@ -85,49 +85,111 @@
     selection.className = 'inspoclip-area-selection';
     selection.style.display = 'none';
 
+    // Hover highlight element
+    const hoverHighlight = document.createElement('div');
+    hoverHighlight.className = 'inspoclip-area-hover';
+    hoverHighlight.style.display = 'none';
+
     overlay.appendChild(instructions);
+    overlay.appendChild(hoverHighlight);
     overlay.appendChild(selection);
     container.appendChild(overlay);
     areaOverlay = overlay;
 
     let startX = 0, startY = 0;
     let isDrawing = false;
+    let hoveredRect = null;
+    const DRAG_THRESHOLD = 5;
+
+    // Find the element under the overlay by temporarily hiding it
+    function getElementAtPoint(x, y) {
+      overlay.style.pointerEvents = 'none';
+      const el = document.elementFromPoint(x, y);
+      overlay.style.pointerEvents = 'auto';
+      return el;
+    }
+
+    // Get a meaningful element's bounding rect (skip tiny/hidden elements)
+    function getSmartRect(el) {
+      if (!el || el === document.body || el === document.documentElement) return null;
+      const rect = el.getBoundingClientRect();
+      // Skip very small elements
+      if (rect.width < 30 || rect.height < 30) {
+        return getSmartRect(el.parentElement);
+      }
+      return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
+    }
+
+    // Hover: show highlight on element under cursor
+    overlay.addEventListener('mousemove', (e) => {
+      if (isDrawing) {
+        // Manual drawing mode
+        const x = Math.min(startX, e.clientX);
+        const y = Math.min(startY, e.clientY);
+        const w = Math.abs(e.clientX - startX);
+        const h = Math.abs(e.clientY - startY);
+        selection.style.left = x + 'px';
+        selection.style.top = y + 'px';
+        selection.style.width = w + 'px';
+        selection.style.height = h + 'px';
+        hoverHighlight.style.display = 'none';
+        return;
+      }
+
+      // Auto-detect mode: highlight element under cursor
+      const el = getElementAtPoint(e.clientX, e.clientY);
+      const rect = getSmartRect(el);
+      if (rect) {
+        hoveredRect = rect;
+        hoverHighlight.style.display = 'block';
+        hoverHighlight.style.left = rect.x + 'px';
+        hoverHighlight.style.top = rect.y + 'px';
+        hoverHighlight.style.width = rect.width + 'px';
+        hoverHighlight.style.height = rect.height + 'px';
+      } else {
+        hoveredRect = null;
+        hoverHighlight.style.display = 'none';
+      }
+    });
 
     overlay.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return;
       isDrawing = true;
       startX = e.clientX;
       startY = e.clientY;
+      // Reset selection to zero size (will be drawn on drag)
       selection.style.left = startX + 'px';
       selection.style.top = startY + 'px';
       selection.style.width = '0';
       selection.style.height = '0';
-      selection.style.display = 'block';
+      selection.style.display = 'none';
       instructions.style.display = 'none';
-    });
-
-    overlay.addEventListener('mousemove', (e) => {
-      if (!isDrawing) return;
-      const x = Math.min(startX, e.clientX);
-      const y = Math.min(startY, e.clientY);
-      const w = Math.abs(e.clientX - startX);
-      const h = Math.abs(e.clientY - startY);
-      selection.style.left = x + 'px';
-      selection.style.top = y + 'px';
-      selection.style.width = w + 'px';
-      selection.style.height = h + 'px';
     });
 
     overlay.addEventListener('mouseup', async (e) => {
       if (!isDrawing) return;
       isDrawing = false;
 
-      const rect = {
-        x: Math.min(startX, e.clientX),
-        y: Math.min(startY, e.clientY),
-        width: Math.abs(e.clientX - startX),
-        height: Math.abs(e.clientY - startY),
-      };
+      const dx = Math.abs(e.clientX - startX);
+      const dy = Math.abs(e.clientY - startY);
+
+      let rect;
+      if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) {
+        // Click without drag: use auto-detected element
+        if (!hoveredRect) {
+          removeAreaOverlay();
+          return;
+        }
+        rect = hoveredRect;
+      } else {
+        // Drag: use manual selection
+        rect = {
+          x: Math.min(startX, e.clientX),
+          y: Math.min(startY, e.clientY),
+          width: dx,
+          height: dy,
+        };
+      }
 
       // Minimum size check
       if (rect.width < 20 || rect.height < 20) {
@@ -1675,7 +1737,17 @@
         background: rgba(192, 120, 74, 0.1);
         box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
         pointer-events: none;
+        z-index: 2;
+      }
+
+      .inspoclip-area-hover {
+        position: fixed;
+        border: 2px dashed #4caf50;
+        background: rgba(76, 175, 80, 0.08);
+        pointer-events: none;
         z-index: 1;
+        transition: left 0.1s ease, top 0.1s ease, width 0.1s ease, height 0.1s ease;
+        border-radius: 2px;
       }
 
       .inspoclip-area-loading {
