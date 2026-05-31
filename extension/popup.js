@@ -199,9 +199,19 @@ async function testServerConnection() {
   }
 }
 
+// Track mouse position for button glow effect
+document.addEventListener('mousemove', (e) => {
+  const btn = e.target.closest('.btn');
+  if (btn) {
+    const rect = btn.getBoundingClientRect();
+    btn.style.setProperty('--x', ((e.clientX - rect.left) / rect.width * 100) + '%');
+    btn.style.setProperty('--y', ((e.clientY - rect.top) / rect.height * 100) + '%');
+  }
+});
+
 function showStatus(message, type) {
   const statusEl = document.getElementById('status');
   statusEl.textContent = message;
-  statusEl.className = `status ${type}`;
+  statusEl.className = `status ${type} visible`;
   setTimeout(() => { statusEl.className = 'status'; }, 3000);
 }
