@@ -135,10 +135,13 @@
         return;
       }
 
-      // Show loading state
-      selection.innerHTML = '<div class="inspoclip-area-loading"><div class="inspoclip-spinner"></div></div>';
-
       try {
+        // Hide overlay before capturing to avoid capturing the UI
+        overlay.style.display = 'none';
+
+        // Small delay to ensure overlay is hidden before capture
+        await new Promise((r) => setTimeout(r, 50));
+
         // Capture the visible tab
         const dataUrl = await new Promise((resolve, reject) => {
           chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' }, (response) => {
