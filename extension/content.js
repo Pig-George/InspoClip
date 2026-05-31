@@ -123,7 +123,8 @@
     // Hover: show highlight on element under cursor
     overlay.addEventListener('mousemove', (e) => {
       if (isDrawing) {
-        // Manual drawing mode
+        // Manual drawing mode — show selection rectangle
+        selection.style.display = 'block';
         const x = Math.min(startX, e.clientX);
         const y = Math.min(startY, e.clientY);
         const w = Math.abs(e.clientX - startX);
@@ -149,17 +150,6 @@
       } else {
         hoveredRect = null;
         hoverHighlight.style.display = 'none';
-      }
-
-      // If drawing manually, also show the selection rectangle
-      if (isDrawing) {
-        selection.style.display = 'block';
-        const x = Math.min(startX, e.clientX);
-        const y = Math.min(startY, e.clientY);
-        selection.style.left = x + 'px';
-        selection.style.top = y + 'px';
-        selection.style.width = Math.abs(e.clientX - startX) + 'px';
-        selection.style.height = Math.abs(e.clientY - startY) + 'px';
       }
     });
 
