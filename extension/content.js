@@ -847,6 +847,7 @@
 
     async function doModalUpload(modalEl) {
       const btn = modalEl.querySelector('.inspoclip-upload-btn');
+      const footer = modalEl.querySelector('.inspoclip-modal-footer');
       btn.disabled = true;
       btn.textContent = locale === 'zh' ? '保存中...' : 'Saving...';
 
@@ -870,9 +871,23 @@
         const uploadRes = await fetch(`${serverUrl}/api/images`, { method: 'POST', body: formData });
         if (!uploadRes.ok) throw new Error('Upload failed');
 
-        btn.textContent = locale === 'zh' ? '✓ 已保存' : '✓ Saved';
-        btn.style.background = '#4caf50';
-        setTimeout(removeModal, 1200);
+        // Success — shrink and hide the footer
+        if (footer) {
+          footer.style.transition = 'max-height 0.35s ease, opacity 0.25s ease, padding 0.35s ease, margin 0.35s ease';
+          footer.style.overflow = 'hidden';
+          footer.style.maxHeight = footer.scrollHeight + 'px';
+          requestAnimationFrame(() => {
+            footer.style.maxHeight = '0';
+            footer.style.opacity = '0';
+            footer.style.paddingTop = '0';
+            footer.style.paddingBottom = '0';
+            footer.style.marginTop = '0';
+          });
+          setTimeout(() => footer.remove(), 400);
+        }
+
+        showToast(locale === 'zh' ? '✓ 已保存到 InspoClip' : '✓ Saved to InspoClip', 'success');
+        toastTimer = setTimeout(removeToast, 3000);
       } catch (err) {
         btn.textContent = locale === 'zh' ? '保存失败' : 'Save failed';
         btn.style.background = '#f44336';
