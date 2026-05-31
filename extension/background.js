@@ -23,6 +23,34 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+// Handle keyboard shortcuts
+chrome.commands.onCommand.addListener(async (command) => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab) return;
+
+  if (command === 'area-analyze') {
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: 'START_AREA_CAPTURE', mode: 'analyze' });
+    } catch {
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+        setTimeout(() => chrome.tabs.sendMessage(tab.id, { type: 'START_AREA_CAPTURE', mode: 'analyze' }), 300);
+      } catch {}
+    }
+  }
+
+  if (command === 'area-save') {
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: 'START_AREA_CAPTURE', mode: 'save' });
+    } catch {
+      try {
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+        setTimeout(() => chrome.tabs.sendMessage(tab.id, { type: 'START_AREA_CAPTURE', mode: 'save' }), 300);
+      } catch {}
+    }
+  }
+});
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   // Analyze — send message to content script
   if (info.menuItemId === 'inspoclip-analyze-image' || info.menuItemId === 'inspoclip-analyze-page') {
