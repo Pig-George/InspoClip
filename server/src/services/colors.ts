@@ -21,7 +21,7 @@ interface ColorCandidate {
  * 4. Detect accent colors from high-gradient regions
  * 5. Ensure diversity with relaxed distance for accent colors
  */
-export async function extractColors(imagePath: string, count: number = 6): Promise<string[]> {
+export async function extractColors(imagePath: string, count: number = 10): Promise<string[]> {
   try {
     const { data, info } = await sharp(imagePath)
       .resize(200, 200, { fit: 'inside' })
