@@ -204,7 +204,8 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
-              onClick={() => setShowDetail(false)}
+              onClick={(e) => { if (e.target === e.currentTarget) setShowDetail(false); }}
+              onDragOver={(e) => e.preventDefault()}
             >
             <motion.div
               initial={{ scale: 0.95, y: 10 }}
@@ -213,6 +214,9 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
               className="w-full max-w-4xl max-h-[85vh] flex rounded-2xl bg-[var(--card)]
                 border border-[var(--card-border)] shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
+              onDragStart={(e) => e.stopPropagation()}
+              onDrag={(e) => e.stopPropagation()}
+              onDragEnd={(e) => e.stopPropagation()}
             >
               {/* Left: Image */}
               <div className="flex-1 min-w-0 bg-gray-200/50 flex items-center justify-center p-4">
