@@ -7,9 +7,10 @@ interface SortableImageCardProps {
   image: ImageType;
   onRefresh: () => void;
   animDelay?: number;
+  disabled?: boolean;
 }
 
-export function SortableImageCard({ image, onRefresh, animDelay }: SortableImageCardProps) {
+export function SortableImageCard({ image, onRefresh, animDelay, disabled }: SortableImageCardProps) {
   const {
     attributes,
     listeners,
@@ -17,7 +18,7 @@ export function SortableImageCard({ image, onRefresh, animDelay }: SortableImage
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: image.id });
+  } = useSortable({ id: image.id, disabled });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -27,7 +28,7 @@ export function SortableImageCard({ image, onRefresh, animDelay }: SortableImage
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} {...attributes} {...(disabled ? {} : listeners)}>
       <ImageCard image={image} onRefresh={onRefresh} animDelay={animDelay} />
     </div>
   );

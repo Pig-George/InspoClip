@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { DayName, Image as ImageType, ViewMode } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
 import { ImageUploader } from './ImageUploader';
-import { ImageCard } from './ImageCard';
 import { SortableImageCard } from './SortableImageCard';
 import {
   DndContext,
@@ -134,30 +133,19 @@ export function DayColumn({ dayName, dayOfWeek, weekId, images, viewMode, isToda
       {/* Content area with DnD */}
       <div className="flex-1 px-4 py-3 space-y-3">
         {images.length > 0 ? (
-          dialogOpen ? (
-            // No DnD when modal is open — render plain cards
-            images.map((image) => (
-              <ImageCard
-                key={image.id}
-                image={image}
-                onRefresh={onRefresh}
-                animDelay={animDelay}
-              />
-            ))
-          ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={images.map((img) => img.id)} strategy={verticalListSortingStrategy}>
-                {images.map((image) => (
-                  <SortableImageCard
-                    key={image.id}
-                    image={image}
-                    onRefresh={onRefresh}
-                    animDelay={animDelay}
-                  />
-                ))}
-              </SortableContext>
-            </DndContext>
-          )
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} disabled={dialogOpen}>
+            <SortableContext items={images.map((img) => img.id)} strategy={verticalListSortingStrategy}>
+              {images.map((image) => (
+                <SortableImageCard
+                  key={image.id}
+                  image={image}
+                  onRefresh={onRefresh}
+                  animDelay={animDelay}
+                  disabled={dialogOpen}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         ) : (
           <div className="flex items-center justify-center h-24 text-[var(--text-muted)] text-sm font-handwriting opacity-30">
             {canUpload ? t('PasteOrDrop') : t('EmptyPage')}
