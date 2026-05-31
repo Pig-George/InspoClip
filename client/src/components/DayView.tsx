@@ -250,19 +250,26 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
 
   // Scroll handler: detect edges for infinite loading + track active day
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastEdgeLoadRef = useRef(0);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const { scrollLeft, scrollWidth, clientWidth } = el;
+    const maxScroll = scrollWidth - clientWidth;
 
-    // Near left edge
-    if (scrollLeft < SCROLL_THRESHOLD) {
+    // Only trigger edge loading if there's meaningful scrollable content
+    // and we're actually near the edge (not just slightly past the start)
+    const now = Date.now();
+    const canLoad = now - lastEdgeLoadRef.current > 500; // throttle edge loads
+
+    if (canLoad && scrollLeft < COL_STEP && scrollLeft < maxScroll * 0.3) {
+      lastEdgeLoadRef.current = now;
       loadPreviousWeek();
     }
-    // Near right edge
-    if (scrollLeft > scrollWidth - clientWidth - SCROLL_THRESHOLD) {
+    if (canLoad && maxScroll > 0 && scrollLeft > maxScroll - COL_STEP && scrollLeft > maxScroll * 0.7) {
+      lastEdgeLoadRef.current = now;
       loadNextWeek();
     }
 
