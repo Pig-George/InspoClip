@@ -89,6 +89,24 @@
   }
 }
 
+/* Day column scrollbar — no rounded corners */
+[data-day-column]::-webkit-scrollbar {
+  width: 6px;
+}
+
+[data-day-column]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-day-column]::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 0;
+}
+
+[data-day-column]::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
