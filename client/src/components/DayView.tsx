@@ -410,6 +410,26 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
     }
   }, [dayEntries]);
 
+  // Keyboard shortcuts for day navigation (only when this view is active)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't handle if input is focused or dialog is open
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+      if (document.querySelector('[data-dialog-overlay]')) return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        scrollToVisibleDay(visibleIndex - 1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        scrollToVisibleDay(visibleIndex + 1);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [visibleIndex, scrollToVisibleDay]);
+
   // Format visible date range
   const visibleRange = useMemo(() => {
     if (dayEntries.length === 0) return '';

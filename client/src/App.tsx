@@ -216,7 +216,7 @@ function AppInner() {
             </h2>
             <div className="space-y-2 text-sm">
               {[
-                { keys: ['←', '→'], desc: locale === 'zh' ? '切换周' : 'Switch week' },
+                { keys: ['←', '→'], desc: locale === 'zh' ? '切换日期' : 'Navigate days/weeks' },
                 { keys: ['/'], desc: locale === 'zh' ? '搜索' : 'Search' },
                 { keys: ['D'], desc: locale === 'zh' ? '日视图' : 'Day view' },
                 { keys: ['W'], desc: locale === 'zh' ? '周视图' : 'Week view' },

@@ -3,6 +3,8 @@ import { useEffect, useCallback } from 'react';
 interface ShortcutHandlers {
   onPrevWeek?: () => void;
   onNextWeek?: () => void;
+  onPrevDay?: () => void;
+  onNextDay?: () => void;
   onOpenSearch?: () => void;
   onCloseDialog?: () => void;
   onSwitchDayView?: () => void;
@@ -36,11 +38,13 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       switch (e.key) {
         case 'ArrowLeft':
           e.preventDefault();
-          handlers.onPrevWeek?.();
+          if (handlers.onPrevDay) handlers.onPrevDay();
+          else if (handlers.onPrevWeek) handlers.onPrevWeek();
           break;
         case 'ArrowRight':
           e.preventDefault();
-          handlers.onNextWeek?.();
+          if (handlers.onNextDay) handlers.onNextDay();
+          else if (handlers.onNextWeek) handlers.onNextWeek();
           break;
         case '/':
           e.preventDefault();
