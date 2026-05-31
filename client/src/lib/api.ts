@@ -180,7 +180,7 @@ export async function fetchMonth(yearMonth: string): Promise<TimelineMonth> {
   return res.json();
 }
 
-export function exportWeekUrl(dateStr: string, format: 'json' | 'markdown'): string {
+export function exportWeekUrl(dateStr: string, format: 'json' | 'markdown' | 'zip'): string {
   return `${BASE}/export/week/${dateStr}?format=${format}`;
 }
 

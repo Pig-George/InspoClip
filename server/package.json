@@ -11,6 +11,8 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@types/archiver": "^7.0.0",
+    "archiver": "^8.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.2",

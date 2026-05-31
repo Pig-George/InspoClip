@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileJson, FileText, X } from 'lucide-react';
+import { FileJson, FileText, FolderDown, X } from 'lucide-react';
 import { exportWeekUrl } from '@/lib/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useScrollLock } from '@/hooks/useScrollLock';
@@ -16,20 +16,26 @@ export function ExportDialog({ open, onClose, weekDate }: ExportDialogProps) {
 
   const formats = [
     {
+      key: 'zip' as const,
+      icon: FolderDown,
+      label: 'ZIP',
+      desc: locale === 'zh' ? '图片 + 数据，完整备份' : 'Images + data, full backup',
+    },
+    {
       key: 'markdown' as const,
       icon: FileText,
       label: 'Markdown',
-      desc: locale === 'zh' ? '纯文本格式，适合 Notion' : 'Plain text, great for Notion',
+      desc: locale === 'zh' ? '内嵌图片的文档，适合 Notion' : 'Document with embedded images',
     },
     {
       key: 'json' as const,
       icon: FileJson,
       label: 'JSON',
-      desc: locale === 'zh' ? '结构化数据，便于迁移' : 'Structured data for migration',
+      desc: locale === 'zh' ? '含 Base64 图片的结构化数据' : 'Structured data with Base64 images',
     },
   ];
 
-  const handleExport = (format: 'json' | 'markdown') => {
+  const handleExport = (format: 'zip' | 'json' | 'markdown') => {
     const url = exportWeekUrl(weekDate, format);
     window.open(url, '_blank');
     onClose();
