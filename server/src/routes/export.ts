@@ -52,6 +52,20 @@ async function getWeekData(dateStr: string) {
   return { week, weekImages, termsByImage, mondayStr };
 }
 
+// Add images to archive, return list of added files
+async function addImagesToArchive(archive: any, weekImages: any[], uploadDir: string) {
+  const added: string[] = [];
+  for (const img of weekImages) {
+    const filePath = path.join(uploadDir, img.filePath);
+    try {
+      await fs.access(filePath);
+      archive.file(filePath, { name: `images/${img.filePath}` });
+      added.push(img.filePath);
+    } catch { /* file missing, skip */ }
+  }
+  return added;
+}
+
 // GET /api/export/week/:date?format=markdown|json|zip
 router.get('/week/:date', async (req: Request, res: Response) => {
   try {
@@ -64,72 +78,36 @@ router.get('/week/:date', async (req: Request, res: Response) => {
       return;
     }
 
-    const { week, weekImages, termsByImage, mondayStr } = data;
+    const { weekImages, termsByImage, mondayStr } = data;
     const uploadDir = process.env.UPLOAD_DIR || './uploads';
     const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+    // All formats export as ZIP with images folder
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="inspoclip-${mondayStr}.zip"`);
+
+    const archive = new ZipArchive();
+    archive.pipe(res);
+
+    // Add images
+    await addImagesToArchive(archive, weekImages, uploadDir);
+
     if (format === 'json') {
-      // JSON export with image data as base64
-      const imagesWithBase64 = await Promise.all(
-        weekImages.map(async (img) => {
-          const filePath = path.join(uploadDir, img.filePath);
-          let base64 = '';
-          try {
-            const buffer = await fs.readFile(filePath);
-            base64 = buffer.toString('base64');
-          } catch { /* file missing */ }
-          return {
-            day: dayNames[img.dayOfWeek],
-            filePath: img.filePath,
-            terms: termsByImage[img.id] || [],
-            base64,
-          };
-        })
-      );
-
-      const result = {
-        week: mondayStr,
-        exportedAt: new Date().toISOString(),
-        images: imagesWithBase64,
-      };
-
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="inspoclip-${mondayStr}.json"`);
-      res.json(result);
-
-    } else if (format === 'zip') {
-      // ZIP export with images + metadata
-      res.setHeader('Content-Type', 'application/zip');
-      res.setHeader('Content-Disposition', `attachment; filename="inspoclip-${mondayStr}.zip"`);
-
-      const archive = new ZipArchive();
-      archive.pipe(res);
-
-      // Add metadata JSON
-      const metadata = {
+      // JSON with relative image paths
+      const jsonData = {
         week: mondayStr,
         exportedAt: new Date().toISOString(),
         images: weekImages.map((img) => ({
           day: dayNames[img.dayOfWeek],
           fileName: img.filePath,
+          imagePath: `images/${img.filePath}`,
           terms: termsByImage[img.id] || [],
         })),
       };
-      archive.append(JSON.stringify(metadata, null, 2), { name: 'metadata.json' });
-
-      // Add images
-      for (const img of weekImages) {
-        const filePath = path.join(uploadDir, img.filePath);
-        try {
-          await fs.access(filePath);
-          archive.file(filePath, { name: `images/${img.filePath}` });
-        } catch { /* file missing, skip */ }
-      }
-
-      await archive.finalize();
+      archive.append(JSON.stringify(jsonData, null, 2), { name: 'data.json' });
 
     } else {
-      // Markdown export with embedded base64 images
+      // Markdown with relative image paths
       let md = `# InspoClip - Week of ${mondayStr}\n\n`;
       md += `> Exported on ${new Date().toISOString()}\n\n`;
 
@@ -146,18 +124,7 @@ router.get('/week/:date', async (req: Request, res: Response) => {
         md += `## ${dayNames[d]}\n\n`;
         for (const img of dayImages) {
           const terms = termsByImage[img.id] || [];
-          const filePath = path.join(uploadDir, img.filePath);
-
-          // Embed image as base64
-          try {
-            const buffer = await fs.readFile(filePath);
-            const ext = path.extname(img.filePath).slice(1).toLowerCase();
-            const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-            md += `![${terms[0] || 'image'}](data:${mime};base64,${buffer.toString('base64')})\n`;
-          } catch {
-            md += `![${terms[0] || 'image'}](${img.filePath})\n`;
-          }
-
+          md += `![${terms[0] || 'image'}](images/${img.filePath})\n`;
           if (terms.length > 0) {
             md += `- **Terms:** ${terms.join(', ')}\n`;
           }
@@ -165,10 +132,10 @@ router.get('/week/:date', async (req: Request, res: Response) => {
         }
       }
 
-      res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="inspoclip-${mondayStr}.md"`);
-      res.send(md);
+      archive.append(md, { name: 'inspoclip.md' });
     }
+
+    await archive.finalize();
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
