@@ -239,6 +239,23 @@ body {
   color: #4a3028;
 }
 
+.btn-ghost {
+  background: transparent;
+  color: #8a7060;
+  border: 1px dashed #d4c4b0;
+}
+
+.btn-ghost:hover {
+  background: #f0e6d6;
+  border-color: #c0784a;
+  color: #c0784a;
+}
+
+.actions-secondary {
+  margin-bottom: 12px;
+  animation: slideUp 0.35s ease 0.15s backwards;
+}
+
 .btn-small {
   padding: 6px 12px;
   font-size: 12px;

@@ -46,22 +46,8 @@
     if (result.lang) locale = result.lang;
   });
 
-  // Helper: convert data URL to blob
-  function dataUrlToBlobLocal(dataUrl) {
-    const parts = dataUrl.split(',');
-    const mime = parts[0].match(/:(.*?);/)[1];
-    const binaryStr = atob(parts[1]);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-    return new Blob([bytes], { type: mime });
-  }
-
   // Listen for messages from background/popup
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (msg.type === 'PING') {
-      sendResponse({ ok: true });
-      return;
-    }
     if (msg.type === 'ANALYZE_IMAGE') {
       doAnalyze(msg.imageUrl);
       sendResponse({ ok: true });
@@ -74,19 +60,184 @@
       handleSave(msg.imageUrl, msg.isImage);
       sendResponse({ ok: true });
     }
-    // From popup: analyze with pre-captured screenshot
-    if (msg.type === 'ANALYZE_FROM_POPUP' && msg.imageDataUrl) {
-      const blob = dataUrlToBlobLocal(msg.imageDataUrl);
-      doAnalyzeWithBlob(blob);
-      sendResponse({ ok: true });
-    }
-    // From popup: save with pre-captured screenshot
-    if (msg.type === 'SAVE_FROM_POPUP' && msg.imageDataUrl) {
-      const blob = dataUrlToBlobLocal(msg.imageDataUrl);
-      handleSaveWithBlob(blob);
+    if (msg.type === 'START_AREA_CAPTURE') {
+      startAreaCapture(msg.mode);
       sendResponse({ ok: true });
     }
   });
+
+  // ---- Area Capture Flow ----
+
+  let areaOverlay = null;
+
+  function startAreaCapture(mode) {
+    // Remove any existing overlay
+    removeAreaOverlay();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'inspoclip-area-overlay';
+
+    const instructions = document.createElement('div');
+    instructions.className = 'inspoclip-area-instructions';
+    instructions.textContent = locale === 'zh' ? '拖拽选择截图区域，按 Esc 取消' : 'Drag to select area, press Esc to cancel';
+
+    const selection = document.createElement('div');
+    selection.className = 'inspoclip-area-selection';
+    selection.style.display = 'none';
+
+    overlay.appendChild(instructions);
+    overlay.appendChild(selection);
+    container.appendChild(overlay);
+    areaOverlay = overlay;
+
+    let startX = 0, startY = 0;
+    let isDrawing = false;
+
+    overlay.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      isDrawing = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      selection.style.left = startX + 'px';
+      selection.style.top = startY + 'px';
+      selection.style.width = '0';
+      selection.style.height = '0';
+      selection.style.display = 'block';
+      instructions.style.display = 'none';
+    });
+
+    overlay.addEventListener('mousemove', (e) => {
+      if (!isDrawing) return;
+      const x = Math.min(startX, e.clientX);
+      const y = Math.min(startY, e.clientY);
+      const w = Math.abs(e.clientX - startX);
+      const h = Math.abs(e.clientY - startY);
+      selection.style.left = x + 'px';
+      selection.style.top = y + 'px';
+      selection.style.width = w + 'px';
+      selection.style.height = h + 'px';
+    });
+
+    overlay.addEventListener('mouseup', async (e) => {
+      if (!isDrawing) return;
+      isDrawing = false;
+
+      const rect = {
+        x: Math.min(startX, e.clientX),
+        y: Math.min(startY, e.clientY),
+        width: Math.abs(e.clientX - startX),
+        height: Math.abs(e.clientY - startY),
+      };
+
+      // Minimum size check
+      if (rect.width < 20 || rect.height < 20) {
+        removeAreaOverlay();
+        return;
+      }
+
+      // Show loading state
+      selection.innerHTML = '<div class="inspoclip-area-loading"><div class="inspoclip-spinner"></div></div>';
+
+      try {
+        // Capture the visible tab
+        const dataUrl = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' }, (response) => {
+            if (response?.dataUrl) resolve(response.dataUrl);
+            else reject(new Error('Capture failed'));
+          });
+        });
+
+        // Crop the image to the selected area
+        const croppedBlob = await cropImage(dataUrl, rect);
+
+        removeAreaOverlay();
+
+        // Process based on mode
+        if (mode === 'analyze') {
+          // Run analysis on the cropped image
+          showToast(locale === 'zh' ? '正在分析选区...' : 'Analyzing selection...', 'loading');
+
+          const ext = croppedBlob.type === 'image/png' ? '.png' : '.jpg';
+          const formData = new FormData();
+          formData.append('image', croppedBlob, 'area' + ext);
+
+          const res = await fetch(`${serverUrl}/api/images/analyze`, { method: 'POST', body: formData });
+          if (!res.ok) throw new Error('Analysis failed');
+          const data = await res.json();
+
+          // Check similarity
+          try {
+            const simForm = new FormData();
+            simForm.append('image', croppedBlob, 'check' + ext);
+            const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, { method: 'POST', body: simForm });
+            if (simRes.ok) {
+              const simData = await simRes.json();
+              data.similarImages = simData.similar || [];
+            }
+          } catch { data.similarImages = []; }
+
+          capturedBlob = croppedBlob;
+          lastPreviewUrl = URL.createObjectURL(croppedBlob);
+          analyzedData = data;
+          analysisHistory.push({ data, previewUrl: lastPreviewUrl, timestamp: Date.now() });
+          historyIndex = analysisHistory.length - 1;
+
+          removeToast();
+          transitionToModal(data, lastPreviewUrl);
+        } else {
+          // Save mode — check similarity then upload
+          capturedBlob = croppedBlob;
+          await doUpload(croppedBlob);
+        }
+      } catch (err) {
+        removeAreaOverlay();
+        showToast(locale === 'zh' ? `截图失败: ${err.message}` : `Capture failed: ${err.message}`, 'error');
+        setTimeout(removeToast, 3000);
+      }
+    });
+
+    // ESC to cancel
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        removeAreaOverlay();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+  }
+
+  function removeAreaOverlay() {
+    if (areaOverlay) {
+      areaOverlay.remove();
+      areaOverlay = null;
+    }
+  }
+
+  async function cropImage(dataUrl, rect) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        // Scale factor between displayed size and actual image size
+        const scaleX = img.naturalWidth / window.innerWidth;
+        const scaleY = img.naturalHeight / window.innerHeight;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = rect.width * scaleX;
+        canvas.height = rect.height * scaleY;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(
+          img,
+          rect.x * scaleX, rect.y * scaleY,
+          rect.width * scaleX, rect.height * scaleY,
+          0, 0,
+          canvas.width, canvas.height
+        );
+
+        canvas.toBlob((blob) => resolve(blob), 'image/png');
+      };
+      img.src = dataUrl;
+    });
+  }
 
   // ---- Analysis Flow ----
 
@@ -260,97 +411,6 @@
     } catch (err) {
       showToast(locale === 'zh' ? `✗ 保存失败: ${err.message}` : `✗ Save failed: ${err.message}`, 'error');
       toastTimer = setTimeout(removeToast, 5000);
-    }
-  }
-
-  // ---- Analysis Flow (with pre-captured blob) ----
-
-  async function doAnalyzeWithBlob(blob) {
-    removeFloatingTab();
-    analyzedData = null;
-    capturedBlob = null;
-
-    showToast(locale === 'zh' ? '正在分析...' : 'Analyzing...');
-
-    try {
-      capturedBlob = blob;
-
-      // Show preview
-      const previewUrl = URL.createObjectURL(blob);
-
-      // Check similarity
-      const ext = blob.type === 'image/png' ? '.png' : '.jpg';
-
-      // Send to server for analysis
-      const formData = new FormData();
-      formData.append('image', blob, 'analyze' + ext);
-
-      const res = await fetch(`${serverUrl}/api/images/analyze`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error('Analysis failed');
-      analyzedData = await res.json();
-
-      // Check similarity
-      try {
-        const simForm = new FormData();
-        simForm.append('image', blob, 'check' + ext);
-        const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, {
-          method: 'POST',
-          body: simForm,
-        });
-        if (simRes.ok) {
-          const simData = await simRes.json();
-          analyzedData.similarImages = simData.similar || [];
-        }
-      } catch {
-        analyzedData.similarImages = [];
-      }
-
-      lastPreviewUrl = previewUrl;
-      analysisHistory.push({ data: analyzedData, previewUrl, timestamp: Date.now() });
-      historyIndex = analysisHistory.length - 1;
-      transitionToModal(analyzedData, previewUrl);
-    } catch (err) {
-      showToast(locale === 'zh' ? `分析失败: ${err.message}` : `Analysis failed: ${err.message}`, 'error');
-      setTimeout(() => removeToast(), 3000);
-    }
-  }
-
-  // ---- Save Flow (with pre-captured blob) ----
-
-  async function handleSaveWithBlob(blob) {
-    showToast(locale === 'zh' ? '正在检查...' : 'Checking...');
-
-    try {
-      const ext = blob.type === 'image/png' ? '.png' : '.jpg';
-
-      // Check similarity
-      const checkForm = new FormData();
-      checkForm.append('image', blob, 'check' + ext);
-
-      const checkRes = await fetch(`${serverUrl}/api/images/check-similarity`, {
-        method: 'POST',
-        body: checkForm,
-      });
-
-      let similar = [];
-      if (checkRes.ok) {
-        const checkData = await checkRes.json();
-        similar = checkData.similar || [];
-      }
-
-      if (similar.length > 0) {
-        removeToast();
-        showSaveConfirmDialog(blob, similar);
-      } else {
-        await doUpload(blob);
-      }
-    } catch (err) {
-      // If check fails, proceed with upload
-      await doUpload(blob);
     }
   }
 
@@ -1573,6 +1633,50 @@
       .inspoclip-confirm-actions {
         display: flex;
         gap: 8px;
+      }
+
+      /* Area Capture Overlay */
+      .inspoclip-area-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 2147483647;
+        cursor: crosshair;
+        pointer-events: auto;
+        background: rgba(0, 0, 0, 0.15);
+      }
+
+      .inspoclip-area-instructions {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+
+      .inspoclip-area-selection {
+        position: fixed;
+        border: 2px solid #c0784a;
+        background: rgba(192, 120, 74, 0.1);
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      .inspoclip-area-loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
       }
 
       /* Floating Tab */
