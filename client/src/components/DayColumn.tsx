@@ -89,7 +89,7 @@ export function DayColumn({ dayName, dayOfWeek, weekId, images, viewMode, isToda
     >
       {/* Sticky header — handcrafted label feel */}
       <div
-        className={`sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b
+        className={`sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b
           bg-[var(--card)] ${isToday ? 'border-[var(--accent)]/40' : 'border-[var(--card-border)]'}`}
         style={{
           borderBottomStyle: 'dashed',
