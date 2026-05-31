@@ -2,8 +2,9 @@ import { WeekData, Tag, Week, Image } from '@/types';
 
 const BASE = '/api';
 
-export async function fetchWeek(dateStr: string): Promise<WeekData> {
-  const res = await fetch(`${BASE}/weeks/${dateStr}`);
+export async function fetchWeek(dateStr: string, contentOnly?: boolean): Promise<WeekData> {
+  const url = contentOnly ? `${BASE}/weeks/${dateStr}?contentOnly=true` : `${BASE}/weeks/${dateStr}`;
+  const res = await fetch(url);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }));
     throw new Error(err.error || 'Failed to fetch week');

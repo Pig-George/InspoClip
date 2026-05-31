@@ -6,9 +6,12 @@ import { eq, inArray, and, gte, lt } from 'drizzle-orm';
 const router = Router();
 
 // GET /api/weeks/:date — fetch week data by any date within the week
+// Query params:
+//   contentOnly=true — only return days with images (don't create empty weeks)
 router.get('/:date', async (req: Request, res: Response) => {
   try {
     const dateStr = req.params.date as string;
+    const contentOnly = req.query.contentOnly === 'true';
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) {
       res.status(400).json({ error: 'Invalid date' });
@@ -22,6 +25,13 @@ router.get('/:date', async (req: Request, res: Response) => {
     const mondayStr = monday.toISOString().split('T')[0];
 
     let week = await db.select().from(weeks).where(eq(weeks.weekStart, mondayStr)).limit(1);
+
+    if (contentOnly && week.length === 0) {
+      // Don't create empty weeks in content-only mode
+      res.json({ week: null, images: [], notes: null });
+      return;
+    }
+
     if (week.length === 0) {
       const [newWeek] = await db.insert(weeks).values({ weekStart: mondayStr }).returning();
       week = [newWeek];

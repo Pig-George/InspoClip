@@ -33,6 +33,8 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
   const [weekMondays, setWeekMondays] = useState<string[]>([]);
   const [hideEmpty, setHideEmpty] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const noMorePreviousRef = useRef(false);
+  const noMoreNextRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dotsRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<HTMLDivElement>(null);
@@ -81,9 +83,15 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
   }, [weekMondays, weekDataMap]);
 
   // Load a week by its Monday date, with direction for scroll adjustment
-  const loadWeek = useCallback(async (mondayStr: string, prepend: boolean) => {
+  const loadWeek = useCallback(async (mondayStr: string, prepend: boolean, contentOnly = false) => {
     try {
-      const data = await fetchWeek(mondayStr);
+      const data = await fetchWeek(mondayStr, contentOnly);
+
+      // In contentOnly mode, skip weeks with no images
+      if (contentOnly && data.week === null) {
+        return null;
+      }
+
       setWeekDataMap((prev) => {
         const next = new Map(prev);
         next.set(mondayStr, data);
@@ -203,7 +211,7 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
 
   // Load previous week when scrolling near left edge
   const loadPreviousWeek = useCallback(async () => {
-    if (loadingMore || weekMondays.length === 0) return;
+    if (loadingMore || weekMondays.length === 0 || noMorePreviousRef.current) return;
 
     // Don't load more if content fits within viewport
     const el = scrollRef.current;
@@ -216,16 +224,20 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
 
     if (!weekDataMap.has(prevMonday)) {
       setLoadingMore(true);
-      await loadWeek(prevMonday, true);
-      setWeekMondays((prev) => [prevMonday, ...prev]);
-      setActiveDayIndex((prev) => prev + 7);
+      const data = await loadWeek(prevMonday, true, hideEmpty);
+      if (data) {
+        setWeekMondays((prev) => [prevMonday, ...prev]);
+        setActiveDayIndex((prev) => prev + 7);
+      } else if (hideEmpty) {
+        noMorePreviousRef.current = true;
+      }
       setLoadingMore(false);
     }
-  }, [loadingMore, weekMondays, weekDataMap, loadWeek]);
+  }, [loadingMore, weekMondays, weekDataMap, loadWeek, hideEmpty]);
 
   // Load next week when scrolling near right edge (only if not in the future)
   const loadNextWeek = useCallback(async () => {
-    if (loadingMore || weekMondays.length === 0) return;
+    if (loadingMore || weekMondays.length === 0 || noMoreNextRef.current) return;
 
     // Don't load more if content fits within viewport
     const el = scrollRef.current;
@@ -242,11 +254,15 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
 
     if (!weekDataMap.has(nextMonday)) {
       setLoadingMore(true);
-      await loadWeek(nextMonday, false);
-      setWeekMondays((prev) => [...prev, nextMonday]);
+      const data = await loadWeek(nextMonday, false, hideEmpty);
+      if (data) {
+        setWeekMondays((prev) => [...prev, nextMonday]);
+      } else if (hideEmpty) {
+        noMoreNextRef.current = true;
+      }
       setLoadingMore(false);
     }
-  }, [loadingMore, weekMondays, weekDataMap, loadWeek]);
+  }, [loadingMore, weekMondays, weekDataMap, loadWeek, hideEmpty]);
 
   // Scroll handler: detect edges for infinite loading + track active day
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -439,7 +455,11 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
           </button>
           {/* Filter toggle */}
           <button
-            onClick={() => setHideEmpty(!hideEmpty)}
+            onClick={() => {
+              noMorePreviousRef.current = false;
+              noMoreNextRef.current = false;
+              setHideEmpty(!hideEmpty);
+            }}
             className={`ml-1 px-1.5 py-0.5 text-[10px] font-heading rounded-sm border transition-colors
               ${hideEmpty
                 ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30'
