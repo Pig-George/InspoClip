@@ -11,6 +11,9 @@ const I18N = {
     openInspoClip: 'Open InspoClip →',
     saving: 'Saving...',
     saved: 'Saved to InspoClip!',
+    analyzing: 'Analyzing...',
+    starting: 'Starting...',
+    injectFail: 'Cannot run on this page',
   },
   zh: {
     subtitle: '设计灵感剪贴簿',
@@ -22,6 +25,9 @@ const I18N = {
     openInspoClip: '打开 InspoClip →',
     saving: '保存中...',
     saved: '已保存到 InspoClip!',
+    analyzing: '分析中...',
+    starting: '启动中...',
+    injectFail: '无法在此页面运行',
   },
 };
 
@@ -100,72 +106,91 @@ document.addEventListener('DOMContentLoaded', async () => {
     testServerConnection();
   });
 
-  // Analyze button — send message to content script, then close popup
+  // Helper: ensure content script is injected
+  async function ensureContentScript(tabId) {
+    try {
+      await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+    } catch {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['content.js'],
+      });
+      await new Promise((r) => setTimeout(r, 600));
+    }
+  }
+
+  // Helper: capture current tab as blob
+  async function captureTab() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 85 });
+    const res = await fetch(dataUrl);
+    return { blob: await res.blob(), tab };
+  }
+
+  // Analyze button — capture screenshot, send to content script for analysis
   analyzeBtn.addEventListener('click', async () => {
     analyzeBtn.disabled = true;
-    analyzeBtn.innerHTML = `<span class="spinner"></span> <span>${locale === 'zh' ? '启动中...' : 'Starting...'}</span>`;
+    analyzeBtn.innerHTML = `<span class="spinner"></span> <span>${t('starting')}</span>`;
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      await chrome.tabs.sendMessage(tab.id, { type: 'ANALYZE_PAGE' });
-      // Close popup after triggering analysis
-      setTimeout(() => window.close(), 200);
+      const { blob, tab } = await captureTab();
+      await ensureContentScript(tab.id);
+
+      // Convert blob to data URL for message passing
+      const reader = new FileReader();
+      const dataUrl = await new Promise((resolve) => {
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+
+      await chrome.tabs.sendMessage(tab.id, {
+        type: 'ANALYZE_FROM_POPUP',
+        imageDataUrl: dataUrl,
+      });
+
+      setTimeout(() => window.close(), 150);
     } catch (err) {
-      // Content script might not be injected, try injecting
-      try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['content.js'],
-        });
-        // Wait a bit for script to initialize
-        setTimeout(async () => {
-          try {
-            await chrome.tabs.sendMessage(tab.id, { type: 'ANALYZE_PAGE' });
-            window.close();
-          } catch {
-            showStatus('Failed to start analysis', 'error');
-            analyzeBtn.disabled = false;
-            analyzeBtn.innerHTML = `<span class="btn-icon">🔍</span> <span>${t('analyzePage')}</span>`;
-          }
-        }, 500);
-      } catch {
-        showStatus('Cannot inject script on this page', 'error');
-        analyzeBtn.disabled = false;
-        analyzeBtn.innerHTML = `<span class="btn-icon">🔍</span> <span>${t('analyzePage')}</span>`;
-      }
+      showStatus(t('injectFail'), 'error');
+      analyzeBtn.disabled = false;
+      analyzeBtn.innerHTML = `<span class="btn-icon">🔍</span> <span>${t('analyzePage')}</span>`;
     }
   });
 
-  // Quick save button — delegate to content script for similarity check
+  // Quick Save button — capture screenshot, check similarity, save
   captureBtn.addEventListener('click', async () => {
     captureBtn.disabled = true;
     captureBtn.innerHTML = `<span class="spinner"></span> <span>${t('saving')}</span>`;
 
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      await chrome.tabs.sendMessage(tab.id, { type: 'SAVE_IMAGE', imageUrl: null, isImage: false });
-      setTimeout(() => window.close(), 200);
+      const { blob, tab } = await captureTab();
+      await ensureContentScript(tab.id);
+
+      const reader = new FileReader();
+      const dataUrl = await new Promise((resolve) => {
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+
+      await chrome.tabs.sendMessage(tab.id, {
+        type: 'SAVE_FROM_POPUP',
+        imageDataUrl: dataUrl,
+      });
+
+      setTimeout(() => window.close(), 150);
     } catch (err) {
-      // Content script might not be injected
-      try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
-        setTimeout(async () => {
-          try {
-            await chrome.tabs.sendMessage(tab.id, { type: 'SAVE_IMAGE', imageUrl: null, isImage: false });
-            window.close();
-          } catch {
-            showStatus('Failed to start save', 'error');
-            captureBtn.disabled = false;
-            captureBtn.innerHTML = `<span class="btn-icon">📸</span> <span>${t('quickSave')}</span>`;
-          }
-        }, 500);
-      } catch {
-        showStatus('Cannot inject script on this page', 'error');
-        captureBtn.disabled = false;
-        captureBtn.innerHTML = `<span class="btn-icon">📸</span> <span>${t('quickSave')}</span>`;
-      }
+      showStatus(t('injectFail'), 'error');
+      captureBtn.disabled = false;
+      captureBtn.innerHTML = `<span class="btn-icon">📸</span> <span>${t('quickSave')}</span>`;
+    }
+  });
+
+  // Track mouse for button glow
+  document.addEventListener('mousemove', (e) => {
+    const btn = e.target.closest('.btn');
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      btn.style.setProperty('--x', ((e.clientX - rect.left) / rect.width * 100) + '%');
+      btn.style.setProperty('--y', ((e.clientY - rect.top) / rect.height * 100) + '%');
     }
   });
 });
@@ -209,16 +234,6 @@ async function testServerConnection() {
     testBtn.disabled = false;
   }
 }
-
-// Track mouse position for button glow effect
-document.addEventListener('mousemove', (e) => {
-  const btn = e.target.closest('.btn');
-  if (btn) {
-    const rect = btn.getBoundingClientRect();
-    btn.style.setProperty('--x', ((e.clientX - rect.left) / rect.width * 100) + '%');
-    btn.style.setProperty('--y', ((e.clientY - rect.top) / rect.height * 100) + '%');
-  }
-});
 
 function showStatus(message, type) {
   const statusEl = document.getElementById('status');

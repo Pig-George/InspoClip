@@ -46,8 +46,22 @@
     if (result.lang) locale = result.lang;
   });
 
+  // Helper: convert data URL to blob
+  function dataUrlToBlobLocal(dataUrl) {
+    const parts = dataUrl.split(',');
+    const mime = parts[0].match(/:(.*?);/)[1];
+    const binaryStr = atob(parts[1]);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  }
+
   // Listen for messages from background/popup
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === 'PING') {
+      sendResponse({ ok: true });
+      return;
+    }
     if (msg.type === 'ANALYZE_IMAGE') {
       doAnalyze(msg.imageUrl);
       sendResponse({ ok: true });
@@ -58,6 +72,18 @@
     }
     if (msg.type === 'SAVE_IMAGE') {
       handleSave(msg.imageUrl, msg.isImage);
+      sendResponse({ ok: true });
+    }
+    // From popup: analyze with pre-captured screenshot
+    if (msg.type === 'ANALYZE_FROM_POPUP' && msg.imageDataUrl) {
+      const blob = dataUrlToBlobLocal(msg.imageDataUrl);
+      doAnalyzeWithBlob(blob);
+      sendResponse({ ok: true });
+    }
+    // From popup: save with pre-captured screenshot
+    if (msg.type === 'SAVE_FROM_POPUP' && msg.imageDataUrl) {
+      const blob = dataUrlToBlobLocal(msg.imageDataUrl);
+      handleSaveWithBlob(blob);
       sendResponse({ ok: true });
     }
   });
@@ -234,6 +260,97 @@
     } catch (err) {
       showToast(locale === 'zh' ? `✗ 保存失败: ${err.message}` : `✗ Save failed: ${err.message}`, 'error');
       toastTimer = setTimeout(removeToast, 5000);
+    }
+  }
+
+  // ---- Analysis Flow (with pre-captured blob) ----
+
+  async function doAnalyzeWithBlob(blob) {
+    removeFloatingTab();
+    analyzedData = null;
+    capturedBlob = null;
+
+    showToast(locale === 'zh' ? '正在分析...' : 'Analyzing...');
+
+    try {
+      capturedBlob = blob;
+
+      // Show preview
+      const previewUrl = URL.createObjectURL(blob);
+
+      // Check similarity
+      const ext = blob.type === 'image/png' ? '.png' : '.jpg';
+
+      // Send to server for analysis
+      const formData = new FormData();
+      formData.append('image', blob, 'analyze' + ext);
+
+      const res = await fetch(`${serverUrl}/api/images/analyze`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error('Analysis failed');
+      analyzedData = await res.json();
+
+      // Check similarity
+      try {
+        const simForm = new FormData();
+        simForm.append('image', blob, 'check' + ext);
+        const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, {
+          method: 'POST',
+          body: simForm,
+        });
+        if (simRes.ok) {
+          const simData = await simRes.json();
+          analyzedData.similarImages = simData.similar || [];
+        }
+      } catch {
+        analyzedData.similarImages = [];
+      }
+
+      lastPreviewUrl = previewUrl;
+      analysisHistory.push({ data: analyzedData, previewUrl, timestamp: Date.now() });
+      historyIndex = analysisHistory.length - 1;
+      transitionToModal(analyzedData, previewUrl);
+    } catch (err) {
+      showToast(locale === 'zh' ? `分析失败: ${err.message}` : `Analysis failed: ${err.message}`, 'error');
+      setTimeout(() => removeToast(), 3000);
+    }
+  }
+
+  // ---- Save Flow (with pre-captured blob) ----
+
+  async function handleSaveWithBlob(blob) {
+    showToast(locale === 'zh' ? '正在检查...' : 'Checking...');
+
+    try {
+      const ext = blob.type === 'image/png' ? '.png' : '.jpg';
+
+      // Check similarity
+      const checkForm = new FormData();
+      checkForm.append('image', blob, 'check' + ext);
+
+      const checkRes = await fetch(`${serverUrl}/api/images/check-similarity`, {
+        method: 'POST',
+        body: checkForm,
+      });
+
+      let similar = [];
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        similar = checkData.similar || [];
+      }
+
+      if (similar.length > 0) {
+        removeToast();
+        showSaveConfirmDialog(blob, similar);
+      } else {
+        await doUpload(blob);
+      }
+    } catch (err) {
+      // If check fails, proceed with upload
+      await doUpload(blob);
     }
   }
 
