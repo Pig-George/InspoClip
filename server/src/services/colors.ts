@@ -14,78 +14,119 @@ interface ColorCandidate {
 /**
  * Extract dominant and visually significant colors from an image.
  *
- * Strategy:
- * 1. Sample pixels from the image at moderate resolution
- * 2. Cluster similar colors using quantization
- * 3. Score each color by: frequency × saturation × brightness variance
- * 4. Ensure diversity by enforcing minimum distance between selected colors
- * 5. Balance between dominant colors and accent colors
+ * Improved strategy:
+ * 1. Sample pixels at higher resolution for finer color detail
+ * 2. Use tighter quantization (16-unit steps) to preserve color nuance
+ * 3. Score by: saturation-weighted frequency + contrast significance
+ * 4. Detect accent colors from high-gradient regions
+ * 5. Ensure diversity with relaxed distance for accent colors
  */
 export async function extractColors(imagePath: string, count: number = 6): Promise<string[]> {
   try {
     const { data, info } = await sharp(imagePath)
-      .resize(150, 150, { fit: 'inside' })
+      .resize(200, 200, { fit: 'inside' })
       .removeAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });
 
-    // Step 1: Cluster pixels into color buckets
-    const quantize = (v: number) => Math.min(255, Math.round(v / 24) * 24);
-    const colorMap = new Map<string, { r: number; g: number; b: number; count: number }>();
+    const width = info.width;
+    const height = info.height;
 
+    // Step 1: Cluster pixels with tighter quantization
+    const quantize = (v: number) => Math.min(255, Math.round(v / 16) * 16);
+    const colorMap = new Map<string, { r: number; g: number; b: number; count: number; edgeCount: number }>();
+
+    // Pre-compute pixel array for edge detection
+    const pixels: [number, number, number][] = [];
     for (let i = 0; i < data.length; i += 3) {
-      const r = quantize(data[i]);
-      const g = quantize(data[i + 1]);
-      const b = quantize(data[i + 2]);
-      const key = `${r},${g},${b}`;
-      const existing = colorMap.get(key);
-      if (existing) {
-        existing.count++;
-      } else {
-        colorMap.set(key, { r, g, b, count: 1 });
+      pixels.push([data[i], data[i + 1], data[i + 2]]);
+    }
+
+    // Step 2: Detect high-gradient (edge) regions
+    const edgeSet = new Set<number>();
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const idx = y * width + x;
+        const [r, g, b] = pixels[idx];
+        // Check gradient against neighbors
+        const neighbors = [
+          pixels[(y - 1) * width + x],
+          pixels[(y + 1) * width + x],
+          pixels[y * width + (x - 1)],
+          pixels[y * width + (x + 1)],
+        ];
+        let maxDiff = 0;
+        for (const [nr, ng, nb] of neighbors) {
+          const diff = Math.abs(r - nr) + Math.abs(g - ng) + Math.abs(b - nb);
+          maxDiff = Math.max(maxDiff, diff);
+        }
+        // High gradient threshold
+        if (maxDiff > 100) {
+          edgeSet.add(idx);
+        }
       }
     }
 
-    const totalPixels = (info.width * info.height);
+    // Step 3: Cluster and score
+    for (let i = 0; i < pixels.length; i++) {
+      const [r, g, b] = pixels[i];
+      const qr = quantize(r);
+      const qg = quantize(g);
+      const qb = quantize(b);
+      const key = `${qr},${qg},${qb}`;
 
-    // Step 2: Convert to HSL and score
+      const existing = colorMap.get(key);
+      if (existing) {
+        existing.count++;
+        if (edgeSet.has(i)) existing.edgeCount++;
+      } else {
+        colorMap.set(key, { r: qr, g: qg, b: qb, count: 1, edgeCount: edgeSet.has(i) ? 1 : 0 });
+      }
+    }
+
+    const totalPixels = width * height;
+    const edgePixels = edgeSet.size || 1;
+
+    // Step 4: Score each color
     const candidates: ColorCandidate[] = [];
-    for (const { r, g, b, count } of colorMap.values()) {
+    for (const { r, g, b, count, edgeCount } of colorMap.values()) {
       const [h, s, l] = rgbToHsl(r, g, b);
       const freq = count / totalPixels;
+      const edgeFreq = edgeCount / edgePixels;
 
-      // Skip near-black, near-white, and very desaturated colors
-      if (l < 0.05 || l > 0.97) continue;
-      if (s < 0.05 && (l < 0.15 || l > 0.85)) continue;
+      // Skip near-black, near-white
+      if (l < 0.04 || l > 0.98) continue;
+      // Skip very desaturated (gray) unless they're in high-contrast areas
+      if (s < 0.08 && edgeFreq < 0.02) continue;
 
-      // Score: balance frequency with visual significance
-      // - High saturation colors get a boost (they're more "design-relevant")
-      // - Very frequent but muted colors get penalized slightly
-      // - Rare but vibrant colors still get picked
-      const satBoost = Math.pow(s, 0.5) * 0.6 + 0.4; // 0.4 ~ 1.0
-      const lightScore = 1 - Math.abs(l - 0.5) * 0.8; // prefer mid-lightness
-      const score = Math.pow(freq, 0.6) * satBoost * lightScore;
+      // Scoring formula:
+      // - Base: frequency (common colors matter)
+      // - Saturation boost: vibrant colors are more design-relevant
+      // - Edge boost: colors in high-gradient regions are visually significant
+      // - Contrast bonus: colors that differ greatly from average get a boost
+      const freqScore = Math.pow(freq, 0.45);
+      const satBoost = 0.3 + Math.pow(s, 0.4) * 0.7;
+      const edgeBoost = 1 + edgeFreq * 3; // up to 4x boost for edge-heavy colors
+      const contrastBonus = 1 + Math.abs(l - 0.5) * s * 0.8; // bonus for high-contrast colors
+
+      const score = freqScore * satBoost * edgeBoost * contrastBonus;
 
       candidates.push({ r, g, b, h, s, l, count, score });
     }
 
-    // Step 3: Sort by score
+    // Step 5: Sort by score and select diverse colors
     candidates.sort((a, b) => b.score - a.score);
 
-    // Step 4: Select diverse colors (enforce minimum distance)
     const selected: ColorCandidate[] = [];
-    const MIN_DISTANCE = 40; // minimum Euclidean distance in RGB space
+    const MIN_DISTANCE = 35;
 
     for (const candidate of candidates) {
       if (selected.length >= count) break;
-
       const isDiverse = selected.every((s) => colorDistance(s, candidate) >= MIN_DISTANCE);
-      if (isDiverse) {
-        selected.push(candidate);
-      }
+      if (isDiverse) selected.push(candidate);
     }
 
-    // If we don't have enough diverse colors, relax the distance constraint
+    // Relax distance if not enough colors
     if (selected.length < count) {
       for (const candidate of candidates) {
         if (selected.length >= count) break;
@@ -95,7 +136,7 @@ export async function extractColors(imagePath: string, count: number = 6): Promi
       }
     }
 
-    // Step 5: Sort selected by hue for a pleasing palette order
+    // Sort by hue for pleasing palette order
     selected.sort((a, b) => a.h - b.h);
 
     return selected.map((c) =>
