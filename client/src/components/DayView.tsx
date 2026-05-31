@@ -204,24 +204,33 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
   // Load previous week when scrolling near left edge
   const loadPreviousWeek = useCallback(async () => {
     if (loadingMore || weekMondays.length === 0) return;
-    setLoadingMore(true);
+
+    // Don't load more if content fits within viewport
+    const el = scrollRef.current;
+    if (el && el.scrollWidth <= el.clientWidth + 10) return;
+
     const firstMonday = weekMondays[0];
     const prevDate = new Date(firstMonday + 'T00:00:00');
     prevDate.setDate(prevDate.getDate() - 7);
     const prevMonday = formatISODate(prevDate);
 
     if (!weekDataMap.has(prevMonday)) {
+      setLoadingMore(true);
       await loadWeek(prevMonday, true);
       setWeekMondays((prev) => [prevMonday, ...prev]);
       setActiveDayIndex((prev) => prev + 7);
+      setLoadingMore(false);
     }
-    setLoadingMore(false);
   }, [loadingMore, weekMondays, weekDataMap, loadWeek]);
 
   // Load next week when scrolling near right edge (only if not in the future)
   const loadNextWeek = useCallback(async () => {
     if (loadingMore || weekMondays.length === 0) return;
-    setLoadingMore(true);
+
+    // Don't load more if content fits within viewport
+    const el = scrollRef.current;
+    if (el && el.scrollWidth <= el.clientWidth + 10) return;
+
     const lastMonday = weekMondays[weekMondays.length - 1];
     const nextDate = new Date(lastMonday + 'T00:00:00');
     nextDate.setDate(nextDate.getDate() + 7);
@@ -229,19 +238,19 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
 
     // Don't load weeks beyond the current week
     const todayMonday = formatISODate(getMonday(new Date()));
-    if (nextMonday > todayMonday) {
-      setLoadingMore(false);
-      return;
-    }
+    if (nextMonday > todayMonday) return;
 
     if (!weekDataMap.has(nextMonday)) {
+      setLoadingMore(true);
       await loadWeek(nextMonday, false);
       setWeekMondays((prev) => [...prev, nextMonday]);
+      setLoadingMore(false);
     }
-    setLoadingMore(false);
   }, [loadingMore, weekMondays, weekDataMap, loadWeek]);
 
   // Scroll handler: detect edges for infinite loading + track active day
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -257,19 +266,22 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
       loadNextWeek();
     }
 
-    // Update active day — find nearest visible column
-    const centerX = scrollLeft + clientWidth / 2;
-    let closestIdx = activeDayIndex;
-    let closestDist = Infinity;
-    for (let i = 0; i < dayEntries.length; i++) {
-      const entry = dayEntries[i];
-      if (hideEmpty && !entry.isToday && entry.images.length === 0) continue;
-      const child = el.querySelector(`[data-date="${entry.isoDate}"]`) as HTMLElement | null;
-      if (!child) continue;
-      const dist = Math.abs(child.offsetLeft + child.offsetWidth / 2 - centerX);
-      if (dist < closestDist) { closestDist = dist; closestIdx = i; }
-    }
-    if (closestIdx !== activeDayIndex) setActiveDayIndex(closestIdx);
+    // Debounce active day update to avoid jitter during fast scrolling
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = setTimeout(() => {
+      const centerX = scrollLeft + clientWidth / 2;
+      let closestIdx = activeDayIndex;
+      let closestDist = Infinity;
+      for (let i = 0; i < dayEntries.length; i++) {
+        const entry = dayEntries[i];
+        if (hideEmpty && !entry.isToday && entry.images.length === 0) continue;
+        const child = el.querySelector(`[data-date="${entry.isoDate}"]`) as HTMLElement | null;
+        if (!child) continue;
+        const dist = Math.abs(child.offsetLeft + child.offsetWidth / 2 - centerX);
+        if (dist < closestDist) { closestDist = dist; closestIdx = i; }
+      }
+      if (closestIdx !== activeDayIndex) setActiveDayIndex(closestIdx);
+    }, 80);
   }, [loadPreviousWeek, loadNextWeek, activeDayIndex, dayEntries, hideEmpty]);
 
   // Navigate to a specific day entry
@@ -479,7 +491,11 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
         ref={scrollRef}
         onScroll={handleScroll}
         className="flex gap-4 overflow-x-auto pb-2"
-        style={{ scrollSnapType: 'x proximity' }}
+        style={{
+          scrollSnapType: visibleEntries.length > 3 ? 'x proximity' : 'none',
+          overscrollBehaviorX: 'contain',
+          willChange: 'scroll-position',
+        }}
       >
         {dayEntries.map((entry, i) => {
           if (hideEmpty && !entry.isToday && entry.images.length === 0) return null;
