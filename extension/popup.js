@@ -3,10 +3,10 @@ const DEFAULT_SERVER = 'http://localhost:3001';
 const I18N = {
   en: {
     subtitle: 'Design Inspiration Saver',
-    analyzePage: 'Analyze Page',
+    analyzePage: 'Analyze',
     quickSave: 'Quick Save',
-    areaAnalyze: 'Area Analyze',
-    areaSave: 'Area Save',
+    fullPage: 'Full Page',
+    areaSelect: 'Area Select',
     settings: 'Settings',
     test: 'Test',
     saveSettings: 'Save Settings',
@@ -16,10 +16,10 @@ const I18N = {
   },
   zh: {
     subtitle: '设计灵感剪贴簿',
-    analyzePage: '分析页面',
+    analyzePage: '分析',
     quickSave: '快速保存',
-    areaAnalyze: '区域分析',
-    areaSave: '区域保存',
+    fullPage: '整页',
+    areaSelect: '区域',
     settings: '设置',
     test: '测试',
     saveSettings: '保存设置',
@@ -35,9 +35,9 @@ let locale = 'en';
 document.addEventListener('DOMContentLoaded', async () => {
   const analyzeBtn = document.getElementById('analyzeBtn');
   const captureBtn = document.getElementById('captureBtn');
-  const areaAnalyzeBtn = document.getElementById('areaAnalyzeBtn');
-  const areaSaveBtn = document.getElementById('areaSaveBtn');
+  const modeToggle = document.getElementById('modeToggle');
   const testConnection = document.getElementById('testConnection');
+  let captureMode = 'page'; // 'page' or 'area'
   const saveSettings = document.getElementById('saveSettings');
   const serverInput = document.getElementById('serverUrl');
   const appUrlInput = document.getElementById('appUrl');
@@ -81,6 +81,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Capture mode toggle
+  modeToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('.mode-btn');
+    if (!btn) return;
+    captureMode = btn.dataset.mode;
+    modeToggle.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+
   // Settings toggle
   const settingsToggle = document.getElementById('settingsToggle');
   const settingsArrow = document.getElementById('settingsArrow');
@@ -111,9 +120,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     analyzeBtn.disabled = true;
     analyzeBtn.innerHTML = `<span class="spinner"></span> <span>${locale === 'zh' ? '启动中...' : 'Starting...'}</span>`;
 
+    const msgType = captureMode === 'area' ? 'START_AREA_CAPTURE' : 'ANALYZE_PAGE';
+    const msg = captureMode === 'area' ? { type: msgType, mode: 'analyze' } : { type: msgType };
+
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      await chrome.tabs.sendMessage(tab.id, { type: 'ANALYZE_PAGE' });
+      await chrome.tabs.sendMessage(tab.id, msg);
       // Close popup after triggering analysis
       setTimeout(() => window.close(), 200);
     } catch (err) {
@@ -127,7 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Wait a bit for script to initialize
         setTimeout(async () => {
           try {
-            await chrome.tabs.sendMessage(tab.id, { type: 'ANALYZE_PAGE' });
+            await chrome.tabs.sendMessage(tab.id, msg);
             window.close();
           } catch {
             showStatus('Failed to start analysis', 'error');
@@ -148,9 +160,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     captureBtn.disabled = true;
     captureBtn.innerHTML = `<span class="spinner"></span> <span>${t('saving')}</span>`;
 
+    const msgType = captureMode === 'area' ? 'START_AREA_CAPTURE' : 'SAVE_IMAGE';
+    const msg = captureMode === 'area' ? { type: msgType, mode: 'save' } : { type: msgType, imageUrl: null, isImage: false };
+
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      await chrome.tabs.sendMessage(tab.id, { type: 'SAVE_IMAGE', imageUrl: null, isImage: false });
+      await chrome.tabs.sendMessage(tab.id, msg);
       setTimeout(() => window.close(), 200);
     } catch (err) {
       // Content script might not be injected
@@ -159,7 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
         setTimeout(async () => {
           try {
-            await chrome.tabs.sendMessage(tab.id, { type: 'SAVE_IMAGE', imageUrl: null, isImage: false });
+            await chrome.tabs.sendMessage(tab.id, msg);
             window.close();
           } catch {
             showStatus('Failed to start save', 'error');
@@ -175,32 +190,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Area screenshot buttons
-  async function startAreaCapture(mode) {
-    try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      await chrome.tabs.sendMessage(tab.id, { type: 'START_AREA_CAPTURE', mode });
-      setTimeout(() => window.close(), 200);
-    } catch {
-      try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
-        setTimeout(async () => {
-          try {
-            await chrome.tabs.sendMessage(tab.id, { type: 'START_AREA_CAPTURE', mode });
-            window.close();
-          } catch {
-            showStatus('Cannot start area capture', 'error');
-          }
-        }, 500);
-      } catch {
-        showStatus('Cannot inject script on this page', 'error');
-      }
-    }
-  }
-
-  areaAnalyzeBtn.addEventListener('click', () => startAreaCapture('analyze'));
-  areaSaveBtn.addEventListener('click', () => startAreaCapture('save'));
 });
 
 function t(key) {

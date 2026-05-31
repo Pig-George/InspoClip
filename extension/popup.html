@@ -29,6 +29,18 @@
     <!-- Status message -->
     <div class="status" id="status"></div>
 
+    <!-- Capture mode toggle -->
+    <div class="mode-toggle" id="modeToggle">
+      <button class="mode-btn active" data-mode="page">
+        <span class="mode-icon">🖥️</span>
+        <span data-i18n="fullPage">Full Page</span>
+      </button>
+      <button class="mode-btn" data-mode="area">
+        <span class="mode-icon">✂️</span>
+        <span data-i18n="areaSelect">Area Select</span>
+      </button>
+    </div>
+
     <!-- Main actions -->
     <div class="actions">
       <button id="analyzeBtn" class="btn btn-primary">
@@ -38,18 +50,6 @@
       <button id="captureBtn" class="btn btn-secondary">
         <span class="btn-icon">📸</span>
         <span data-i18n="quickSave">Quick Save</span>
-      </button>
-    </div>
-
-    <!-- Screenshot actions -->
-    <div class="actions actions-secondary">
-      <button id="areaAnalyzeBtn" class="btn btn-ghost">
-        <span class="btn-icon">✂️</span>
-        <span data-i18n="areaAnalyze">Area Analyze</span>
-      </button>
-      <button id="areaSaveBtn" class="btn btn-ghost">
-        <span class="btn-icon">✂️</span>
-        <span data-i18n="areaSave">Area Save</span>
       </button>
     </div>
 

@@ -187,6 +187,48 @@ body {
 .status.error { background: #f8d7da; color: #721c24; }
 .status.loading { background: #fff3cd; color: #856404; }
 
+/* Mode Toggle */
+.mode-toggle {
+  display: flex;
+  background: #f0e6d6;
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 10px;
+  gap: 2px;
+  animation: slideDown 0.35s ease 0.05s backwards;
+}
+
+.mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: #8a7060;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.25s ease;
+}
+
+.mode-btn:hover:not(.active) {
+  color: #4a3028;
+  background: rgba(255,255,255,0.5);
+}
+
+.mode-btn.active {
+  background: white;
+  color: #c0784a;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.mode-icon { font-size: 13px; }
+
 /* Actions */
 .actions {
   display: flex;
