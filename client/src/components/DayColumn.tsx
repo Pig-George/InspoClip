@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { DayName, Image as ImageType, ViewMode } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
 import { ImageUploader } from './ImageUploader';
+import { ImageCard } from './ImageCard';
 import { SortableImageCard } from './SortableImageCard';
 import {
   DndContext,
@@ -33,6 +35,16 @@ interface DayColumnProps {
 
 export function DayColumn({ dayName, dayOfWeek, weekId, images, viewMode, isToday, dateStr, canUpload = true, animDelay = 0, onRefresh }: DayColumnProps) {
   const { t, locale } = useLanguage();
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Detect when a dialog/modal is open to disable DnD
+  useEffect(() => {
+    const check = () => setDialogOpen(!!document.querySelector('[data-dialog-overlay]'));
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, { childList: true, subtree: true });
+    check();
+    return () => observer.disconnect();
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -122,18 +134,30 @@ export function DayColumn({ dayName, dayOfWeek, weekId, images, viewMode, isToda
       {/* Content area with DnD */}
       <div className="flex-1 px-4 py-3 space-y-3">
         {images.length > 0 ? (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={images.map((img) => img.id)} strategy={verticalListSortingStrategy}>
-              {images.map((image) => (
-                <SortableImageCard
-                  key={image.id}
-                  image={image}
-                  onRefresh={onRefresh}
-                  animDelay={animDelay}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
+          dialogOpen ? (
+            // No DnD when modal is open — render plain cards
+            images.map((image) => (
+              <ImageCard
+                key={image.id}
+                image={image}
+                onRefresh={onRefresh}
+                animDelay={animDelay}
+              />
+            ))
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={images.map((img) => img.id)} strategy={verticalListSortingStrategy}>
+                {images.map((image) => (
+                  <SortableImageCard
+                    key={image.id}
+                    image={image}
+                    onRefresh={onRefresh}
+                    animDelay={animDelay}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )
         ) : (
           <div className="flex items-center justify-center h-24 text-[var(--text-muted)] text-sm font-handwriting opacity-30">
             {canUpload ? t('PasteOrDrop') : t('EmptyPage')}
