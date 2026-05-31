@@ -70,6 +70,20 @@
           <div class="input-row">
             <input type="text" id="appUrl" placeholder="http://localhost:8080" />
           </div>
+
+          <label data-i18n="shortcuts">Keyboard Shortcuts</label>
+          <div class="shortcut-row">
+            <span class="shortcut-label" data-i18n="areaAnalyze">Area Analyze</span>
+            <input type="text" id="shortcutAnalyze" class="shortcut-input" placeholder="Ctrl+Shift+A" readonly />
+            <button class="btn btn-tiny" data-clear="shortcutAnalyze">✕</button>
+          </div>
+          <div class="shortcut-row">
+            <span class="shortcut-label" data-i18n="areaSave">Area Save</span>
+            <input type="text" id="shortcutSave" class="shortcut-input" placeholder="Ctrl+Shift+S" readonly />
+            <button class="btn btn-tiny" data-clear="shortcutSave">✕</button>
+          </div>
+          <p class="hint" data-i18n="shortcutHint">Click input then press your desired key combo</p>
+
           <button id="saveSettings" class="btn btn-small btn-full" data-i18n="saveSettings">Save Settings</button>
         </div>
       </div>

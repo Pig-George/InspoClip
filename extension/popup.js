@@ -8,6 +8,10 @@ const I18N = {
     fullPage: 'Full Page',
     areaSelect: 'Area Select',
     settings: 'Settings',
+    shortcuts: 'Keyboard Shortcuts',
+    areaAnalyze: 'Area Analyze',
+    areaSave: 'Area Save',
+    shortcutHint: 'Click input then press your desired key combo',
     test: 'Test',
     saveSettings: 'Save Settings',
     openInspoClip: 'Open InspoClip →',
@@ -21,6 +25,10 @@ const I18N = {
     fullPage: '整页',
     areaSelect: '区域',
     settings: '设置',
+    shortcuts: '快捷键',
+    areaAnalyze: '区域分析',
+    areaSave: '区域保存',
+    shortcutHint: '点击输入框后按下你想要的快捷键组合',
     test: '测试',
     saveSettings: '保存设置',
     openInspoClip: '打开 InspoClip →',
@@ -60,11 +68,81 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Load settings
-  const result = await chrome.storage.sync.get(['serverUrl', 'appUrl']);
+  const result = await chrome.storage.sync.get(['serverUrl', 'appUrl', 'shortcuts']);
   serverUrl = result.serverUrl || DEFAULT_SERVER;
   const appUrl = result.appUrl || serverUrl.replace(/:3001$/, ':8080');
   serverInput.value = serverUrl;
   appUrlInput.value = appUrl;
+
+  // Load shortcuts
+  const shortcuts = result.shortcuts || { analyze: 'Ctrl+Shift+A', save: 'Ctrl+Shift+S' };
+  const shortcutAnalyzeInput = document.getElementById('shortcutAnalyze');
+  const shortcutSaveInput = document.getElementById('shortcutSave');
+  shortcutAnalyzeInput.value = shortcuts.analyze || '';
+  shortcutSaveInput.value = shortcuts.save || '';
+
+  // Shortcut recording logic
+  function setupShortcutInput(input, clearBtn) {
+    let recording = false;
+
+    input.addEventListener('click', () => {
+      if (recording) return;
+      recording = true;
+      input.value = '';
+      input.classList.add('recording');
+      input.placeholder = locale === 'zh' ? '按下快捷键...' : 'Press keys...';
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (!recording) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Ignore modifier-only keys
+      if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
+
+      const parts = [];
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.altKey) parts.push('Alt');
+      if (e.shiftKey) parts.push('Shift');
+      if (e.metaKey) parts.push('Meta');
+
+      // Map key names
+      let key = e.key;
+      if (key === ' ') key = 'Space';
+      else if (key === 'ArrowUp') key = 'Up';
+      else if (key === 'ArrowDown') key = 'Down';
+      else if (key === 'ArrowLeft') key = 'Left';
+      else if (key === 'ArrowRight') key = 'Right';
+      else if (key.length === 1) key = key.toUpperCase();
+
+      parts.push(key);
+      input.value = parts.join('+');
+      recording = false;
+      input.classList.remove('recording');
+      input.placeholder = '';
+    });
+
+    input.addEventListener('blur', () => {
+      if (recording) {
+        recording = false;
+        input.classList.remove('recording');
+        input.placeholder = '';
+        if (!input.value) input.value = input.dataset.lastValue || '';
+      }
+    });
+
+    input.addEventListener('focus', () => {
+      input.dataset.lastValue = input.value;
+    });
+
+    clearBtn.addEventListener('click', () => {
+      input.value = '';
+    });
+  }
+
+  setupShortcutInput(shortcutAnalyzeInput, document.querySelector('[data-clear="shortcutAnalyze"]'));
+  setupShortcutInput(shortcutSaveInput, document.querySelector('[data-clear="shortcutSave"]'));
 
   // Open app link
   openAppLink.href = appUrl;
@@ -110,7 +188,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   saveSettings.addEventListener('click', async () => {
     serverUrl = serverInput.value.trim().replace(/\/$/, '') || DEFAULT_SERVER;
     const newAppUrl = appUrlInput.value.trim().replace(/\/$/, '') || serverUrl.replace(/:3001$/, ':8080');
-    await chrome.storage.sync.set({ serverUrl, appUrl: newAppUrl });
+    const newShortcuts = {
+      analyze: shortcutAnalyzeInput.value.trim(),
+      save: shortcutSaveInput.value.trim(),
+    };
+    await chrome.storage.sync.set({ serverUrl, appUrl: newAppUrl, shortcuts: newShortcuts });
     openAppLink.href = newAppUrl;
     testServerConnection();
   });

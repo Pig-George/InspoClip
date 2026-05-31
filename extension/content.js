@@ -66,6 +66,59 @@
     }
   });
 
+  // ---- Custom Keyboard Shortcuts ----
+
+  let customShortcuts = { analyze: 'Ctrl+Shift+A', save: 'Ctrl+Shift+S' };
+
+  // Load custom shortcuts
+  chrome.storage.sync.get(['shortcuts'], (result) => {
+    if (result.shortcuts) customShortcuts = { ...customShortcuts, ...result.shortcuts };
+  });
+
+  // Listen for shortcut changes
+  chrome.storage.onChanged.addListener((changes) => {
+    if (changes.shortcuts) customShortcuts = { ...customShortcuts, ...changes.shortcuts.newValue };
+  });
+
+  function matchShortcut(e, pattern) {
+    if (!pattern) return false;
+    const parts = pattern.split('+').map((p) => p.trim().toLowerCase());
+    const key = parts.filter((p) => !['ctrl', 'alt', 'shift', 'meta'].includes(p))[0];
+    const needCtrl = parts.includes('ctrl');
+    const needAlt = parts.includes('alt');
+    const needShift = parts.includes('shift');
+    const needMeta = parts.includes('meta');
+
+    let pressedKey = e.key.toLowerCase();
+    if (pressedKey === ' ') pressedKey = 'space';
+    else if (pressedKey === 'arrowup') pressedKey = 'up';
+    else if (pressedKey === 'arrowdown') pressedKey = 'down';
+    else if (pressedKey === 'arrowleft') pressedKey = 'left';
+    else if (pressedKey === 'arrowright') pressedKey = 'right';
+
+    return (
+      pressedKey === key &&
+      e.ctrlKey === needCtrl &&
+      e.altKey === needAlt &&
+      e.shiftKey === needShift &&
+      e.metaKey === needMeta
+    );
+  }
+
+  document.addEventListener('keydown', (e) => {
+    // Don't trigger in inputs
+    const tag = e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
+
+    if (matchShortcut(e, customShortcuts.analyze)) {
+      e.preventDefault();
+      startAreaCapture('analyze');
+    } else if (matchShortcut(e, customShortcuts.save)) {
+      e.preventDefault();
+      startAreaCapture('save');
+    }
+  });
+
   // ---- Area Capture Flow ----
 
   let areaOverlay = null;
