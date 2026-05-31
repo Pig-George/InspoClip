@@ -31,6 +31,25 @@ export function TimelineView() {
     loadMonth(currentMonth);
   }, [currentMonth, loadMonth]);
 
+  // Keyboard shortcuts for month navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+      if (document.querySelector('[data-dialog-overlay]')) return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goToPrevMonth();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        goToNextMonth();
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [currentMonth]);
+
   const goToPrevMonth = () => {
     const [y, m] = currentMonth.split('-').map(Number);
     const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
