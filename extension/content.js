@@ -182,7 +182,6 @@
           analysisHistory.push({ data, previewUrl: lastPreviewUrl, timestamp: Date.now() });
           historyIndex = analysisHistory.length - 1;
 
-          removeToast();
           transitionToModal(data, lastPreviewUrl);
         } else {
           // Save mode — check similarity then upload
@@ -520,7 +519,11 @@
   // ---- Transition Toast → Modal ----
 
   function transitionToModal(data, previewUrl) {
-    if (!currentToast) return;
+    if (!currentToast) {
+      // No toast — show modal directly from top-right
+      showModal(data, previewUrl, window.innerWidth - 20, 20);
+      return;
+    }
 
     // Get toast position for origin of animation
     const toastRect = currentToast.getBoundingClientRect();
