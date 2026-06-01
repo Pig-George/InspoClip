@@ -16,15 +16,15 @@ async function getConfig(): Promise<{
     return {
       provider: map.AI_PROVIDER || 'openai',
       apiKey: map.AI_API_KEY || process.env.AI_API_KEY || 'sk-placeholder',
-      baseURL: map.AI_API_BASE || process.env.AI_API_BASE || 'https://api.deepseek.com/v1',
-      model: map.AI_MODEL || process.env.AI_MODEL || 'deepseek-chat',
+      baseURL: map.AI_API_BASE || process.env.AI_API_BASE || 'https://api.openai.com/v1',
+      model: map.AI_MODEL || process.env.AI_MODEL || 'gpt-5.4-codex',
     };
   } catch {
     return {
       provider: 'openai',
       apiKey: process.env.AI_API_KEY || 'sk-placeholder',
-      baseURL: process.env.AI_API_BASE || 'https://api.deepseek.com/v1',
-      model: process.env.AI_MODEL || 'deepseek-chat',
+      baseURL: process.env.AI_API_BASE || 'https://api.openai.com/v1',
+      model: process.env.AI_MODEL || 'gpt-5.4-codex',
     };
   }
 }

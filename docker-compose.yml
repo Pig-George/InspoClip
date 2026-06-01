@@ -24,8 +24,8 @@ services:
       DATABASE_URL: postgresql://inspoclip:inspoclip@postgres:5432/inspoclip
       AI_PROVIDER: ${AI_PROVIDER:-openai}
       AI_API_KEY: ${AI_API_KEY:-sk-placeholder}
-      AI_API_BASE: ${AI_API_BASE:-https://api.deepseek.com/v1}
-      AI_MODEL: ${AI_MODEL:-deepseek-chat}
+      AI_API_BASE: ${AI_API_BASE:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-gpt-5.4-codex}
       PORT: 3001
       UPLOAD_DIR: /app/uploads
     volumes:

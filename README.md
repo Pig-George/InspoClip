@@ -137,8 +137,8 @@ docker compose up -d --build
 |------|------|--------|
 | `AI_PROVIDER` | 模型服务商 | `openai` |
 | `AI_API_KEY` | API 密钥 | `sk-placeholder` |
-| `AI_API_BASE` | API 地址 | `https://api.deepseek.com/v1` |
-| `AI_MODEL` | 模型名称 | `deepseek-chat` |
+| `AI_API_BASE` | API 地址 | `https://api.openai.com/v1` |
+| `AI_MODEL` | 模型名称 | `gpt-5.4-codex` |
 | `PORT` | 前端端口 | `8080` |
 
 ## 项目结构
