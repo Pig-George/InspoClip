@@ -67,17 +67,17 @@
 
 ## 页面展示
 
-- inspoClip 主页![image.png](https://mood-mom.oss-cn-hangzhou.aliyuncs.com/picgo/node/20260601225455463.png)
+- 主页：![主页](docs/images/home.png)
 
-- 图片详情：包含设计术语、标签、配色方案和PROMPT ![image.png](https://mood-mom.oss-cn-hangzhou.aliyuncs.com/picgo/node/20260601225625598.png)
+- 图片详情：![详情](docs/images/detail.png)
 
-- 周视图：![image.png](https://mood-mom.oss-cn-hangzhou.aliyuncs.com/picgo/node/20260601231038032.png)
+- 周视图：![周视图](docs/images/week.png)
 
-- 时间轴视图: ![image.png](https://mood-mom.oss-cn-hangzhou.aliyuncs.com/picgo/node/20260601225708423.png)
+- 时间轴视图：![时间轴](docs/images/timeline.png)
 
-- inspoClip 插件演示: ![PixPin_2026-06-01_23-04-07.gif](https://mood-mom.oss-cn-hangzhou.aliyuncs.com/picgo/node/PixPin_2026-06-01_23-04-07.gif)
+- 插件演示：![插件演示](docs/images/extension-demo.gif)
 
-- inspoClip 插件-自定义选区功能: ![PixPin_2026-06-01_23-06-53.gif](https://mood-mom.oss-cn-hangzhou.aliyuncs.com/picgo/node/PixPin_2026-06-01_23-06-53.gif)
+- 自定义选区：![自定义选区](docs/images/extension-area.gif)
 
 ## 技术栈
 
