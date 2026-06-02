@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -X POST http://localhost:18060/mcp -H \"Content-Type: application/json\" -H \"Accept: application/json, text/event-stream\" -d \"{\\\\\"jsonrpc\\\\\":\\\\\"2.0\\\\\",\\\\\"method\\\\\":\\\\\"initialize\\\\\",\\\\\"params\\\\\":{\\\\\"protocolVersion\\\\\":\\\\\"2024-11-05\\\\\",\\\\\"capabilities\\\\\":{},\\\\\"clientInfo\\\\\":{\\\\\"name\\\\\":\\\\\"claude\\\\\",\\\\\"version\\\\\":\\\\\"1.0\\\\\"}},\\\\\"id\\\\\":0}\" -D headers.txt)",
+      "Bash(node C:/Users/hexb/temp/mcp-call.js)",
+      "Bash(powershell -Command \"Start-Sleep -Seconds 30; Get-Content 'C:\\\\Users\\\\hexb\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--project-aiWork-AIMood\\\\5fcf4116-9180-496d-a9d6-eeffbb19ba39\\\\tasks\\\\btk6c3iq9.output' -ErrorAction SilentlyContinue\")",
+      "Bash(powershell -Command \"Start-Sleep -Seconds 40; Get-Content 'C:\\\\Users\\\\hexb\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--project-aiWork-AIMood\\\\5fcf4116-9180-496d-a9d6-eeffbb19ba39\\\\tasks\\\\btk6c3iq9.output' -ErrorAction SilentlyContinue\")",
+      "Bash(powershell -Command \"Start-Sleep -Seconds 60; Get-Content 'C:\\\\Users\\\\hexb\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--project-aiWork-AIMood\\\\5fcf4116-9180-496d-a9d6-eeffbb19ba39\\\\tasks\\\\btk6c3iq9.output' -ErrorAction SilentlyContinue\")",
+      "Bash(node C:/Users/hexb/temp/mcp-call2.js)",
+      "Bash(node C:/Users/hexb/temp/mcp-get-posts.js)",
+      "Bash(node C:/Users/hexb/temp/mcp-get-posts2.js)",
+      "Bash(node C:/Users/hexb/temp/mcp-list-tools.js)",
+      "Bash(node C:/Users/hexb/temp/mcp-get-posts3.js)",
+      "Bash(node C:/Users/hexb/temp/mcp-get-posts4.js)",
+      "Bash(node C:/Users/hexb/temp/mcp-get-posts5.js)",
+      "Bash(node C:/Users/hexb/temp/mcp-publish.js)",
+      "Bash(curl -s -X POST \"http://localhost:3001/api/images/1fba8997-a57e-402a-a184-118efe4e3691/prompt\")",
+      "Bash(curl -s \"https://www.micuapi.ai/v1/models\" -H \"Authorization: Bearer sk-fwS43I7pu4bktc9neeYlO0Fa3gqjKatGnnnoPtGpOvV8lJ34\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(m['id']\\) for m in d.get\\('data',[]\\) if 'gpt' in m['id'].lower\\(\\) or 'codex' in m['id'].lower\\(\\)]\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('en:', d.get\\('contentEn',''\\)[:100]\\); print\\('zh:', d.get\\('contentZh',''\\)[:100]\\)\")",
+      "Bash(git stash *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\hexb\\temp"
+    ]
+  }
+}

@@ -17,14 +17,14 @@ async function getConfig(): Promise<{
       provider: map.AI_PROVIDER || 'openai',
       apiKey: map.AI_API_KEY || process.env.AI_API_KEY || 'sk-placeholder',
       baseURL: map.AI_API_BASE || process.env.AI_API_BASE || 'https://api.openai.com/v1',
-      model: map.AI_MODEL || process.env.AI_MODEL || 'gpt-5.4-codex',
+      model: map.AI_MODEL || process.env.AI_MODEL || 'gpt-5.4',
     };
   } catch {
     return {
       provider: 'openai',
       apiKey: process.env.AI_API_KEY || 'sk-placeholder',
       baseURL: process.env.AI_API_BASE || 'https://api.openai.com/v1',
-      model: process.env.AI_MODEL || 'gpt-5.4-codex',
+      model: process.env.AI_MODEL || 'gpt-5.4',
     };
   }
 }
@@ -212,8 +212,7 @@ export async function generateTerms(imagePath: string): Promise<string[]> {
   return callOpenAI(cfg.apiKey, cfg.baseURL, cfg.model, base64, mimeType);
 }
 
-const PROMPT_GEN_PROMPT = `Analyze this UI/UX design screenshot and generate a detailed AI image/design prompt that could recreate a similar design style. The prompt should describe the visual style, color palette, typography, layout patterns, mood, and key design elements. Provide the prompt in BOTH English and Chinese. Format your response as JSON:
-{"en": "Your English prompt here", "zh": "你的中文提示词"}`;
+const PROMPT_GEN_PROMPT = `Analyze this UI/UX design screenshot and generate a detailed AI image/design prompt that could recreate a similar design style. The prompt should describe the visual style, color palette, typography, layout patterns, mood, and key design elements. Provide the prompt in BOTH English and Chinese. Format your response as JSON: {"en": "Your English prompt here", "zh": "你的中文提示词"}`;
 
 export async function generateDesignPrompt(imagePath: string): Promise<{ en: string; zh: string }> {
   const cfg = await getConfig();

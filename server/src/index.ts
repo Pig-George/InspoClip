@@ -95,7 +95,7 @@ async function initDB() {
     AI_PROVIDER: process.env.AI_PROVIDER || 'openai',
     AI_API_KEY: process.env.AI_API_KEY || 'sk-placeholder',
     AI_API_BASE: process.env.AI_API_BASE || 'https://api.openai.com/v1',
-    AI_MODEL: process.env.AI_MODEL || 'gpt-5.4-codex',
+    AI_MODEL: process.env.AI_MODEL || 'gpt-5.4',
   };
   for (const [key, value] of Object.entries(defaults)) {
     const rows = await db.select().from(configTable).where(eq(configTable.key, key)).limit(1);
