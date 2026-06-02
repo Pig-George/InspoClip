@@ -8,4 +8,5 @@ server/uploads/*
 testdata
 *.png
 !client/public/favicon.png
+!docs/images/*.png
 server/test_image.png
