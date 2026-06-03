@@ -130,8 +130,8 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
     if (hasNext) mondays.push(nextMondayStr);
     setWeekMondays(mondays);
 
-    const promises = [loadWeek(prevMondayStr, true), loadWeek(initMonday, false)];
-    if (hasNext) promises.push(loadWeek(nextMondayStr, false));
+    const promises = [loadWeek(prevMondayStr, true, hideEmpty), loadWeek(initMonday, false, hideEmpty)];
+    if (hasNext) promises.push(loadWeek(nextMondayStr, false, hideEmpty));
 
     Promise.all(promises).then(() => {
       const todayIso = formatISODate(new Date());

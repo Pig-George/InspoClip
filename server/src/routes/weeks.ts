@@ -26,13 +26,11 @@ router.get('/:date', async (req: Request, res: Response) => {
 
     let week = await db.select().from(weeks).where(eq(weeks.weekStart, mondayStr)).limit(1);
 
-    if (contentOnly && week.length === 0) {
-      // Don't create empty weeks in content-only mode
-      res.json({ week: null, images: [], notes: null });
-      return;
-    }
-
     if (week.length === 0) {
+      if (contentOnly) {
+        res.json({ week: null, images: [], notes: null });
+        return;
+      }
       const [newWeek] = await db.insert(weeks).values({ weekStart: mondayStr }).returning();
       week = [newWeek];
     }
@@ -44,6 +42,12 @@ router.get('/:date', async (req: Request, res: Response) => {
       .from(images)
       .where(eq(images.weekId, weekId))
       .orderBy(images.sortOrder, images.createdAt);
+
+    // In contentOnly mode, return empty if no images
+    if (contentOnly && weekImages.length === 0) {
+      res.json({ week: null, images: [], notes: null });
+      return;
+    }
 
     const imageIds = weekImages.map((img) => img.id);
     let allTerms: any[] = [];
