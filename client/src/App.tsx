@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { WeekHeader } from '@/components/WeekHeader';
@@ -26,7 +26,7 @@ function AppInner() {
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [pasteSimilarOpen, setPasteSimilarOpen] = useState(false);
   const [pasteSimilarImages, setPasteSimilarImages] = useState<SimilarImage[]>([]);
-  const pendingPasteRef = useState<{ file: File; weekId: string; dayOfWeek: number } | null>(null);
+  const pendingPasteRef = useRef<{ file: File; weekId: string; dayOfWeek: number } | null>(null);
   const { locale } = useLanguage();
 
   const loadWeek = useCallback(async (monday: Date) => {

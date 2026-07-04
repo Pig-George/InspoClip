@@ -133,7 +133,7 @@ export function DayColumn({ dayName, dayOfWeek, weekId, images, viewMode, isToda
       {/* Content area with DnD */}
       <div className="flex-1 px-4 py-3 space-y-3">
         {images.length > 0 ? (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} disabled={dialogOpen}>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={images.map((img) => img.id)} strategy={verticalListSortingStrategy}>
               {images.map((image) => (
                 <SortableImageCard

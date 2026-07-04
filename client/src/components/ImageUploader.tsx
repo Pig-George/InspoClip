@@ -141,7 +141,7 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files?.length > 0) handleFiles(files);
+    if (files && files.length > 0) handleFiles(files);
     e.target.value = '';
   };
 

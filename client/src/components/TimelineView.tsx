@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { fetchMonth, imageUrl } from '@/lib/api';
+import type { TimelineMonth } from '@/lib/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { getWeekNumber, formatDateRange } from '@/lib/utils';
-import type { TimelineMonth } from '@/types';
 
 export function TimelineView() {
   const [data, setData] = useState<TimelineMonth | null>(null);
