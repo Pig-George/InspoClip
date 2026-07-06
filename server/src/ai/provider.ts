@@ -1,7 +1,13 @@
-export interface ImageModelInput {
-  imageUrl: string;
+export type ImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+
+interface ImagePromptInput {
   prompt: string;
 }
+
+export type ImageModelInput = ImagePromptInput & (
+  | { imageUrl: string; base64Image?: never; mimeType?: never }
+  | { imageUrl?: never; base64Image: string; mimeType: ImageMimeType }
+);
 
 export interface VideoModelInput {
   videoUrl: string;

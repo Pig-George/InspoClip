@@ -26,6 +26,8 @@ describe('createLangChainProvider', () => {
     expect(factory).toHaveBeenCalledWith({
       model: 'qwen3.7-plus',
       apiKey: 'test-key',
+      maxTokens: 300,
+      temperature: 0.7,
       configuration: { baseURL: 'https://example.test/v1' },
     });
   });
@@ -103,6 +105,29 @@ describe('createLangChainProvider', () => {
         content: [
           { type: 'text', text: 'Describe the visual style' },
           { type: 'image_url', image_url: { url: 'https://cdn.test/image.png' } },
+        ],
+      },
+    ]);
+  });
+
+  it('converts typed base64 image data to an OpenAI data URL', async () => {
+    const { invoke, provider } = createHarness();
+
+    await provider.analyzeImage({
+      base64Image: 'cG5nLWJ5dGVz',
+      mimeType: 'image/png',
+      prompt: 'Describe the visual style',
+    });
+
+    expect(invoke).toHaveBeenCalledWith([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Describe the visual style' },
+          {
+            type: 'image_url',
+            image_url: { url: 'data:image/png;base64,cG5nLWJ5dGVz' },
+          },
         ],
       },
     ]);
@@ -248,5 +273,7 @@ describe('createLangChainProvider', () => {
         max_pixels: 12845056,
       },
     });
+    expect(body.max_tokens).toBe(300);
+    expect(body.temperature).toBe(0.7);
   });
 });

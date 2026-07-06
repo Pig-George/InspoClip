@@ -15,6 +15,8 @@ export interface Invoker {
 export interface InvokerOptions {
   model: string;
   apiKey: string;
+  maxTokens: number;
+  temperature: number;
   configuration: {
     baseURL: string;
     fetch?: typeof fetch;
@@ -71,6 +73,15 @@ function requireHttpUrl(value: string, name: string): string {
   return trimmed;
 }
 
+function imageUrl(input: ImageModelInput): string {
+  if ('base64Image' in input && input.base64Image !== undefined) {
+    const base64 = input.base64Image.trim();
+    if (!base64) throw new Error('Base64 image must not be empty');
+    return `data:${input.mimeType};base64,${base64}`;
+  }
+  return requireHttpUrl(input.imageUrl, 'Image URL');
+}
+
 function requireFps(fps: number): number {
   if (!Number.isInteger(fps) || fps < 1 || fps > 5) {
     throw new Error('Video FPS must be an integer between 1 and 5');
@@ -107,6 +118,8 @@ export function createLangChainProvider(
   const invoker = factory({
     model: validatedConfig.model,
     apiKey: validatedConfig.apiKey,
+    maxTokens: 300,
+    temperature: 0.7,
     configuration: {
       baseURL: validatedConfig.baseURL,
       ...clientConfiguration,
@@ -137,13 +150,13 @@ export function createLangChainProvider(
 
     async analyzeImage(input: ImageModelInput): Promise<unknown> {
       const prompt = requirePrompt(input.prompt);
-      const imageUrl = requireHttpUrl(input.imageUrl, 'Image URL');
+      const url = imageUrl(input);
       const response = await invoker.invoke([
         {
           role: 'user',
           content: [
             { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: imageUrl } },
+            { type: 'image_url', image_url: { url } },
           ],
         },
       ]);
