@@ -14,6 +14,8 @@ import { useLanguage } from '@/context/LanguageContext';
 import { SimilarityConfirmDialog } from '@/components/SimilarityConfirmDialog';
 import { getMonday, formatISODate } from '@/lib/utils';
 import type { WeekData, ViewMode } from '@/types';
+import { VideoUploadDialog } from '@/components/video/VideoUploadDialog';
+import { VideoAnalysisView } from '@/components/video/VideoAnalysisView';
 
 function AppInner() {
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
@@ -26,6 +28,9 @@ function AppInner() {
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [pasteSimilarOpen, setPasteSimilarOpen] = useState(false);
   const [pasteSimilarImages, setPasteSimilarImages] = useState<SimilarImage[]>([]);
+  const [videoUploadOpen, setVideoUploadOpen] = useState(false);
+  const [videoId, setVideoId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('video'));
+  const [videoJobId, setVideoJobId] = useState<string | undefined>();
   const pendingPasteRef = useRef<{ file: File; weekId: string; dayOfWeek: number } | null>(null);
   const { locale } = useLanguage();
 
@@ -171,6 +176,17 @@ function AppInner() {
     onShowHelp: () => setShowShortcutHelp((v) => !v),
   });
 
+  const openVideo = (id: string, jobId?: string) => {
+    setVideoId(id); setVideoJobId(jobId); setVideoUploadOpen(false);
+    const url = new URL(window.location.href); url.searchParams.set('video', id); window.history.pushState({}, '', url);
+  };
+  const closeVideo = () => {
+    setVideoId(null); setVideoJobId(undefined);
+    const url = new URL(window.location.href); url.searchParams.delete('video'); window.history.pushState({}, '', url);
+  };
+
+  if (videoId) return <VideoAnalysisView videoId={videoId} initialJobId={videoJobId} onBack={closeVideo} />;
+
   return (
     <div className="min-h-screen px-4 py-6 max-w-[1400px] mx-auto">
       <WeekHeader
@@ -258,6 +274,10 @@ function AppInner() {
         onConfirm={handlePasteConfirm}
         onCancel={handlePasteCancel}
       />
+      <button onClick={() => setVideoUploadOpen(true)} className="fixed bottom-6 right-6 z-40 rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-heading text-white shadow-lg hover:bg-[var(--accent-hover)]">
+        分析视频
+      </button>
+      <VideoUploadDialog open={videoUploadOpen} onClose={() => setVideoUploadOpen(false)} onUploaded={openVideo} />
     </div>
   );
 }

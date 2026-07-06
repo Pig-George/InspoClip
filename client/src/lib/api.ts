@@ -89,6 +89,11 @@ export interface AIConfig {
   AI_API_KEY?: string;
   AI_API_BASE?: string;
   AI_MODEL?: string;
+  VIDEO_AI_PROVIDER?: string;
+  VIDEO_AI_API_KEY?: string;
+  VIDEO_AI_API_BASE?: string;
+  VIDEO_AI_MODEL?: string;
+  VIDEO_AI_FPS?: string;
 }
 
 export async function fetchConfig(): Promise<AIConfig> {

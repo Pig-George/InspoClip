@@ -11,3 +11,4 @@ testdata
 !docs/images/*.png
 server/test_image.png
 .worktrees/
+*.tsbuildinfo
