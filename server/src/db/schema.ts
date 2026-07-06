@@ -1,4 +1,4 @@
-import { pgTable, uuid, date, smallint, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, date, integer, jsonb, smallint, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const weeks = pgTable('weeks', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -70,3 +70,54 @@ export const imageCritiques = pgTable('image_critiques', {
   contentZh: text('content_zh').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const videos = pgTable('videos', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  filePath: text('file_path').notNull(),
+  thumbnailPath: text('thumbnail_path'),
+  originalName: text('original_name').notNull(),
+  mimeType: text('mime_type').notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  durationMs: integer('duration_ms').notNull(),
+  width: integer('width').notNull(),
+  height: integer('height').notNull(),
+  source: text('source').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const videoAnalysisJobs = pgTable('video_analysis_jobs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  videoId: uuid('video_id').notNull().references(() => videos.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('pending'),
+  progress: smallint('progress').notNull().default(0),
+  model: text('model').notNull(),
+  fps: smallint('fps').notNull().default(3),
+  attemptCount: smallint('attempt_count').notNull().default(0),
+  errorMessage: text('error_message'),
+  rawResponse: text('raw_response'),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const videoAnalyses = pgTable('video_analyses', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  videoId: uuid('video_id').notNull().references(() => videos.id, { onDelete: 'cascade' }).unique(),
+  summary: text('summary').notNull(),
+  visualStyle: jsonb('visual_style').notNull(),
+  analysis: jsonb('analysis').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const videoPromptOutputs = pgTable('video_prompt_outputs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  analysisId: uuid('analysis_id').notNull().references(() => videoAnalyses.id, { onDelete: 'cascade' }),
+  purpose: text('purpose').notNull(),
+  target: text('target').notNull().default(''),
+  locale: text('locale').notNull().default('zh'),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  outputKey: uniqueIndex('video_prompt_outputs_key').on(table.analysisId, table.purpose, table.target, table.locale),
+}));

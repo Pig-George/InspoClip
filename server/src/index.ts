@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { mkdir } from 'node:fs/promises';
 import { db } from './db/index.js';
 import { config as configTable } from './db/schema.js';
 import { eq } from 'drizzle-orm';
@@ -13,6 +14,11 @@ import configRouter from './routes/config.js';
 import searchRouter from './routes/search.js';
 import tagsRouter from './routes/tags.js';
 import exportRouter from './routes/export.js';
+import { createVideosRouter } from './routes/videos.js';
+import { createVideoJobsRouter } from './routes/video-jobs.js';
+import { DrizzleVideoRepository } from './video/repository.js';
+import { VideoWorker } from './video/worker.js';
+import { createVideoAiService } from './services/video-ai.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -82,6 +88,28 @@ async function initDB() {
       content_zh TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT NOW()
     );
+    CREATE TABLE IF NOT EXISTS videos (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), file_path TEXT NOT NULL, thumbnail_path TEXT,
+      original_name TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes INTEGER NOT NULL,
+      duration_ms INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL,
+      source TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS video_analysis_jobs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), video_id UUID NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending', progress SMALLINT NOT NULL DEFAULT 0, model TEXT NOT NULL,
+      fps SMALLINT NOT NULL DEFAULT 3, attempt_count SMALLINT NOT NULL DEFAULT 0, error_message TEXT,
+      raw_response TEXT, started_at TIMESTAMP, completed_at TIMESTAMP, created_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS video_analyses (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), video_id UUID NOT NULL UNIQUE REFERENCES videos(id) ON DELETE CASCADE,
+      summary TEXT NOT NULL, visual_style JSONB NOT NULL, analysis JSONB NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS video_prompt_outputs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), analysis_id UUID NOT NULL REFERENCES video_analyses(id) ON DELETE CASCADE,
+      purpose TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', locale TEXT NOT NULL DEFAULT 'zh',
+      content TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW(), UNIQUE(analysis_id, purpose, target, locale)
+    );
     ALTER TABLE images ADD COLUMN IF NOT EXISTS phash TEXT;
     ALTER TABLE images ADD COLUMN IF NOT EXISTS ahash TEXT;
     ALTER TABLE images ADD COLUMN IF NOT EXISTS colorhash TEXT;
@@ -96,6 +124,11 @@ async function initDB() {
     AI_API_KEY: process.env.AI_API_KEY || 'sk-placeholder',
     AI_API_BASE: process.env.AI_API_BASE || 'https://api.openai.com/v1',
     AI_MODEL: process.env.AI_MODEL || 'gpt-5.4',
+    VIDEO_AI_PROVIDER: process.env.VIDEO_AI_PROVIDER || 'openai-compatible',
+    VIDEO_AI_API_KEY: process.env.VIDEO_AI_API_KEY || '',
+    VIDEO_AI_API_BASE: process.env.VIDEO_AI_API_BASE || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    VIDEO_AI_MODEL: process.env.VIDEO_AI_MODEL || 'qwen3.7-plus',
+    VIDEO_AI_FPS: process.env.VIDEO_AI_FPS || '3',
   };
   for (const [key, value] of Object.entries(defaults)) {
     const rows = await db.select().from(configTable).where(eq(configTable.key, key)).limit(1);
@@ -119,12 +152,19 @@ app.use('/api/config', configRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/tags', tagsRouter);
 app.use('/api/export', exportRouter);
+const videoRepository = new DrizzleVideoRepository();
+app.use('/api/videos', createVideosRouter({ repository: videoRepository }));
+app.use('/api/video-jobs', createVideoJobsRouter(videoRepository));
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
 async function start() {
+  await Promise.all([
+    mkdir(process.env.UPLOAD_DIR || './uploads', { recursive: true }),
+    mkdir(process.env.VIDEO_UPLOAD_DIR || './videos', { recursive: true }),
+  ]);
   // Retry DB init with backoff (Docker DNS may not resolve immediately)
   for (let i = 0; i < 5; i++) {
     try {
@@ -140,6 +180,11 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`InspoClip server running on http://localhost:${PORT}`);
   });
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+  const worker = new VideoWorker(videoRepository, {
+    analyzeVideo: async (input) => (await createVideoAiService()).analyzeVideo(input),
+  }, { videoUrlFor: (video) => `${publicBaseUrl}/api/videos/${video.id}/content` });
+  void worker.start().catch((error) => console.error('Video worker stopped:', error));
 }
 
 start();

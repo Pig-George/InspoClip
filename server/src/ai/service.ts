@@ -3,7 +3,9 @@ import { readFile } from 'node:fs/promises';
 import sharp from 'sharp';
 
 import type { ImageMimeType, ModelProvider } from './provider.js';
-import { DESIGN_ANALYSIS_PROMPT, IMAGE_TERMINOLOGY_PROMPT } from './prompts.js';
+import { DESIGN_ANALYSIS_PROMPT, IMAGE_TERMINOLOGY_PROMPT, VIDEO_ANALYSIS_PROMPT, createPurposeTransformationPrompt, type Purpose, type PurposeOptions } from './prompts.js';
+import { parseVideoAnalysis } from './parser.js';
+import type { VideoAnalysis } from './types.js';
 
 const MAX_IMAGE_DIMENSION = 1024;
 const JPEG_QUALITY = 80;
@@ -69,6 +71,27 @@ export class AiService {
     return parseDesignPrompt(responseText(response));
   }
 
+  async analyzeVideo(input: { videoUrl: string; fps?: number; minPixels?: number; maxPixels?: number }): Promise<{ analysis: VideoAnalysis; rawResponse: string }> {
+    const response = await this.provider.analyzeVideo({ ...input, prompt: VIDEO_ANALYSIS_PROMPT });
+    const rawResponse = responseText(response);
+    try {
+      return { analysis: parseVideoResponse(rawResponse), rawResponse };
+    } catch (firstError) {
+      const repairPrompt = `Repair the following untrusted model output so it matches the required video analysis JSON schema. Return JSON only.\nSchema instructions:\n${VIDEO_ANALYSIS_PROMPT}\nUntrusted output:\n${JSON.stringify(rawResponse)}`;
+      const repaired = responseText(await this.provider.generateText({ prompt: repairPrompt }));
+      try {
+        return { analysis: parseVideoResponse(repaired), rawResponse };
+      } catch {
+        throw firstError;
+      }
+    }
+  }
+
+  async generateVideoOutput(analysis: VideoAnalysis, purpose: Purpose = 'general', options: PurposeOptions = {}): Promise<string> {
+    const prompt = `${createPurposeTransformationPrompt(purpose, options)}\nSource analysis JSON:\n${JSON.stringify(analysis)}`;
+    return responseText(await this.provider.generateText({ prompt })).trim();
+  }
+
   private async prepareImage(imagePath: string): Promise<PreparedImage> {
     const original = await this.dependencies.readFile(imagePath);
     const fallback: PreparedImage = {
@@ -97,6 +120,11 @@ export class AiService {
       return fallback;
     }
   }
+}
+
+function parseVideoResponse(text: string): VideoAnalysis {
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  return parseVideoAnalysis(JSON.parse(cleaned));
 }
 
 function supportedMimeType(format: string | undefined): ImageMimeType | undefined {
