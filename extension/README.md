@@ -20,6 +20,11 @@ Save design inspiration from any webpage directly to your InspoClip collection.
 - **Right-click** on any image or page → "Save to InspoClip"
 - **Click** the extension icon → "Capture This Page"
 - Configure your InspoClip server URL in the popup settings
+- Right-click a webpage video and choose **Save and analyze video with InspoClip**
+- Or select a local MP4/MOV/WebM file or paste a public video URL in the popup
+- The popup shows analysis progress; use **View full analysis** for the timeline and prompt outputs
+
+Protected, cross-origin, and `blob:` video URLs may not be downloadable by the extension. Save those videos locally and upload the file instead.
 
 ## Requirements
 

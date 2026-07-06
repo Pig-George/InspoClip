@@ -26,10 +26,18 @@ services:
       AI_API_KEY: ${AI_API_KEY:-sk-placeholder}
       AI_API_BASE: ${AI_API_BASE:-https://api.openai.com/v1}
       AI_MODEL: ${AI_MODEL:-gpt-5.4}
+      VIDEO_AI_PROVIDER: ${VIDEO_AI_PROVIDER:-openai-compatible}
+      VIDEO_AI_API_KEY: ${VIDEO_AI_API_KEY:-}
+      VIDEO_AI_API_BASE: ${VIDEO_AI_API_BASE:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      VIDEO_AI_MODEL: ${VIDEO_AI_MODEL:-qwen3.7-plus}
+      VIDEO_AI_FPS: ${VIDEO_AI_FPS:-3}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
       PORT: 3001
       UPLOAD_DIR: /app/uploads
+      VIDEO_UPLOAD_DIR: /app/videos
     volumes:
       - uploads:/app/uploads
+      - videos:/app/videos
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,3 +61,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  videos:

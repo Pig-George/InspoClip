@@ -229,3 +229,11 @@ InspoClip/
 ## License
 
 MIT
+
+## 视频动效分析
+
+InspoClip 支持上传 10 秒至 2 分钟、最大 200 MB 的 MP4、MOV 或 WebM 产品/UI 动效演示。服务端异步调用视频理解模型，输出完整时间线、界面状态变化和可复刻动作，并按用途生成通用提示词、视频生成提示词、前端实现规格、AE/Figma 动效规格、分镜或 JSON。
+
+默认视频模型为 `qwen3.7-plus`，可在设置页独立修改视频 API 地址、密钥、模型和 1–5 FPS 采样率。部署时必须将 `PUBLIC_BASE_URL` 设置为云模型可访问的 HTTPS 地址；模型会从 `${PUBLIC_BASE_URL}/api/videos/:id/content` 读取待分析视频，`localhost` 仅适用于能够访问本机的模型代理。
+
+视频任务状态为 `pending`、`processing`、`completed` 或 `failed`。服务重启后会恢复中断任务，限流和瞬时网络错误最多重试三次。视频和封面保存在独立 Docker volume `videos` 中。
