@@ -1,3 +1,5 @@
+importScripts('video.js');
+
 const DEFAULT_SERVER = 'http://localhost:3001';
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -5,6 +7,11 @@ chrome.runtime.onInstalled.addListener(() => {
     id: 'inspoclip-save-image',
     title: 'Save Image to InspoClip',
     contexts: ['image']
+  });
+  chrome.contextMenus.create({
+    id: 'inspoclip-save-video',
+    title: 'Save and analyze video with InspoClip',
+    contexts: ['video']
   });
   chrome.contextMenus.create({
     id: 'inspoclip-save-page',
@@ -52,6 +59,18 @@ chrome.commands.onCommand.addListener(async (command) => {
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'inspoclip-save-video') {
+    try {
+      const result = await saveVideoFromUrl(info.srcUrl);
+      const settings = await chrome.storage.sync.get(['appUrl']);
+      const appUrl = settings.appUrl || (await getServerUrl()).replace(/:3001$/, ':8080');
+      await chrome.tabs.create({ url: InspoClipVideo.buildClientVideoUrl(appUrl, result.videoId) });
+    } catch (err) {
+      console.error('Failed to save video:', err);
+      chrome.notifications.create({ type: 'basic', iconUrl: 'icons/icon128.png', title: 'InspoClip', message: err.message || 'Video upload failed' });
+    }
+    return;
+  }
   // Analyze — send message to content script
   if (info.menuItemId === 'inspoclip-analyze-image' || info.menuItemId === 'inspoclip-analyze-page') {
     try {
@@ -139,7 +158,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true;
   }
+
+  if (message.type === 'UPLOAD_VIDEO_URL') {
+    saveVideoFromUrl(message.url, message.serverUrl)
+      .then((result) => sendResponse({ success: true, ...result }))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
 });
+
+async function saveVideoFromUrl(url, explicitServerUrl) {
+  const serverUrl = explicitServerUrl || await getServerUrl();
+  return InspoClipVideo.uploadVideoUrl(fetch, serverUrl, url);
+}
 
 async function captureAndUpload(serverUrl, dayOfWeek) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

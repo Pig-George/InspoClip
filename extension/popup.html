@@ -53,6 +53,17 @@
       </button>
     </div>
 
+    <div class="video-section">
+      <div class="video-title">🎬 <span>UI Video Analysis</span></div>
+      <input type="file" id="videoFile" accept="video/mp4,video/quicktime,video/webm" />
+      <div class="input-row video-url-row">
+        <input type="url" id="videoUrl" placeholder="https://example.com/demo.mp4" />
+        <button id="videoUrlBtn" class="btn btn-small">Analyze</button>
+      </div>
+      <div id="videoProgress" class="video-progress"></div>
+      <a id="videoResultLink" class="video-result-link" href="#" hidden>View full analysis →</a>
+    </div>
+
     <!-- Settings (collapsed by default) -->
     <div class="settings-section">
       <button class="settings-toggle" id="settingsToggle">
@@ -95,6 +106,7 @@
     </div>
   </div>
 
+  <script src="video.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

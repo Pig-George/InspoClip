@@ -74,6 +74,43 @@ document.addEventListener('DOMContentLoaded', async () => {
   serverInput.value = serverUrl;
   appUrlInput.value = appUrl;
 
+  const videoFile = document.getElementById('videoFile');
+  const videoUrlInput = document.getElementById('videoUrl');
+  const videoUrlBtn = document.getElementById('videoUrlBtn');
+  const videoProgress = document.getElementById('videoProgress');
+  const videoResultLink = document.getElementById('videoResultLink');
+
+  async function trackVideo(result) {
+    videoProgress.textContent = locale === 'zh' ? '等待分析…' : 'Waiting for analysis…';
+    videoResultLink.hidden = true;
+    const job = await InspoClipVideo.pollVideoJob(fetch, serverUrl, result.jobId, {
+      onUpdate: (value) => { videoProgress.textContent = `${value.status} · ${value.progress}%`; },
+    });
+    if (job.status === 'failed') throw new Error(job.errorMessage || 'Video analysis failed');
+    videoProgress.textContent = locale === 'zh' ? '分析完成' : 'Analysis completed';
+    videoResultLink.href = InspoClipVideo.buildClientVideoUrl(appUrlInput.value || appUrl, result.videoId);
+    videoResultLink.hidden = false;
+  }
+
+  videoFile.addEventListener('change', async () => {
+    const file = videoFile.files?.[0];
+    if (!file) return;
+    videoProgress.textContent = locale === 'zh' ? '上传中…' : 'Uploading…';
+    try {
+      if (file.size > 200 * 1024 * 1024) throw new Error('Video exceeds 200MB');
+      await trackVideo(await InspoClipVideo.uploadVideoBlob(fetch, serverUrl, file, file.name));
+    } catch (err) { videoProgress.textContent = err.message || 'Upload failed'; }
+  });
+
+  videoUrlBtn.addEventListener('click', async () => {
+    videoProgress.textContent = locale === 'zh' ? '获取视频…' : 'Fetching video…';
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'UPLOAD_VIDEO_URL', url: videoUrlInput.value, serverUrl });
+      if (!response?.success) throw new Error(response?.error || 'Upload failed');
+      await trackVideo(response);
+    } catch (err) { videoProgress.textContent = err.message || 'Upload failed'; }
+  });
+
   // Load shortcuts
   const shortcuts = result.shortcuts || { analyze: 'Ctrl+Shift+A', save: 'Ctrl+Shift+S' };
   const shortcutAnalyzeInput = document.getElementById('shortcutAnalyze');

@@ -515,3 +515,9 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+.video-section { margin-top: 14px; padding: 12px; border: 1px solid rgba(128,128,128,.25); border-radius: 12px; }
+.video-title { font-weight: 600; margin-bottom: 9px; }
+.video-section input[type="file"] { width: 100%; font-size: 12px; margin-bottom: 8px; }
+.video-url-row input { min-width: 0; }
+.video-progress { min-height: 18px; margin-top: 8px; font-size: 12px; opacity: .8; }
+.video-result-link { display: inline-block; margin-top: 5px; color: #c0784a; font-size: 12px; }
