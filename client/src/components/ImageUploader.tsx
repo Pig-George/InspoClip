@@ -133,7 +133,11 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded, onOpenVideo }: Im
           if (file) files.push(file);
         }
       }
-      if (files.length > 0) handleFiles(files);
+      if (files.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleFiles(files);
+      }
     },
     [handleFiles]
   );
