@@ -12,12 +12,18 @@ describe('video media validation', () => {
   });
 
   it.each([
-    [{ durationMs: 9_999, width: 1, height: 1, container: 'mp4' }, 'at least 10 seconds'],
+    [{ durationMs: 0, width: 1, height: 1, container: 'mp4' }, 'valid duration'],
+    [{ durationMs: Number.NaN, width: 1, height: 1, container: 'mp4' }, 'valid duration'],
     [{ durationMs: 120_001, width: 1, height: 1, container: 'mp4' }, 'at most 120 seconds'],
     [{ durationMs: 10_000, width: 0, height: 1, container: 'mp4' }, 'dimensions'],
     [{ durationMs: 10_000, width: 1, height: 1, container: 'matroska' }, 'Unsupported'],
   ])('rejects invalid metadata %#', (metadata, message) => {
     expect(() => validateVideoMetadata(metadata)).toThrow(message);
+  });
+
+  it('accepts short UI demo videos under 10 seconds', () => {
+    expect(validateVideoMetadata({ durationMs: 5_000, width: 1280, height: 720, container: 'mp4' }))
+      .toEqual({ durationMs: 5_000, width: 1280, height: 720, container: 'mp4' });
   });
 
   it('rejects ffprobe output without a video stream', async () => {

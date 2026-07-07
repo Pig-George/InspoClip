@@ -24,7 +24,7 @@ function normalizeContainer(formatName: string): string {
 }
 
 export function validateVideoMetadata(metadata: VideoMetadata): VideoMetadata {
-  if (!Number.isFinite(metadata.durationMs) || metadata.durationMs < 10_000) throw new Error('Video must be at least 10 seconds');
+  if (!Number.isFinite(metadata.durationMs) || metadata.durationMs <= 0) throw new Error('Video must have a valid duration');
   if (metadata.durationMs > 120_000) throw new Error('Video must be at most 120 seconds');
   if (!Number.isInteger(metadata.width) || !Number.isInteger(metadata.height) || metadata.width <= 0 || metadata.height <= 0) {
     throw new Error('Invalid video dimensions');
