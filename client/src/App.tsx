@@ -198,8 +198,6 @@ function AppInner() {
     const url = new URL(window.location.href); url.searchParams.delete('video'); window.history.pushState({}, '', url);
   };
 
-  if (videoId) return <VideoAnalysisView videoId={videoId} initialJobId={videoJobId} onBack={closeVideo} />;
-
   return (
     <div className="min-h-screen px-4 py-6 max-w-[1400px] mx-auto">
       <WeekHeader
@@ -288,6 +286,8 @@ function AppInner() {
         onConfirm={handlePasteConfirm}
         onCancel={handlePasteCancel}
       />
+
+      {videoId && <VideoAnalysisView videoId={videoId} initialJobId={videoJobId} onBack={closeVideo} />}
     </div>
   );
 }

@@ -1,6 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import { X } from 'lucide-react';
 import { fetchVideo, fetchVideoJob, retryVideo, videoContentUrl } from '@/lib/video-api';
 import type { VideoDetail, VideoJob, VideoStage } from '@/types/video';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { VideoJobProgress } from './VideoJobProgress';
 import { VideoTimeline } from './VideoTimeline';
 import { VideoPromptPanel } from './VideoPromptPanel';
@@ -10,13 +14,68 @@ export function VideoAnalysisView({ videoId, initialJobId, onBack }: { videoId: 
   const [job, setJob] = useState<VideoJob | null>(null);
   const [error, setError] = useState('');
   const player = useRef<HTMLVideoElement>(null);
-  const load = async () => { const value = await fetchVideo(videoId); setDetail(value); setJob(value.job); };
-  useEffect(() => { let cancelled=false; let timer:number|undefined; const poll=async()=>{try{const current=initialJobId?await fetchVideoJob(initialJobId):(await fetchVideo(videoId)).job;if(cancelled)return;if(current)setJob(current);if(current?.status==='completed'){await load();return;}if(current?.status!=='failed')timer=window.setTimeout(poll,1500);}catch(value){if(!cancelled)setError(value instanceof Error?value.message:'加载失败');}}; load().then(poll).catch((value)=>setError(value.message)); return()=>{cancelled=true;if(timer)clearTimeout(timer);}; },[videoId,initialJobId]);
+  const overlayRef = useScrollLock(true);
+  const load = useCallback(async () => { const value = await fetchVideo(videoId); setDetail(value); setJob(value.job); }, [videoId]);
+  useEffect(() => { let cancelled=false; let timer:number|undefined; const poll=async()=>{try{const current=initialJobId?await fetchVideoJob(initialJobId):(await fetchVideo(videoId)).job;if(cancelled)return;if(current)setJob(current);if(current?.status==='completed'){await load();return;}if(current?.status!=='failed')timer=window.setTimeout(poll,1500);}catch(value){if(!cancelled)setError(value instanceof Error?value.message:'加载失败');}}; load().then(poll).catch((value)=>setError(value.message)); return()=>{cancelled=true;if(timer)clearTimeout(timer);}; },[videoId,initialJobId,load]);
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => { if (event.key === 'Escape') onBack(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onBack]);
   const selectStage=(stage:VideoStage)=>{if(player.current){player.current.currentTime=stage.startTime;void player.current.play();}};
-  return <main className="mx-auto min-h-screen max-w-6xl p-6"><button onClick={onBack} className="mb-4 text-[var(--accent)]">← 返回灵感库</button><h1 className="text-2xl font-heading">视频动效分析</h1>
-    {error&&<p className="mt-4 text-red-500">{error}</p>}
-    {job&&job.status!=='completed'&&<div className="mt-4"><VideoJobProgress job={job} onRetry={async()=>setJob(await retryVideo(videoId))}/></div>}
-    <div className="mt-5 grid gap-6 lg:grid-cols-[1.2fr_1fr]"><video ref={player} className="w-full rounded-2xl bg-black" controls src={videoContentUrl(videoId)} /><div>{detail?.analysis?<><h2 className="mb-3 text-lg font-heading">{detail.analysis.summary}</h2><VideoTimeline stages={detail.analysis.stages} onSelect={selectStage}/></>:<p className="text-[var(--text-muted)]">分析完成后将在此显示阶段时间线。</p>}</div></div>
-    {detail?.analysis&&<div className="mt-6"><VideoPromptPanel videoId={videoId}/></div>}
-  </main>;
+  return createPortal(
+    <AnimatePresence>
+      <motion.div
+        ref={overlayRef}
+        data-dialog-overlay
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
+        onClick={(event) => { if (event.target === event.currentTarget) onBack(); }}
+      >
+        <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-label="视频动效分析"
+          initial={{ scale: 0.95, y: 10 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.95, y: 10 }}
+          className="w-full max-w-4xl max-h-[85vh] flex rounded-2xl bg-[var(--card)] border border-[var(--card-border)] shadow-2xl overflow-hidden"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex-1 min-w-0 bg-gray-200/50 flex items-center justify-center p-4">
+            <video ref={player} className="max-h-[80vh] w-full rounded-lg bg-black" controls src={videoContentUrl(videoId)} />
+          </div>
+
+          <div className="w-[320px] flex-shrink-0 flex flex-col border-l border-[var(--card-border)]">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--card-border)]">
+              <h2 className="text-base font-heading font-semibold text-[var(--text)]">视频动效分析</h2>
+              <button
+                type="button"
+                aria-label="关闭"
+                onClick={onBack}
+                className="p-1 rounded-full hover:bg-[var(--muted)] transition-colors"
+              >
+                <X className="w-4 h-4 text-[var(--text-muted)]" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {error&&<p className="text-sm text-red-500">{error}</p>}
+              {job&&job.status!=='completed'&&<VideoJobProgress job={job} onRetry={async()=>setJob(await retryVideo(videoId))}/>}
+              <div>
+                <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">阶段分析</h3>
+                {detail?.analysis
+                  ? <><h4 className="mb-3 text-sm font-heading text-[var(--text)]">{detail.analysis.summary}</h4><VideoTimeline stages={detail.analysis.stages} onSelect={selectStage}/></>
+                  : <p className="text-sm text-[var(--text-muted)]">分析完成后将在此显示阶段时间线。</p>}
+              </div>
+              {detail?.analysis&&<VideoPromptPanel videoId={videoId}/>}
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>,
+    document.body
+  );
 }
