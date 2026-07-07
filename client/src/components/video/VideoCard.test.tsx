@@ -19,4 +19,18 @@ describe('VideoCard', () => {
     fireEvent.click(screen.getByRole('button', { name: /Demo.mp4/ }));
     expect(onOpen).toHaveBeenCalledWith('video-a', 'job-a');
   });
+
+  it('uses the same scrapbook styling as image cards with a stable tilt and decoration', () => {
+    render(<VideoCard video={{
+      id: 'video-a', weekId: 'week-a', dayOfWeek: 1, sortOrder: 0,
+      filePath: 'video.mp4', thumbnailPath: null, originalName: 'Demo.mp4',
+      mimeType: 'video/mp4', sizeBytes: 100, durationMs: 5_000, width: 1280, height: 720,
+      source: 'client', createdAt: new Date().toISOString(), job: null,
+    }} onOpen={() => undefined} onRefresh={() => undefined} />);
+
+    const card = screen.getByRole('button', { name: /Demo.mp4/ });
+    expect(card).toHaveClass('polaroid');
+    expect(card).toHaveStyle({ transform: 'rotate(1deg)' });
+    expect(card.querySelector('[data-video-decoration]')).toBeInTheDocument();
+  });
 });

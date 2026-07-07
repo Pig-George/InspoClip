@@ -1,5 +1,7 @@
 import { RotateCcw, Trash2, Video } from 'lucide-react';
 import { deleteVideo, retryVideo, videoThumbnailUrl } from '@/lib/video-api';
+import { DecorElement } from '@/components/DecorElement';
+import type { DecorationType } from '@/types';
 import type { WeekVideo } from '@/types/video';
 
 interface VideoCardProps {
@@ -14,8 +16,21 @@ function formatDuration(durationMs: number): string {
 }
 
 const statusLabel = { pending: '等待分析', processing: '分析中', completed: '分析完成', failed: '分析失败' } as const;
+const decorations: DecorationType[] = ['tape', 'pin', 'clip', 'washi', 'stitch', 'staple', 'sticker', 'corner'];
+
+function stableCharCode(value: string, index: number): number {
+  return value.charCodeAt(index % Math.max(1, value.length)) || 0;
+}
+
+function videoCardStyle(videoId: string): { rotate: number; decoration: DecorationType } {
+  return {
+    rotate: stableCharCode(videoId, 0) % 5 - 2,
+    decoration: decorations[stableCharCode(videoId, 1) % decorations.length],
+  };
+}
 
 export function VideoCard({ video, onOpen, onRefresh }: VideoCardProps) {
+  const { rotate, decoration } = videoCardStyle(video.id);
   const handleDelete = async (event: React.MouseEvent) => {
     event.stopPropagation();
     await deleteVideo(video.id);
@@ -34,9 +49,12 @@ export function VideoCard({ video, onOpen, onRefresh }: VideoCardProps) {
       aria-label={`打开视频分析 ${video.originalName}`}
       onClick={() => onOpen(video.id, video.job?.id)}
       onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onOpen(video.id, video.job?.id); }}
-      className="polaroid group/video relative w-full cursor-pointer rounded-sm border border-[var(--card-border)] bg-[var(--card)] p-2 shadow-md transition-transform hover:-translate-y-0.5 hover:shadow-lg"
+      className="polaroid group/video relative w-full cursor-pointer rounded-sm border border-[var(--card-border)] bg-[var(--card)] p-2 shadow-md transition-transform hover:shadow-lg"
+      style={{ transform: `rotate(${rotate}deg)` }}
     >
-      <div className="absolute -top-1 left-1/2 z-10 h-3 w-14 -translate-x-1/2 -rotate-2 bg-[var(--accent)]/25" />
+      <div data-video-decoration>
+        <DecorElement type={decoration} />
+      </div>
       <div className="relative aspect-[4/3] overflow-hidden rounded-sm bg-[var(--muted)]">
         {video.thumbnailPath ? (
           <img src={videoThumbnailUrl(video.id)} alt="" className="h-full w-full object-cover" loading="lazy" />
