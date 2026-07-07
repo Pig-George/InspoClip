@@ -15,9 +15,10 @@ const MAX_H = 420; // 15 lines
 interface WeekViewProps {
   weekData: WeekData | null;
   onRefresh: () => void;
+  onOpenVideo: (videoId: string, jobId?: string) => void;
 }
 
-export function WeekView({ weekData, onRefresh }: WeekViewProps) {
+export function WeekView({ weekData, onRefresh, onOpenVideo }: WeekViewProps) {
   const { t } = useLanguage();
   const [notesContent, setNotesContent] = useState(weekData?.notes?.content || '');
   const [notesHeight, setNotesHeight] = useState(140);
@@ -67,6 +68,7 @@ export function WeekView({ weekData, onRefresh }: WeekViewProps) {
     if (!weekData) return [];
     return weekData.images.filter((img) => img.dayOfWeek === dayOfWeek);
   };
+  const getVideosForDay = (dayOfWeek: number) => weekData?.videos?.filter((video) => video.dayOfWeek === dayOfWeek) ?? [];
 
   const todayIso = formatISODate(new Date());
 
@@ -115,11 +117,13 @@ export function WeekView({ weekData, onRefresh }: WeekViewProps) {
                 dayOfWeek={dayOfWeek}
                 weekId={weekData?.week?.id || ''}
                 images={getImagesForDay(dayOfWeek)}
+                videos={getVideosForDay(dayOfWeek)}
                 viewMode="week"
                 isToday={dateStr === todayIso}
                 dateStr={dateStr}
                 canUpload={dateStr === todayIso}
                 onRefresh={onRefresh}
+                onOpenVideo={onOpenVideo}
               />
             </motion.div>
           );

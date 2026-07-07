@@ -73,6 +73,9 @@ export const imageCritiques = pgTable('image_critiques', {
 
 export const videos = pgTable('videos', {
   id: uuid('id').defaultRandom().primaryKey(),
+  weekId: uuid('week_id').references(() => weeks.id, { onDelete: 'cascade' }),
+  dayOfWeek: smallint('day_of_week'),
+  sortOrder: smallint('sort_order').notNull().default(0),
   filePath: text('file_path').notNull(),
   thumbnailPath: text('thumbnail_path'),
   originalName: text('original_name').notNull(),

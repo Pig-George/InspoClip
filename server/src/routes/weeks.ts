@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
-import { weeks, images, terms as termsTable, notes, tags as tagsTable, imageTags, imageColors as imageColorsTable } from '../db/schema.js';
-import { eq, inArray, and, gte, lt } from 'drizzle-orm';
+import { weeks, images, terms as termsTable, notes, tags as tagsTable, imageTags, imageColors as imageColorsTable, videos, videoAnalysisJobs } from '../db/schema.js';
+import { eq, inArray, and, gte, lt, desc } from 'drizzle-orm';
 
 const router = Router();
 
@@ -28,7 +28,7 @@ router.get('/:date', async (req: Request, res: Response) => {
 
     if (week.length === 0) {
       if (contentOnly) {
-        res.json({ week: null, images: [], notes: null });
+        res.json({ week: null, images: [], videos: [], notes: null });
         return;
       }
       const [newWeek] = await db.insert(weeks).values({ weekStart: mondayStr }).returning();
@@ -43,9 +43,18 @@ router.get('/:date', async (req: Request, res: Response) => {
       .where(eq(images.weekId, weekId))
       .orderBy(images.sortOrder, images.createdAt);
 
+    const weekVideos = await db.select().from(videos)
+      .where(eq(videos.weekId, weekId)).orderBy(videos.sortOrder, videos.createdAt);
+    const videoIds = weekVideos.map((video) => video.id);
+    const videoJobs = videoIds.length > 0
+      ? await db.select().from(videoAnalysisJobs).where(inArray(videoAnalysisJobs.videoId, videoIds)).orderBy(desc(videoAnalysisJobs.createdAt))
+      : [];
+    const latestJobByVideo = new Map<string, typeof videoJobs[number]>();
+    for (const job of videoJobs) if (!latestJobByVideo.has(job.videoId)) latestJobByVideo.set(job.videoId, job);
+
     // In contentOnly mode, return empty if no images
-    if (contentOnly && weekImages.length === 0) {
-      res.json({ week: null, images: [], notes: null });
+    if (contentOnly && weekImages.length === 0 && weekVideos.length === 0) {
+      res.json({ week: null, images: [], videos: [], notes: null });
       return;
     }
 
@@ -114,6 +123,7 @@ router.get('/:date', async (req: Request, res: Response) => {
         tags: tagsByImage[img.id] || [],
         colors: colorsByImage[img.id] || [],
       })),
+      videos: weekVideos.map((video) => ({ ...video, job: latestJobByVideo.get(video.id) ?? null })),
       notes: weekNotes[0] || null,
     });
   } catch (err: any) {

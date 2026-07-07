@@ -7,6 +7,9 @@ import { videoUpload } from '../middleware/video-upload.js';
 import { generateVideoThumbnail, inspectVideo, type VideoMetadata } from '../video/media.js';
 import { DrizzleVideoRepository, type VideoRepository, type VideoSource } from '../video/repository.js';
 import { createVideoAiService, getVideoModelConfig } from '../services/video-ai.js';
+import { db } from '../db/index.js';
+import { weeks } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
 
 const PURPOSES = new Set<Purpose>(['general', 'video-generation', 'frontend', 'motion-design', 'storyboard', 'json']);
 
@@ -19,6 +22,32 @@ export interface VideosRouterDependencies {
   getModelSettings(): Promise<{ model: string; fps: number }>;
   generateOutput(analysis: VideoAnalysis, purpose: Purpose, options: PurposeOptions): Promise<string>;
   videoRoot: string;
+  resolvePlacement(): Promise<{ weekId: string; dayOfWeek: number }>;
+}
+
+const WEEKDAY_TO_DAY_OF_WEEK: Record<string, number> = {
+  Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6,
+};
+
+export function getLocalWeekPlacement(date: Date, timeZone = process.env.APP_TIME_ZONE || process.env.TZ || 'Asia/Shanghai'): { weekStart: string; dayOfWeek: number } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value;
+  const year = Number(value('year'));
+  const month = Number(value('month'));
+  const day = Number(value('day'));
+  const dayOfWeek = WEEKDAY_TO_DAY_OF_WEEK[String(value('weekday'))];
+  const localDate = new Date(Date.UTC(year, month - 1, day));
+  localDate.setUTCDate(localDate.getUTCDate() - dayOfWeek);
+  return { weekStart: localDate.toISOString().slice(0, 10), dayOfWeek };
+}
+
+async function resolveTodayPlacement(): Promise<{ weekId: string; dayOfWeek: number }> {
+  const placement = getLocalWeekPlacement(new Date());
+  let [week] = await db.select().from(weeks).where(eq(weeks.weekStart, placement.weekStart)).limit(1);
+  if (!week) [week] = await db.insert(weeks).values({ weekStart: placement.weekStart }).returning();
+  return { weekId: week.id, dayOfWeek: placement.dayOfWeek };
 }
 
 function safeStoredPath(root: string, storedPath: string): string {
@@ -45,6 +74,7 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
     }),
     generateOutput: overrides.generateOutput ?? (async (analysis, purpose, options) => (await createVideoAiService()).generateVideoOutput(analysis, purpose, options)),
     videoRoot,
+    resolvePlacement: overrides.resolvePlacement ?? resolveTodayPlacement,
   };
   const router = Router();
 
@@ -56,7 +86,12 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
       const thumbnailPath = `${file.filename}.thumb.jpg`;
       const generatedThumbnail = await deps.thumbnail(file.path, safeStoredPath(videoRoot, thumbnailPath)).catch(() => null);
       const source: VideoSource = req.body?.source === 'extension' ? 'extension' : 'client';
+      const requestedDay = Number(req.body?.dayOfWeek);
+      const placement = typeof req.body?.weekId === 'string' && req.body.weekId && Number.isInteger(requestedDay) && requestedDay >= 0 && requestedDay <= 6
+        ? { weekId: req.body.weekId, dayOfWeek: requestedDay }
+        : await deps.resolvePlacement();
       const video = await deps.repository.createVideo({
+        ...placement, sortOrder: 0,
         filePath: file.filename, thumbnailPath: generatedThumbnail ? thumbnailPath : null,
         originalName: file.originalname, mimeType: file.mimetype, sizeBytes: file.size,
         durationMs: metadata.durationMs, width: metadata.width, height: metadata.height, source,
@@ -74,6 +109,12 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
     const video = await deps.repository.getVideo(String(req.params.id));
     if (!video) { res.status(404).json({ error: 'Video not found' }); return; }
     res.sendFile(path.basename(video.filePath), { root: path.resolve(videoRoot) });
+  });
+
+  router.get('/:id/thumbnail', async (req, res) => {
+    const video = await deps.repository.getVideo(String(req.params.id));
+    if (!video?.thumbnailPath) { res.status(404).json({ error: 'Video thumbnail not found' }); return; }
+    res.sendFile(path.basename(video.thumbnailPath), { root: path.resolve(videoRoot) });
   });
 
   router.get('/:id/analysis', async (req, res) => {

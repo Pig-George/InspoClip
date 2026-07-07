@@ -14,8 +14,8 @@ import { useLanguage } from '@/context/LanguageContext';
 import { SimilarityConfirmDialog } from '@/components/SimilarityConfirmDialog';
 import { getMonday, formatISODate } from '@/lib/utils';
 import type { WeekData, ViewMode } from '@/types';
-import { VideoUploadDialog } from '@/components/video/VideoUploadDialog';
 import { VideoAnalysisView } from '@/components/video/VideoAnalysisView';
+import { uploadVideo } from '@/lib/video-api';
 
 function AppInner() {
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
@@ -28,11 +28,18 @@ function AppInner() {
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [pasteSimilarOpen, setPasteSimilarOpen] = useState(false);
   const [pasteSimilarImages, setPasteSimilarImages] = useState<SimilarImage[]>([]);
-  const [videoUploadOpen, setVideoUploadOpen] = useState(false);
   const [videoId, setVideoId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('video'));
   const [videoJobId, setVideoJobId] = useState<string | undefined>();
   const pendingPasteRef = useRef<{ file: File; weekId: string; dayOfWeek: number } | null>(null);
   const { locale } = useLanguage();
+
+  const openVideo = useCallback((id: string, jobId?: string) => {
+    setVideoId(id);
+    setVideoJobId(jobId);
+    const url = new URL(window.location.href);
+    url.searchParams.set('video', id);
+    window.history.pushState({}, '', url);
+  }, []);
 
   const loadWeek = useCallback(async (monday: Date) => {
     setLoading(true);
@@ -59,8 +66,13 @@ function AppInner() {
       const dayOfWeek = dow === 0 ? 6 : dow - 1;
       const todayMonday = getMonday(now);
       const weekData = await fetchWeek(formatISODate(todayMonday));
-      const result = await uploadImage(file, weekData.week.id, dayOfWeek);
-      if (result?.id) setLastUploadedImageId(result.id);
+      if (file.type.startsWith('video/')) {
+        const result = await uploadVideo(file, 'client', weekData.week.id, dayOfWeek);
+        openVideo(result.videoId, result.jobId);
+      } else {
+        const result = await uploadImage(file, weekData.week.id, dayOfWeek);
+        if (result?.id) setLastUploadedImageId(result.id);
+      }
       setCurrentMonday(todayMonday);
       setUploadTick((t) => t + 1);
     } catch (err: any) {
@@ -73,7 +85,7 @@ function AppInner() {
     } finally {
       setUploading(false);
     }
-  }, []);
+  }, [openVideo]);
 
   // Global paste handler — check similarity before upload
   useEffect(() => {
@@ -86,7 +98,7 @@ function AppInner() {
 
       let file: File | null = null;
       for (const item of Array.from(items)) {
-        if (item.type.startsWith('image/')) {
+        if (item.type.startsWith('image/') || item.type.startsWith('video/')) {
           file = item.getAsFile();
           break;
         }
@@ -94,6 +106,11 @@ function AppInner() {
       if (!file) return;
 
       e.preventDefault();
+
+      if (file.type.startsWith('video/')) {
+        doPasteUpload(file);
+        return;
+      }
 
       // Check similarity first
       try {
@@ -176,10 +193,6 @@ function AppInner() {
     onShowHelp: () => setShowShortcutHelp((v) => !v),
   });
 
-  const openVideo = (id: string, jobId?: string) => {
-    setVideoId(id); setVideoJobId(jobId); setVideoUploadOpen(false);
-    const url = new URL(window.location.href); url.searchParams.set('video', id); window.history.pushState({}, '', url);
-  };
   const closeVideo = () => {
     setVideoId(null); setVideoJobId(undefined);
     const url = new URL(window.location.href); url.searchParams.delete('video'); window.history.pushState({}, '', url);
@@ -205,11 +218,12 @@ function AppInner() {
           Loading...
         </div>
       ) : viewMode === 'day' ? (
-        <DayView key={uploadTick} initialMonday={currentMonday} onRefresh={refresh} />
+        <DayView key={uploadTick} initialMonday={currentMonday} onRefresh={refresh} onOpenVideo={openVideo} />
       ) : (
         <WeekView
           weekData={weekData}
           onRefresh={refresh}
+          onOpenVideo={openVideo}
         />
       )}
 
@@ -274,10 +288,6 @@ function AppInner() {
         onConfirm={handlePasteConfirm}
         onCancel={handlePasteCancel}
       />
-      <button onClick={() => setVideoUploadOpen(true)} className="fixed bottom-6 right-6 z-40 rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-heading text-white shadow-lg hover:bg-[var(--accent-hover)]">
-        分析视频
-      </button>
-      <VideoUploadDialog open={videoUploadOpen} onClose={() => setVideoUploadOpen(false)} onUploaded={openVideo} />
     </div>
   );
 }

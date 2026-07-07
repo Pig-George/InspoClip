@@ -8,6 +8,9 @@ export type VideoSource = 'client' | 'extension';
 export type VideoJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export interface CreateVideoInput {
+  weekId?: string | null;
+  dayOfWeek?: number | null;
+  sortOrder?: number;
   filePath: string;
   thumbnailPath?: string | null;
   originalName: string;
@@ -19,11 +22,16 @@ export interface CreateVideoInput {
   source: VideoSource;
 }
 
-export interface VideoRecord extends CreateVideoInput {
+export interface VideoRecord extends Omit<CreateVideoInput, 'weekId' | 'dayOfWeek' | 'sortOrder'> {
   id: string;
+  weekId: string | null;
+  dayOfWeek: number | null;
+  sortOrder: number;
   thumbnailPath: string | null;
   createdAt: Date;
 }
+
+export interface VideoWithJob extends VideoRecord { job: VideoJobRecord | null }
 
 export interface VideoJobRecord {
   id: string;
@@ -63,6 +71,7 @@ export interface VideoPromptOutputRecord {
 export interface VideoRepository {
   createVideo(input: CreateVideoInput): Promise<VideoRecord>;
   getVideo(id: string): Promise<VideoRecord | null>;
+  listVideosForWeek(weekId: string): Promise<VideoWithJob[]>;
   createJob(videoId: string, model: string, fps: number): Promise<VideoJobRecord>;
   getJob(id: string): Promise<VideoJobRecord | null>;
   getLatestJobForVideo(videoId: string): Promise<VideoJobRecord | null>;
@@ -84,12 +93,21 @@ export class InMemoryVideoRepository implements VideoRepository {
   private outputs = new Map<string, VideoPromptOutputRecord>();
 
   async createVideo(input: CreateVideoInput): Promise<VideoRecord> {
-    const record: VideoRecord = { ...input, id: randomUUID(), thumbnailPath: input.thumbnailPath ?? null, createdAt: new Date() };
+    const record: VideoRecord = {
+      ...input, id: randomUUID(), weekId: input.weekId ?? null, dayOfWeek: input.dayOfWeek ?? null,
+      sortOrder: input.sortOrder ?? 0, thumbnailPath: input.thumbnailPath ?? null, createdAt: new Date(),
+    };
     this.videos.set(record.id, record);
     return record;
   }
 
   async getVideo(id: string): Promise<VideoRecord | null> { return this.videos.get(id) ?? null; }
+  async listVideosForWeek(weekId: string): Promise<VideoWithJob[]> {
+    return Promise.all([...this.videos.values()]
+      .filter((video) => video.weekId === weekId)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime())
+      .map(async (video) => ({ ...video, job: await this.getLatestJobForVideo(video.id) })));
+  }
 
   async createJob(videoId: string, model: string, fps: number): Promise<VideoJobRecord> {
     if (!this.videos.has(videoId)) throw new Error('Video not found');
@@ -198,6 +216,14 @@ export class DrizzleVideoRepository implements VideoRepository {
   async getVideo(id: string): Promise<VideoRecord | null> {
     const [record] = await this.database.select().from(videos).where(eq(videos.id, id)).limit(1);
     return (record as VideoRecord | undefined) ?? null;
+  }
+
+  async listVideosForWeek(weekId: string): Promise<VideoWithJob[]> {
+    const records = await this.database.select().from(videos)
+      .where(eq(videos.weekId, weekId)).orderBy(asc(videos.sortOrder), asc(videos.createdAt));
+    return Promise.all(records.map(async (record) => ({
+      ...(record as VideoRecord), job: await this.getLatestJobForVideo(record.id),
+    })));
   }
 
   async createJob(videoId: string, model: string, fps: number): Promise<VideoJobRecord> {

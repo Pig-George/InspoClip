@@ -18,21 +18,25 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { reorderImages } from '@/lib/api';
+import { VideoCard } from './video/VideoCard';
+import type { WeekVideo } from '@/types/video';
 
 interface DayColumnProps {
   dayName: DayName;
   dayOfWeek: number;
   weekId: string;
   images: ImageType[];
+  videos: WeekVideo[];
   viewMode: ViewMode;
   isToday: boolean;
   dateStr?: string;
   canUpload?: boolean;
   animDelay?: number;
   onRefresh: () => void;
+  onOpenVideo: (videoId: string, jobId?: string) => void;
 }
 
-export function DayColumn({ dayName, dayOfWeek, weekId, images, viewMode, isToday, dateStr, canUpload = true, animDelay = 0, onRefresh }: DayColumnProps) {
+export function DayColumn({ dayName, dayOfWeek, weekId, images, videos, viewMode, isToday, dateStr, canUpload = true, animDelay = 0, onRefresh, onOpenVideo }: DayColumnProps) {
   const { t, locale } = useLanguage();
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -126,12 +130,13 @@ export function DayColumn({ dayName, dayOfWeek, weekId, images, viewMode, isToda
             ? 'bg-[var(--accent)] text-white'
             : 'bg-[var(--accent)]/15 text-[var(--accent)]'}`}
         >
-          {images.length}
+          {images.length + videos.length}
         </span>
       </div>
 
       {/* Content area with DnD */}
       <div className="flex-1 px-4 py-3 space-y-3">
+        {videos.map((video) => <VideoCard key={video.id} video={video} onOpen={onOpenVideo} onRefresh={onRefresh} />)}
         {images.length > 0 ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={images.map((img) => img.id)} strategy={verticalListSortingStrategy}>
@@ -146,17 +151,17 @@ export function DayColumn({ dayName, dayOfWeek, weekId, images, viewMode, isToda
               ))}
             </SortableContext>
           </DndContext>
-        ) : (
+        ) : videos.length === 0 ? (
           <div className="flex items-center justify-center h-24 text-[var(--text-muted)] text-sm font-handwriting opacity-30">
             {canUpload ? t('PasteOrDrop') : t('EmptyPage')}
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Sticky footer — only today can upload */}
       <div className="sticky bottom-0 z-10 px-4 py-3 border-t border-[var(--card-border)] bg-[var(--card)]">
         {canUpload ? (
-          <ImageUploader weekId={weekId} dayOfWeek={dayOfWeek} onUploaded={onRefresh} />
+          <ImageUploader weekId={weekId} dayOfWeek={dayOfWeek} onUploaded={onRefresh} onOpenVideo={onOpenVideo} />
         ) : (
           <p className="text-[11px] text-[var(--text-muted)] text-center font-handwriting opacity-40">
             {locale === 'zh' ? '仅今日可上传' : 'Upload only today'}

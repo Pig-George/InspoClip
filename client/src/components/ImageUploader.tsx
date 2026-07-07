@@ -7,14 +7,16 @@ import { toast } from '@/components/Toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { SimilarityConfirmDialog } from './SimilarityConfirmDialog';
 import type { SimilarImage } from '@/lib/api';
+import { uploadVideo } from '@/lib/video-api';
 
 interface ImageUploaderProps {
   weekId: string;
   dayOfWeek: number;
   onUploaded: () => void;
+  onOpenVideo: (videoId: string, jobId?: string) => void;
 }
 
-export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderProps) {
+export function ImageUploader({ weekId, dayOfWeek, onUploaded, onOpenVideo }: ImageUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -66,6 +68,20 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
 
   const handleFiles = useCallback(
     async (files: FileList | File[]) => {
+      const videoFile = Array.from(files).find((f) => f.type.startsWith('video/'));
+      if (videoFile) {
+        setUploading(true);
+        try {
+          const result = await uploadVideo(videoFile, 'client', weekId, dayOfWeek);
+          onUploaded();
+          onOpenVideo(result.videoId, result.jobId);
+        } catch (err: any) {
+          toast('error', `视频上传失败: ${err?.message || err}`);
+        } finally {
+          setUploading(false);
+        }
+        return;
+      }
       const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
       if (imageFiles.length === 0) return;
 
@@ -89,7 +105,7 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
 
       doUpload(imageFiles);
     },
-    [doUpload]
+    [doUpload, weekId, dayOfWeek, onUploaded, onOpenVideo]
   );
 
   const handleConfirm = useCallback(() => {
@@ -112,7 +128,7 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
       if (!items) return;
       const files: File[] = [];
       for (const item of Array.from(items)) {
-        if (item.type.startsWith('image/')) {
+        if (item.type.startsWith('image/') || item.type.startsWith('video/')) {
           const file = item.getAsFile();
           if (file) files.push(file);
         }
@@ -201,7 +217,7 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded }: ImageUploaderPr
           <input
             ref={inputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             multiple
             onChange={handleInputChange}
             className="hidden"

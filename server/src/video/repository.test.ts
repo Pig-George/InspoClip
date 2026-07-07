@@ -24,9 +24,29 @@ describe('InMemoryVideoRepository', () => {
     const video = await repo.createVideo({
       filePath: 'video.mp4', originalName: 'demo.mp4', mimeType: 'video/mp4',
       sizeBytes: 100, durationMs: 12_000, width: 1280, height: 720, source: 'client',
+      weekId: 'week-a', dayOfWeek: 2, sortOrder: 0,
     });
     const job = await repo.createJob(video.id, 'qwen3.7-plus', 3);
     expect(job).toMatchObject({ videoId: video.id, status: 'pending', progress: 0, attemptCount: 0 });
+  });
+
+  it('lists videos for a week with their latest analysis job', async () => {
+    const repo = new InMemoryVideoRepository();
+    const video = await repo.createVideo({
+      filePath: 'video.mp4', originalName: 'demo.mp4', mimeType: 'video/mp4',
+      sizeBytes: 100, durationMs: 12_000, width: 1280, height: 720, source: 'client',
+      weekId: 'week-a', dayOfWeek: 3, sortOrder: 0,
+    });
+    await repo.createJob(video.id, 'qwen3.7-plus', 3);
+    await repo.createVideo({
+      filePath: 'other.mp4', originalName: 'other.mp4', mimeType: 'video/mp4',
+      sizeBytes: 100, durationMs: 2_000, width: 640, height: 360, source: 'client',
+      weekId: 'week-b', dayOfWeek: 1, sortOrder: 0,
+    });
+
+    await expect(repo.listVideosForWeek('week-a')).resolves.toMatchObject([
+      { id: video.id, weekId: 'week-a', dayOfWeek: 3, job: { status: 'pending' } },
+    ]);
   });
 
   it('claims each pending job only once', async () => {

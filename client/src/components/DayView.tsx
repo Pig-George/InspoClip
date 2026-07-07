@@ -21,9 +21,10 @@ const NOTES_MAX_H = 420;
 interface DayViewProps {
   initialMonday: Date;
   onRefresh: () => void;
+  onOpenVideo: (videoId: string, jobId?: string) => void;
 }
 
-export function DayView({ initialMonday, onRefresh }: DayViewProps) {
+export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps) {
   const { t, locale } = useLanguage();
   const [notesContent, setNotesContent] = useState('');
   const [notesHeight, setNotesHeight] = useState(140);
@@ -51,6 +52,7 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
       dayName: typeof ALL_DAYS[number]['dayName'];
       weekId: string;
       images: import('@/types').Image[];
+      videos: import('@/types/video').WeekVideo[];
       isToday: boolean;
       canUpload: boolean;
     }[] = [];
@@ -74,6 +76,7 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
           dayName: ALL_DAYS[i].dayName,
           weekId: data.week.id,
           images: data.images.filter((img) => img.dayOfWeek === i),
+          videos: (data.videos ?? []).filter((video) => video.dayOfWeek === i),
           isToday: isoDate === todayIso,
           canUpload: isoDate === todayIso,
         });
@@ -545,7 +548,7 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
         }}
       >
         {dayEntries.map((entry, i) => {
-          if (hideEmpty && !entry.isToday && entry.images.length === 0) return null;
+          if (hideEmpty && !entry.isToday && entry.images.length === 0 && entry.videos.length === 0) return null;
           return (
             <motion.div
               key={entry.isoDate}
@@ -563,12 +566,14 @@ export function DayView({ initialMonday, onRefresh }: DayViewProps) {
                 dayOfWeek={entry.dayOfWeek}
                 weekId={entry.weekId}
                 images={entry.images}
+                videos={entry.videos}
                 viewMode="day"
                 isToday={entry.isToday}
                 dateStr={entry.isoDate}
                 canUpload={entry.canUpload}
                 animDelay={Math.min(i, 8) * 0.06 + 0.3}
                 onRefresh={handleRefresh}
+                onOpenVideo={onOpenVideo}
               />
             </motion.div>
           );

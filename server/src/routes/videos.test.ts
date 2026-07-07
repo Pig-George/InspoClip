@@ -1,7 +1,7 @@
 import express, { type RequestHandler } from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
-import { createVideosRouter } from './videos.js';
+import { createVideosRouter, getLocalWeekPlacement } from './videos.js';
 import { createVideoJobsRouter } from './video-jobs.js';
 import { InMemoryVideoRepository } from '../video/repository.js';
 import type { VideoAnalysis } from '../ai/types.js';
@@ -30,18 +30,26 @@ function setup() {
     getModelSettings: async () => ({ model: 'qwen3.7-plus', fps: 3 }),
     generateOutput: async (_value, purpose) => `${purpose}: output`,
     videoRoot: 'C:/videos',
+    resolvePlacement: async () => ({ weekId: 'week-today', dayOfWeek: 0 }),
   }));
   app.use('/api/video-jobs', createVideoJobsRouter(repo));
   return { app, repo, removeFile };
 }
 
 describe('video routes', () => {
+  it('resolves default placement with the configured business timezone', () => {
+    expect(getLocalWeekPlacement(new Date('2026-07-06T17:00:00.000Z'), 'Asia/Shanghai')).toEqual({
+      weekStart: '2026-07-06',
+      dayOfWeek: 1,
+    });
+  });
+
   it('uploads a video and creates a pending job', async () => {
     const { app, repo } = setup();
-    const response = await request(app).post('/api/videos').send({ source: 'client' });
+    const response = await request(app).post('/api/videos').send({ source: 'client', weekId: 'week-a', dayOfWeek: 4 });
     expect(response.status).toBe(202);
     expect(response.body).toMatchObject({ status: 'pending' });
-    expect(await repo.getVideo(response.body.videoId)).toMatchObject({ durationMs: 20_000, source: 'client' });
+    expect(await repo.getVideo(response.body.videoId)).toMatchObject({ durationMs: 20_000, source: 'client', weekId: 'week-a', dayOfWeek: 4 });
     expect(await repo.getJob(response.body.jobId)).toMatchObject({ model: 'qwen3.7-plus', fps: 3 });
   });
 

@@ -10,10 +10,12 @@ async function responseJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function uploadVideo(file: File, source: 'client' | 'extension' = 'client'): Promise<VideoUploadResult> {
+export async function uploadVideo(file: File, source: 'client' | 'extension' = 'client', weekId?: string, dayOfWeek?: number): Promise<VideoUploadResult> {
   const form = new FormData();
   form.append('video', file);
   form.append('source', source);
+  if (weekId) form.append('weekId', weekId);
+  if (dayOfWeek !== undefined) form.append('dayOfWeek', String(dayOfWeek));
   return responseJson(await fetch(`${BASE}/videos`, { method: 'POST', body: form }));
 }
 export async function fetchVideo(id: string): Promise<VideoDetail> { return responseJson(await fetch(`${BASE}/videos/${id}`)); }
@@ -28,3 +30,4 @@ export async function generateVideoOutput(id: string, purpose: VideoPurpose = 'g
   }));
 }
 export function videoContentUrl(id: string): string { return `${BASE}/videos/${id}/content`; }
+export function videoThumbnailUrl(id: string): string { return `${BASE}/videos/${id}/thumbnail`; }

@@ -89,7 +89,8 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS videos (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), file_path TEXT NOT NULL, thumbnail_path TEXT,
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(), week_id UUID REFERENCES weeks(id) ON DELETE CASCADE,
+      day_of_week SMALLINT, sort_order SMALLINT NOT NULL DEFAULT 0, file_path TEXT NOT NULL, thumbnail_path TEXT,
       original_name TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes INTEGER NOT NULL,
       duration_ms INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL,
       source TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW()
@@ -115,6 +116,9 @@ async function initDB() {
     ALTER TABLE images ADD COLUMN IF NOT EXISTS colorhash TEXT;
     ALTER TABLE images ADD COLUMN IF NOT EXISTS thumbnail_path TEXT;
     ALTER TABLE images ADD COLUMN IF NOT EXISTS sort_order SMALLINT NOT NULL DEFAULT 0;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS week_id UUID REFERENCES weeks(id) ON DELETE CASCADE;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS day_of_week SMALLINT;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS sort_order SMALLINT NOT NULL DEFAULT 0;
   `);
   console.log('Database tables ready');
 

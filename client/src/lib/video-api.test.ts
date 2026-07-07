@@ -8,11 +8,13 @@ describe('video API', () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ videoId: 'v', jobId: 'j', status: 'pending' }), { status: 202, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
     const file = new File(['video'], 'demo.mp4', { type: 'video/mp4' });
-    await expect(uploadVideo(file)).resolves.toMatchObject({ videoId: 'v' });
+    await expect(uploadVideo(file, 'client', 'week-a', 4)).resolves.toMatchObject({ videoId: 'v' });
     const options = fetchMock.mock.calls[0][1];
     expect(options.method).toBe('POST');
     expect(options.body).toBeInstanceOf(FormData);
     expect((options.body as FormData).get('video')).toBe(file);
+    expect((options.body as FormData).get('weekId')).toBe('week-a');
+    expect((options.body as FormData).get('dayOfWeek')).toBe('4');
   });
 
   it('uses general as the default output purpose', async () => {

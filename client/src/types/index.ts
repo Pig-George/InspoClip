@@ -42,6 +42,7 @@ export interface Note {
 export interface WeekData {
   week: Week;
   images: Image[];
+  videos: import('./video').WeekVideo[];
   notes: Note | null;
 }
 

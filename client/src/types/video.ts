@@ -10,8 +10,9 @@ export interface VideoAnalysis {
   assets: string[];
   uncertainties: string[];
 }
-export interface VideoRecord { id: string; filePath: string; thumbnailPath: string | null; originalName: string; mimeType: string; sizeBytes: number; durationMs: number; width: number; height: number; source: 'client' | 'extension'; createdAt: string }
+export interface VideoRecord { id: string; weekId: string | null; dayOfWeek: number | null; sortOrder: number; filePath: string; thumbnailPath: string | null; originalName: string; mimeType: string; sizeBytes: number; durationMs: number; width: number; height: number; source: 'client' | 'extension'; createdAt: string }
 export interface VideoJob { id: string; videoId: string; status: VideoJobStatus; progress: number; model: string; fps: number; attemptCount: number; errorMessage: string | null }
+export interface WeekVideo extends VideoRecord { job: VideoJob | null }
 export interface VideoUploadResult { videoId: string; jobId: string; status: VideoJobStatus }
 export interface VideoDetail { video: VideoRecord; job: VideoJob | null; analysis: VideoAnalysis | null }
 export interface VideoPromptOutput { id: string; purpose: VideoPurpose; target: string; locale: string; content: string }
