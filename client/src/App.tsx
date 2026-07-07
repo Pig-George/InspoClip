@@ -29,6 +29,7 @@ function AppInner() {
   const [pasteSimilarOpen, setPasteSimilarOpen] = useState(false);
   const [pasteSimilarImages, setPasteSimilarImages] = useState<SimilarImage[]>([]);
   const [videoId, setVideoId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('video'));
+  const [videoOpen, setVideoOpen] = useState(() => new URLSearchParams(window.location.search).has('video'));
   const [videoJobId, setVideoJobId] = useState<string | undefined>();
   const pendingPasteRef = useRef<{ file: File; weekId: string; dayOfWeek: number } | null>(null);
   const { locale } = useLanguage();
@@ -36,6 +37,7 @@ function AppInner() {
   const openVideo = useCallback((id: string, jobId?: string) => {
     setVideoId(id);
     setVideoJobId(jobId);
+    setVideoOpen(true);
     const url = new URL(window.location.href);
     url.searchParams.set('video', id);
     window.history.pushState({}, '', url);
@@ -194,7 +196,7 @@ function AppInner() {
   });
 
   const closeVideo = () => {
-    setVideoId(null); setVideoJobId(undefined);
+    setVideoOpen(false);
     const url = new URL(window.location.href); url.searchParams.delete('video'); window.history.pushState({}, '', url);
   };
 
@@ -287,7 +289,7 @@ function AppInner() {
         onCancel={handlePasteCancel}
       />
 
-      {videoId && <VideoAnalysisView videoId={videoId} initialJobId={videoJobId} onBack={closeVideo} />}
+      <VideoAnalysisView open={videoOpen} videoId={videoId} initialJobId={videoJobId} onBack={closeVideo} />
     </div>
   );
 }

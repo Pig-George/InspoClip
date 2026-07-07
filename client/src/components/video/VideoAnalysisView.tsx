@@ -9,23 +9,44 @@ import { VideoJobProgress } from './VideoJobProgress';
 import { VideoTimeline } from './VideoTimeline';
 import { VideoPromptPanel } from './VideoPromptPanel';
 
-export function VideoAnalysisView({ videoId, initialJobId, onBack }: { videoId: string; initialJobId?: string; onBack: () => void }) {
+export function VideoAnalysisView({ open = true, videoId, initialJobId, onBack }: { open?: boolean; videoId?: string | null; initialJobId?: string; onBack: () => void }) {
   const [detail, setDetail] = useState<VideoDetail | null>(null);
   const [job, setJob] = useState<VideoJob | null>(null);
   const [error, setError] = useState('');
   const player = useRef<HTMLVideoElement>(null);
-  const overlayRef = useScrollLock(true);
-  const load = useCallback(async () => { const value = await fetchVideo(videoId); setDetail(value); setJob(value.job); }, [videoId]);
-  useEffect(() => { let cancelled=false; let timer:number|undefined; const poll=async()=>{try{const current=initialJobId?await fetchVideoJob(initialJobId):(await fetchVideo(videoId)).job;if(cancelled)return;if(current)setJob(current);if(current?.status==='completed'){await load();return;}if(current?.status!=='failed')timer=window.setTimeout(poll,1500);}catch(value){if(!cancelled)setError(value instanceof Error?value.message:'加载失败');}}; load().then(poll).catch((value)=>setError(value.message)); return()=>{cancelled=true;if(timer)clearTimeout(timer);}; },[videoId,initialJobId,load]);
+  const overlayRef = useScrollLock(open);
+  const load = useCallback(async () => {
+    if (!videoId) return;
+    const value = await fetchVideo(videoId);
+    setDetail(value);
+    setJob(value.job);
+  }, [videoId]);
   useEffect(() => {
+    if (!open || !videoId) return;
+    let cancelled=false; let timer:number|undefined;
+    const poll=async()=>{
+      try{
+        const current=initialJobId?await fetchVideoJob(initialJobId):(await fetchVideo(videoId)).job;
+        if(cancelled)return;
+        if(current)setJob(current);
+        if(current?.status==='completed'){await load();return;}
+        if(current?.status!=='failed')timer=window.setTimeout(poll,1500);
+      }catch(value){if(!cancelled)setError(value instanceof Error?value.message:'加载失败');}
+    };
+    setError('');
+    load().then(poll).catch((value)=>setError(value.message));
+    return()=>{cancelled=true;if(timer)clearTimeout(timer);};
+  },[open,videoId,initialJobId,load]);
+  useEffect(() => {
+    if (!open) return;
     const handler = (event: KeyboardEvent) => { if (event.key === 'Escape') onBack(); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [onBack]);
+  }, [open, onBack]);
   const selectStage=(stage:VideoStage)=>{if(player.current){player.current.currentTime=stage.startTime;void player.current.play();}};
   return createPortal(
     <AnimatePresence>
-      <motion.div
+      {open && videoId && <motion.div
         ref={overlayRef}
         data-dialog-overlay
         initial={{ opacity: 0 }}
@@ -74,7 +95,7 @@ export function VideoAnalysisView({ videoId, initialJobId, onBack }: { videoId: 
             </div>
           </div>
         </motion.div>
-      </motion.div>
+      </motion.div>}
     </AnimatePresence>,
     document.body
   );

@@ -52,7 +52,7 @@ describe('VideoAnalysisView', () => {
     vi.mocked(retryVideo).mockResolvedValue(detail.job);
     const onBack = vi.fn();
 
-    render(<VideoAnalysisView videoId="video-a" initialJobId="job-a" onBack={onBack} />);
+    render(<VideoAnalysisView open videoId="video-a" initialJobId="job-a" onBack={onBack} />);
 
     const dialog = await screen.findByRole('dialog', { name: /视频动效分析|Video motion analysis/ });
     expect(dialog).toHaveClass('max-w-4xl');
@@ -70,10 +70,23 @@ describe('VideoAnalysisView', () => {
     vi.mocked(fetchVideoJob).mockResolvedValue(detail.job);
     const onBack = vi.fn();
 
-    render(<VideoAnalysisView videoId="video-a" onBack={onBack} />);
+    render(<VideoAnalysisView open videoId="video-a" onBack={onBack} />);
 
     await screen.findByRole('dialog');
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+  });
+
+  it('keeps the dialog mounted for the exit animation when open becomes false', async () => {
+    vi.mocked(fetchVideo).mockResolvedValue(detail);
+    vi.mocked(fetchVideoJob).mockResolvedValue(detail.job);
+    const onBack = vi.fn();
+
+    const { rerender } = render(<VideoAnalysisView open videoId="video-a" onBack={onBack} />);
+
+    await screen.findByRole('dialog');
+    rerender(<VideoAnalysisView open={false} videoId="video-a" onBack={onBack} />);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
