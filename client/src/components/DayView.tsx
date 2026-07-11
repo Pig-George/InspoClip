@@ -25,6 +25,78 @@ interface DayViewProps {
   onOpenVideo: (videoId: string, jobId?: string) => void;
 }
 
+interface InitialDayScrollTargetInput {
+  loadedMondays: string[];
+  weekDataByMonday: Map<string, WeekData>;
+  todayIso: string;
+  initMonday: string;
+  hideEmpty: boolean;
+}
+
+interface InitialDayScrollTarget {
+  index: number;
+  isoDate: string;
+}
+
+function addDaysIso(mondayStr: string, dayOffset: number) {
+  const date = new Date(`${mondayStr}T00:00:00`);
+  date.setDate(date.getDate() + dayOffset);
+  return formatISODate(date);
+}
+
+function getFallbackTodayTarget(loadedMondays: string[], initMonday: string, todayIso: string): InitialDayScrollTarget {
+  const weekIndex = Math.max(0, loadedMondays.indexOf(initMonday));
+  let dayOffset = 0;
+
+  for (let i = 0; i < WEEK_DAYS; i++) {
+    if (addDaysIso(initMonday, i) === todayIso) {
+      dayOffset = i;
+      break;
+    }
+  }
+
+  return {
+    index: weekIndex * WEEK_DAYS + dayOffset,
+    isoDate: todayIso,
+  };
+}
+
+function hasContentOnDay(data: WeekData, dayOfWeek: number) {
+  return data.images.some((img) => img.dayOfWeek === dayOfWeek)
+    || (data.videos ?? []).some((video) => video.dayOfWeek === dayOfWeek);
+}
+
+export function getInitialDayScrollTarget({
+  loadedMondays,
+  weekDataByMonday,
+  todayIso,
+  initMonday,
+  hideEmpty,
+}: InitialDayScrollTargetInput): InitialDayScrollTarget {
+  const fallback = getFallbackTodayTarget(loadedMondays, initMonday, todayIso);
+  if (!hideEmpty) return fallback;
+
+  let latestContentTarget: InitialDayScrollTarget | null = null;
+
+  loadedMondays.forEach((mondayStr, weekIndex) => {
+    const data = weekDataByMonday.get(mondayStr);
+    if (!data) return;
+
+    for (let dayOfWeek = 0; dayOfWeek < WEEK_DAYS; dayOfWeek++) {
+      const isoDate = addDaysIso(mondayStr, dayOfWeek);
+      if (isoDate > todayIso) continue;
+      if (!hasContentOnDay(data, dayOfWeek)) continue;
+
+      latestContentTarget = {
+        index: weekIndex * WEEK_DAYS + dayOfWeek,
+        isoDate,
+      };
+    }
+  });
+
+  return latestContentTarget ?? fallback;
+}
+
 export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps) {
   const { t, locale } = useLanguage();
   const [notesContent, setNotesContent] = useState('');
@@ -138,11 +210,19 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
     if (hasNext) mondays.push(nextMondayStr);
     setWeekMondays(mondays);
 
-    const promises = [loadWeek(prevMondayStr, true, hideEmpty), loadWeek(initMonday, false, hideEmpty)];
+    const promises = [loadWeek(prevMondayStr, true, hideEmpty), loadWeek(initMonday, false, false)];
     if (hasNext) promises.push(loadWeek(nextMondayStr, false, hideEmpty));
 
-    Promise.all(promises).then(async () => {
-      let loadedMondays = [...mondays];
+    Promise.all(promises).then(async (initialResults) => {
+      const weekDataByMonday = new Map<string, WeekData>();
+      for (const data of initialResults) {
+        if (data?.week) weekDataByMonday.set(data.week.weekStart, data);
+      }
+
+      let loadedMondays = hideEmpty
+        ? Array.from(weekDataByMonday.keys()).sort()
+        : [...mondays];
+
       if (hideEmpty) {
         const todayIso = formatISODate(new Date());
         const [previousContent, nextContent] = await Promise.all([
@@ -153,31 +233,35 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
           .sort((a, b) => a.week.weekStart.localeCompare(b.week.weekStart));
         if (contentWeeks.length > 0) {
           loadedMondays = [...new Set([...loadedMondays, ...contentWeeks.map((data) => data.week.weekStart)])].sort();
+          for (const data of contentWeeks) {
+            weekDataByMonday.set(data.week.weekStart, data);
+          }
           setWeekDataMap((prev) => {
             const next = new Map(prev);
             for (const data of contentWeeks) next.set(data.week.weekStart, data);
             return next;
           });
-          setWeekMondays(loadedMondays);
         }
+        setWeekMondays(loadedMondays);
       }
 
       const todayIso = formatISODate(new Date());
-      const todayWeekOffset = Math.max(0, loadedMondays.indexOf(initMonday));
-      const monday = new Date(initMonday + 'T00:00:00');
-      let todayIdx = todayWeekOffset * 7;
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        if (formatISODate(d) === todayIso) {
-          todayIdx = todayWeekOffset * 7 + i;
-          break;
-        }
-      }
-      setActiveDayIndex(todayIdx);
+      const target = getInitialDayScrollTarget({
+        loadedMondays,
+        weekDataByMonday,
+        todayIso,
+        initMonday,
+        hideEmpty,
+      });
+      setActiveDayIndex(target.index);
       setTimeout(() => {
         if (scrollRef.current) {
-          scrollRef.current.scrollLeft = todayIdx * COL_STEP - COL_STEP;
+          const targetEl = scrollRef.current.querySelector(`[data-date="${target.isoDate}"]`) as HTMLElement | null;
+          if (targetEl) {
+            targetEl.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'start' });
+          } else {
+            scrollRef.current.scrollLeft = target.index * COL_STEP - COL_STEP;
+          }
         }
       }, 100);
     });
