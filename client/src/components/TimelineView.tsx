@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
-import { fetchMonth, imageUrl } from '@/lib/api';
+import { fetchMonth } from '@/lib/api';
 import type { TimelineMonth } from '@/lib/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { getWeekNumber, formatDateRange } from '@/lib/utils';
 import { VideoCard } from '@/components/video/VideoCard';
+import { ImageCard } from '@/components/ImageCard';
 
 interface TimelineViewProps {
   onOpenVideo: (videoId: string, jobId?: string) => void;
@@ -156,23 +157,8 @@ export function TimelineView({ onOpenVideo }: TimelineViewProps) {
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: weekIdx * 0.1 + imgIdx * 0.05 }}
-                      className="relative aspect-square rounded-lg overflow-hidden border border-[var(--card-border)] shadow-sm
-                        hover:shadow-md hover:scale-105 transition-all cursor-pointer group"
                     >
-                      <img
-                        src={imageUrl(image.filePath)}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                      {image.terms.length > 0 && (
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity
-                          flex items-end p-1.5">
-                          <span className="text-[10px] text-white font-term truncate">
-                            {image.terms[0].keyword.split(' / ')[0]}
-                          </span>
-                        </div>
-                      )}
+                      <ImageCard image={image} onRefresh={() => loadMonth(currentMonth)} animDelay={0} />
                     </motion.div>
                   ))}
 
