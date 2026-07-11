@@ -8,8 +8,8 @@ import { generateVideoThumbnail, inspectVideo, type VideoMetadata } from '../vid
 import { DrizzleVideoRepository, type VideoRepository, type VideoSource } from '../video/repository.js';
 import { createVideoAiService, getVideoModelConfig } from '../services/video-ai.js';
 import { db } from '../db/index.js';
-import { weeks } from '../db/schema.js';
-import { eq } from 'drizzle-orm';
+import { weeks, videoTags, tags as tagsTable } from '../db/schema.js';
+import { eq, inArray } from 'drizzle-orm';
 
 const PURPOSES = new Set<Purpose>(['general', 'video-generation', 'frontend', 'motion-design', 'storyboard', 'json']);
 
@@ -20,7 +20,7 @@ export interface VideosRouterDependencies {
   thumbnail(inputPath: string, outputPath: string): Promise<string>;
   removeFile(filePath: string): Promise<void>;
   getModelSettings(): Promise<{ model: string; fps: number }>;
-  generateOutput(analysis: VideoAnalysis, purpose: Purpose, options: PurposeOptions): Promise<string>;
+  generateOutput(analysis: VideoAnalysis, purpose: Purpose, options: PurposeOptions): Promise<{ en: string; zh: string }>;
   videoRoot: string;
   resolvePlacement(): Promise<{ weekId: string; dayOfWeek: number }>;
 }
@@ -78,6 +78,10 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
   };
   const router = Router();
 
+  // Track in-flight prompt generations so GET can report "generating" status
+  const inflightGenerations = new Map<string, Promise<{ en: string; zh: string }>>();
+  const generationKey = (videoId: string, purpose: string, target: string) => `${videoId}\0${purpose}\0${target}`;
+
   router.post('/', deps.upload, async (req, res) => {
     const file = req.file;
     if (!file) { res.status(400).json({ error: 'No video file provided' }); return; }
@@ -132,15 +136,28 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
       }
       const purpose = purposeValue as Purpose;
       const target = optionalString(req.body?.target, 'target');
-      const locale = optionalString(req.body?.locale, 'locale', 'zh');
-      const cached = await deps.repository.getPromptOutput(videoId, purpose, target, locale);
+      const cached = await deps.repository.getPromptOutput(videoId, purpose, target);
       if (cached) { res.json(cached); return; }
       const analysis = await deps.repository.getAnalysis(videoId);
       if (!analysis) { res.status(409).json({ error: 'Video analysis is not completed' }); return; }
-      const content = purpose === 'json'
-        ? JSON.stringify(analysis.analysis, null, 2)
-        : await deps.generateOutput(analysis.analysis, purpose, { target, locale });
-      res.json(await deps.repository.savePromptOutput(videoId, purpose, target, locale, content));
+      const key = generationKey(videoId, purpose, target);
+      const existing = inflightGenerations.get(key);
+      if (existing) {
+        const content = await existing;
+        const saved = await deps.repository.getPromptOutput(videoId, purpose, target)
+          ?? await deps.repository.savePromptOutput(videoId, purpose, target, content.en, content.zh);
+        res.json(saved);
+        return;
+      }
+      const promise = (async () => {
+        return purpose === 'json'
+          ? { en: JSON.stringify(analysis.analysis, null, 2), zh: JSON.stringify(analysis.analysis, null, 2) }
+          : await deps.generateOutput(analysis.analysis, purpose, { target });
+      })();
+      inflightGenerations.set(key, promise);
+      promise.catch(() => {}).finally(() => inflightGenerations.delete(key));
+      const content = await promise;
+      res.json(await deps.repository.savePromptOutput(videoId, purpose, target, content.en, content.zh));
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : 'Prompt generation failed' });
     }
@@ -151,10 +168,14 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
       const purposeValue = req.query.purpose ?? 'general';
       if (typeof purposeValue !== 'string' || !PURPOSES.has(purposeValue as Purpose)) { res.status(400).json({ error: 'Unsupported prompt purpose' }); return; }
       const target = optionalString(req.query.target, 'target');
-      const locale = optionalString(req.query.locale, 'locale', 'zh');
-      const output = await deps.repository.getPromptOutput(String(req.params.id), purposeValue, target, locale);
-      if (!output) { res.status(404).json({ error: 'Prompt output not found' }); return; }
-      res.json(output);
+      const videoId = String(req.params.id);
+      const output = await deps.repository.getPromptOutput(videoId, purposeValue, target);
+      if (output) { res.json(output); return; }
+      if (inflightGenerations.has(generationKey(videoId, purposeValue, target))) {
+        res.status(202).json({ generating: true });
+        return;
+      }
+      res.status(404).json({ error: 'Prompt output not found' });
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid request' });
     }
@@ -173,7 +194,17 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
     const video = await deps.repository.getVideo(id);
     if (!video) { res.status(404).json({ error: 'Video not found' }); return; }
     const [job, analysis] = await Promise.all([deps.repository.getLatestJobForVideo(id), deps.repository.getAnalysis(id)]);
-    res.json({ video, job, analysis: analysis?.analysis ?? null });
+    const videoTagRows = await db
+      .select({ tagId: tagsTable.id, tagName: tagsTable.name, tagColor: tagsTable.color })
+      .from(videoTags)
+      .innerJoin(tagsTable, eq(videoTags.tagId, tagsTable.id))
+      .where(eq(videoTags.videoId, id));
+    res.json({
+      video, job,
+      analysis: analysis?.analysis ?? null,
+      summary: analysis?.summary ?? null,
+      tags: videoTagRows.map((t) => ({ id: t.tagId, name: t.tagName, color: t.tagColor })),
+    });
   });
 
   router.delete('/:id', async (req, res) => {

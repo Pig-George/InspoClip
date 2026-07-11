@@ -76,6 +76,13 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW(),
       UNIQUE(image_id, tag_id)
     );
+    CREATE TABLE IF NOT EXISTS video_tags (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      video_id UUID REFERENCES videos(id) ON DELETE CASCADE,
+      tag_id UUID REFERENCES tags(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(video_id, tag_id)
+    );
     CREATE TABLE IF NOT EXISTS image_colors (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       image_id UUID REFERENCES images(id) ON DELETE CASCADE,
@@ -108,10 +115,11 @@ async function initDB() {
       summary TEXT NOT NULL, visual_style JSONB NOT NULL, analysis JSONB NOT NULL,
       created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
     );
+    DROP TABLE IF EXISTS video_prompt_outputs;
     CREATE TABLE IF NOT EXISTS video_prompt_outputs (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), analysis_id UUID NOT NULL REFERENCES video_analyses(id) ON DELETE CASCADE,
-      purpose TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', locale TEXT NOT NULL DEFAULT 'zh',
-      content TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW(), UNIQUE(analysis_id, purpose, target, locale)
+      purpose TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', content_en TEXT NOT NULL, content_zh TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(), UNIQUE(analysis_id, purpose, target)
     );
     ALTER TABLE images ADD COLUMN IF NOT EXISTS phash TEXT;
     ALTER TABLE images ADD COLUMN IF NOT EXISTS ahash TEXT;
@@ -191,6 +199,7 @@ async function start() {
     console.log(`InspoClip server running on http://localhost:${PORT}`);
   });
   const modelVideoPublicBaseUrl = process.env.MODEL_VIDEO_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+  const modelVideoVerifyBaseUrl = (process.env.MODEL_VIDEO_VERIFY_BASE_URL || modelVideoPublicBaseUrl).replace(/\/+$/, '');
   const ensurePublicVideoUrlAvailable = async (url: string) => {
     let lastError = '';
     for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -213,7 +222,10 @@ async function start() {
       const baseUrl = modelVideoPublicBaseUrl.replace(/\/+$/, '');
       return `${baseUrl}/api/model-videos/${video.id}/content?token=${encodeURIComponent(issued.token)}`;
     },
-    ensureVideoUrlAvailable: ensurePublicVideoUrlAvailable,
+    ensureVideoUrlAvailable: async (url) => {
+      const pathAndQuery = url.substring(url.indexOf('/api/model-videos/'));
+      await ensurePublicVideoUrlAvailable(`${modelVideoVerifyBaseUrl}${pathAndQuery}`);
+    },
     releaseVideoUrl: (url) => {
       const token = new URL(url).searchParams.get('token');
       modelVideoAccessTokens.revoke(token);

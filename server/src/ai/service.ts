@@ -94,9 +94,10 @@ export class AiService {
     }
   }
 
-  async generateVideoOutput(analysis: VideoAnalysis, purpose: Purpose = 'general', options: PurposeOptions = {}): Promise<string> {
+  async generateVideoOutput(analysis: VideoAnalysis, purpose: Purpose = 'general', options: PurposeOptions = {}): Promise<{ en: string; zh: string }> {
     const prompt = `${createPurposeTransformationPrompt(purpose, options)}\nSource analysis JSON:\n${JSON.stringify(analysis)}`;
-    return responseText(await this.provider.generateText({ prompt })).trim();
+    const text = responseText(await this.provider.generateText({ prompt })).trim();
+    return parseVideoPromptOutput(text);
   }
 
   private async prepareImage(imagePath: string): Promise<PreparedImage> {
@@ -189,4 +190,9 @@ function parseDesignPrompt(text: string): { en: string; zh: string } {
     // Preserve the legacy bilingual raw-text fallback.
   }
   return { en: trimmed, zh: trimmed };
+}
+
+function parseVideoPromptOutput(text: string): { en: string; zh: string } {
+  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  return parseDesignPrompt(trimmed);
 }

@@ -28,7 +28,7 @@ function setup() {
     thumbnail: vi.fn().mockResolvedValue('demo.thumb.jpg'),
     removeFile,
     getModelSettings: async () => ({ model: 'qwen3.7-plus', fps: 3 }),
-    generateOutput: async (_value, purpose) => `${purpose}: output`,
+    generateOutput: async (_value, purpose) => ({ en: `${purpose}: en`, zh: `${purpose}: zh` }),
     videoRoot: 'C:/videos',
     resolvePlacement: async () => ({ weekId: 'week-today', dayOfWeek: 0 }),
   }));
@@ -62,15 +62,15 @@ describe('video routes', () => {
     expect((await request(app).get(`/api/videos/${uploaded.body.videoId}/analysis`)).body.summary).toBe('demo');
   });
 
-  it('generates and caches general output by default', async () => {
+  it('generates and caches bilingual output by default', async () => {
     const { app, repo } = setup();
     const uploaded = await request(app).post('/api/videos').send({});
     const claimed = await repo.claimPendingJob();
     await repo.completeJob(claimed!.id, analysis);
-    const generated = await request(app).post(`/api/videos/${uploaded.body.videoId}/prompts`).send({ locale: 'zh' });
+    const generated = await request(app).post(`/api/videos/${uploaded.body.videoId}/prompts`).send({});
     expect(generated.status).toBe(200);
-    expect(generated.body).toMatchObject({ purpose: 'general', content: 'general: output' });
-    const cached = await request(app).get(`/api/videos/${uploaded.body.videoId}/prompts?purpose=general&locale=zh`);
+    expect(generated.body).toMatchObject({ purpose: 'general', contentEn: 'general: en', contentZh: 'general: zh' });
+    const cached = await request(app).get(`/api/videos/${uploaded.body.videoId}/prompts?purpose=general`);
     expect(cached.body.id).toBe(generated.body.id);
   });
 

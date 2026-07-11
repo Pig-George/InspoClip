@@ -18,10 +18,10 @@ describe('video API', () => {
   });
 
   it('uses general as the default output purpose', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'p', purpose: 'general', content: 'x' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'p', purpose: 'general', contentEn: 'x', contentZh: 'y' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
     await generateVideoOutput('v');
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ purpose: 'general', locale: 'zh' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ purpose: 'general' });
   });
 
   it('surfaces the server error body', async () => {

@@ -95,9 +95,9 @@ describe('InMemoryVideoRepository', () => {
     expect(await repo.getJob(job.id)).toMatchObject({ status: 'pending' });
     await repo.claimPendingJob();
     await repo.completeJob(job.id, analysis);
-    const saved = await repo.savePromptOutput(video.id, 'general', '', 'zh', 'content');
-    const same = await repo.savePromptOutput(video.id, 'general', '', 'zh', 'replacement');
+    const saved = await repo.savePromptOutput(video.id, 'general', '', 'content-en', 'content-zh');
+    const same = await repo.savePromptOutput(video.id, 'general', '', 'replacement-en', 'replacement-zh');
     expect(same.id).toBe(saved.id);
-    expect((await repo.getPromptOutput(video.id, 'general', '', 'zh'))?.content).toBe('replacement');
+    expect((await repo.getPromptOutput(video.id, 'general', ''))?.contentEn).toBe('replacement-en');
   });
 });

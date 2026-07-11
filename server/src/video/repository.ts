@@ -63,8 +63,8 @@ export interface VideoPromptOutputRecord {
   analysisId: string;
   purpose: string;
   target: string;
-  locale: string;
-  content: string;
+  contentEn: string;
+  contentZh: string;
   createdAt: Date;
 }
 
@@ -85,8 +85,8 @@ export interface VideoRepository {
   retryJob(jobId: string): Promise<VideoJobRecord | null>;
   recoverProcessingJobs(): Promise<number>;
   getAnalysis(videoId: string): Promise<VideoAnalysisRecord | null>;
-  savePromptOutput(videoId: string, purpose: string, target: string, locale: string, content: string): Promise<VideoPromptOutputRecord>;
-  getPromptOutput(videoId: string, purpose: string, target: string, locale: string): Promise<VideoPromptOutputRecord | null>;
+  savePromptOutput(videoId: string, purpose: string, target: string, contentEn: string, contentZh: string): Promise<VideoPromptOutputRecord>;
+  getPromptOutput(videoId: string, purpose: string, target: string): Promise<VideoPromptOutputRecord | null>;
   deleteVideo(id: string): Promise<VideoRecord | null>;
 }
 
@@ -177,26 +177,26 @@ export class InMemoryVideoRepository implements VideoRepository {
 
   async getAnalysis(videoId: string): Promise<VideoAnalysisRecord | null> { return this.analyses.get(videoId) ?? null; }
 
-  private outputKey(analysisId: string, purpose: string, target: string, locale: string) {
-    return `${analysisId}\0${purpose}\0${target}\0${locale}`;
+  private outputKey(analysisId: string, purpose: string, target: string) {
+    return `${analysisId}\0${purpose}\0${target}`;
   }
 
-  async savePromptOutput(videoId: string, purpose: string, target: string, locale: string, content: string): Promise<VideoPromptOutputRecord> {
+  async savePromptOutput(videoId: string, purpose: string, target: string, contentEn: string, contentZh: string): Promise<VideoPromptOutputRecord> {
     const analysis = this.analyses.get(videoId);
     if (!analysis) throw new Error('Analysis not found');
-    const key = this.outputKey(analysis.id, purpose, target, locale);
+    const key = this.outputKey(analysis.id, purpose, target);
     const previous = this.outputs.get(key);
     const record: VideoPromptOutputRecord = previous
-      ? { ...previous, content }
-      : { id: randomUUID(), analysisId: analysis.id, purpose, target, locale, content, createdAt: new Date() };
+      ? { ...previous, contentEn, contentZh }
+      : { id: randomUUID(), analysisId: analysis.id, purpose, target, contentEn, contentZh, createdAt: new Date() };
     this.outputs.set(key, record);
     return record;
   }
 
-  async getPromptOutput(videoId: string, purpose: string, target: string, locale: string): Promise<VideoPromptOutputRecord | null> {
+  async getPromptOutput(videoId: string, purpose: string, target: string): Promise<VideoPromptOutputRecord | null> {
     const analysis = this.analyses.get(videoId);
     if (!analysis) return null;
-    return this.outputs.get(this.outputKey(analysis.id, purpose, target, locale)) ?? null;
+    return this.outputs.get(this.outputKey(analysis.id, purpose, target)) ?? null;
   }
 
   async deleteVideo(id: string): Promise<VideoRecord | null> {
@@ -303,24 +303,24 @@ export class DrizzleVideoRepository implements VideoRepository {
     return (record as VideoAnalysisRecord | undefined) ?? null;
   }
 
-  async savePromptOutput(videoId: string, purpose: string, target: string, locale: string, content: string): Promise<VideoPromptOutputRecord> {
+  async savePromptOutput(videoId: string, purpose: string, target: string, contentEn: string, contentZh: string): Promise<VideoPromptOutputRecord> {
     const analysis = await this.getAnalysis(videoId);
     if (!analysis) throw new Error('Analysis not found');
     const [record] = await this.database.insert(videoPromptOutputs).values({
-      analysisId: analysis.id, purpose, target, locale, content,
+      analysisId: analysis.id, purpose, target, contentEn, contentZh,
     }).onConflictDoUpdate({
-      target: [videoPromptOutputs.analysisId, videoPromptOutputs.purpose, videoPromptOutputs.target, videoPromptOutputs.locale],
-      set: { content },
+      target: [videoPromptOutputs.analysisId, videoPromptOutputs.purpose, videoPromptOutputs.target],
+      set: { contentEn, contentZh },
     }).returning();
     return record as VideoPromptOutputRecord;
   }
 
-  async getPromptOutput(videoId: string, purpose: string, target: string, locale: string): Promise<VideoPromptOutputRecord | null> {
+  async getPromptOutput(videoId: string, purpose: string, target: string): Promise<VideoPromptOutputRecord | null> {
     const analysis = await this.getAnalysis(videoId);
     if (!analysis) return null;
     const [record] = await this.database.select().from(videoPromptOutputs).where(and(
       eq(videoPromptOutputs.analysisId, analysis.id), eq(videoPromptOutputs.purpose, purpose),
-      eq(videoPromptOutputs.target, target), eq(videoPromptOutputs.locale, locale),
+      eq(videoPromptOutputs.target, target),
     )).limit(1);
     return (record as VideoPromptOutputRecord | undefined) ?? null;
   }

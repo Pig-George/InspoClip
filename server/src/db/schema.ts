@@ -71,6 +71,13 @@ export const imageCritiques = pgTable('image_critiques', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+export const videoTags = pgTable('video_tags', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  videoId: uuid('video_id').references(() => videos.id, { onDelete: 'cascade' }),
+  tagId: uuid('tag_id').references(() => tags.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 export const videos = pgTable('videos', {
   id: uuid('id').defaultRandom().primaryKey(),
   weekId: uuid('week_id').references(() => weeks.id, { onDelete: 'cascade' }),
@@ -118,9 +125,9 @@ export const videoPromptOutputs = pgTable('video_prompt_outputs', {
   analysisId: uuid('analysis_id').notNull().references(() => videoAnalyses.id, { onDelete: 'cascade' }),
   purpose: text('purpose').notNull(),
   target: text('target').notNull().default(''),
-  locale: text('locale').notNull().default('zh'),
-  content: text('content').notNull(),
+  contentEn: text('content_en').notNull(),
+  contentZh: text('content_zh').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
-  outputKey: uniqueIndex('video_prompt_outputs_key').on(table.analysisId, table.purpose, table.target, table.locale),
+  outputKey: uniqueIndex('video_prompt_outputs_key').on(table.analysisId, table.purpose, table.target),
 }));
