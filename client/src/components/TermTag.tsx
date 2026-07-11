@@ -121,11 +121,11 @@ export function TermTag({ terms, onRefresh }: TermTagProps) {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-term
-          bg-[var(--accent)]/15 text-[var(--accent)] cursor-pointer max-w-[220px] overflow-hidden"
+          bg-[var(--accent)]/15 text-[var(--accent)] cursor-pointer min-w-0 max-w-full overflow-hidden"
       >
         <motion.button
           onClick={(e) => { e.stopPropagation(); handleCopy(firstTerm.id + '-en', firstEn); }}
-          className="hover:underline truncate"
+          className="min-w-0 truncate hover:underline"
           whileTap={{ scale: 0.95 }}
         >
           {copiedId === firstTerm.id + '-en' ? (
@@ -139,7 +139,7 @@ export function TermTag({ terms, onRefresh }: TermTagProps) {
             <span className="opacity-40 flex-shrink-0">/</span>
             <motion.button
               onClick={(e) => { e.stopPropagation(); handleCopy(firstTerm.id + '-zh', firstZh); }}
-              className="hover:underline truncate"
+              className="min-w-0 truncate hover:underline"
               whileTap={{ scale: 0.95 }}
             >
               {copiedId === firstTerm.id + '-zh' ? (

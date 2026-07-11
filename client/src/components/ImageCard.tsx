@@ -161,7 +161,10 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
       </div>
 
       {/* Terms */}
-      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex flex-wrap justify-center gap-1">
+      <div
+        data-testid="image-card-terms"
+        className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex w-[calc(100%-0.75rem)] max-w-[calc(100%-0.75rem)] flex-wrap justify-center gap-1"
+      >
         {image.terms.length > 0 && (
           <TermTag terms={image.terms} onRefresh={onRefresh} />
         )}
