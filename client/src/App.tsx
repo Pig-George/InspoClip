@@ -213,7 +213,7 @@ function AppInner() {
         onOpenVideo={openVideo}
       />
       {viewMode === 'timeline' ? (
-        <TimelineView />
+        <TimelineView onOpenVideo={openVideo} />
       ) : loading && viewMode === 'week' ? (
         <div className="flex items-center justify-center h-64 text-[var(--text-muted)] text-xl">
           Loading...

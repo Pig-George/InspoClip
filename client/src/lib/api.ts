@@ -1,4 +1,5 @@
 import { WeekData, Tag, Week, Image } from '@/types';
+import type { WeekVideo } from '@/types/video';
 
 const BASE = '/api';
 
@@ -198,7 +199,7 @@ export interface DesignPrompt {
 
 export interface TimelineMonth {
   month: string;
-  weeks: { week: Week; images: Image[] }[];
+  weeks: { week: Week; images: Image[]; videos: WeekVideo[] }[];
 }
 
 export async function fetchMonth(yearMonth: string): Promise<TimelineMonth> {

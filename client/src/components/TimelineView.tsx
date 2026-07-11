@@ -5,8 +5,13 @@ import { fetchMonth, imageUrl } from '@/lib/api';
 import type { TimelineMonth } from '@/lib/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { getWeekNumber, formatDateRange } from '@/lib/utils';
+import { VideoCard } from '@/components/video/VideoCard';
 
-export function TimelineView() {
+interface TimelineViewProps {
+  onOpenVideo: (videoId: string, jobId?: string) => void;
+}
+
+export function TimelineView({ onOpenVideo }: TimelineViewProps) {
   const [data, setData] = useState<TimelineMonth | null>(null);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
@@ -73,7 +78,10 @@ export function TimelineView() {
     });
   };
 
-  const totalImages = data?.weeks.reduce((sum, w) => sum + w.images.length, 0) || 0;
+  const totalInspirations = data?.weeks.reduce(
+    (sum, weekData) => sum + weekData.images.length + (weekData.videos?.length ?? 0),
+    0,
+  ) || 0;
 
   if (loading && !data) {
     return (
@@ -99,9 +107,7 @@ export function TimelineView() {
             {formatMonth(currentMonth)}
           </h2>
           <p className="text-sm text-[var(--text-muted)] font-handwriting">
-            {locale === 'zh'
-              ? `共 ${totalImages} 张灵感`
-              : `${totalImages} inspirations`}
+            {locale === 'zh' ? `共 ${totalInspirations} 个灵感` : `${totalInspirations} inspirations`}
           </p>
         </div>
 
@@ -117,62 +123,78 @@ export function TimelineView() {
       <div className="relative">
         <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-[var(--card-border)]" />
 
-        {data?.weeks.map((weekData, weekIdx) => (
-          <motion.div
-            key={weekData.week.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: weekIdx * 0.1 }}
-            className="relative pl-16 mb-8"
-          >
-            <div className="absolute left-4 top-2 w-5 h-5 rounded-full bg-[var(--accent)] border-4 border-[var(--background)] shadow-md" />
+        {data?.weeks.map((weekData, weekIdx) => {
+          const videos = weekData.videos ?? [];
+          const hasContent = weekData.images.length > 0 || videos.length > 0;
 
-            <div className="mb-3">
-              <span className="text-sm font-heading font-semibold text-[var(--accent)]">
-                {locale === 'zh'
-                  ? `第 ${getWeekNumber(new Date(weekData.week.weekStart))} 周`
-                  : `Week ${getWeekNumber(new Date(weekData.week.weekStart))}`}
-              </span>
-              <span className="ml-2 text-xs text-[var(--text-muted)] font-handwriting">
-                {formatDateRange(new Date(weekData.week.weekStart))}
-              </span>
-            </div>
+          return (
+            <motion.div
+              key={weekData.week.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: weekIdx * 0.1 }}
+              className="relative pl-16 mb-8"
+            >
+              <div className="absolute left-4 top-2 w-5 h-5 rounded-full bg-[var(--accent)] border-4 border-[var(--background)] shadow-md" />
 
-            {weekData.images.length > 0 ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                {weekData.images.map((image, imgIdx) => (
-                  <motion.div
-                    key={image.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: weekIdx * 0.1 + imgIdx * 0.05 }}
-                    className="aspect-square rounded-lg overflow-hidden border border-[var(--card-border)] shadow-sm
-                      hover:shadow-md hover:scale-105 transition-all cursor-pointer group"
-                  >
-                    <img
-                      src={imageUrl(image.filePath)}
-                      alt=""
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    {image.terms.length > 0 && (
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity
-                        flex items-end p-1.5">
-                        <span className="text-[10px] text-white font-term truncate">
-                          {image.terms[0].keyword.split(' / ')[0]}
-                        </span>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
+              <div className="mb-3">
+                <span className="text-sm font-heading font-semibold text-[var(--accent)]">
+                  {locale === 'zh'
+                    ? `第 ${getWeekNumber(new Date(weekData.week.weekStart))} 周`
+                    : `Week ${getWeekNumber(new Date(weekData.week.weekStart))}`}
+                </span>
+                <span className="ml-2 text-xs text-[var(--text-muted)] font-handwriting">
+                  {formatDateRange(new Date(weekData.week.weekStart))}
+                </span>
               </div>
-            ) : (
-              <p className="text-sm text-[var(--text-muted)] font-handwriting opacity-50">
-                {locale === 'zh' ? '本周无灵感' : 'No inspirations this week'}
-              </p>
-            )}
-          </motion.div>
-        ))}
+
+              {hasContent ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                  {weekData.images.map((image, imgIdx) => (
+                    <motion.div
+                      key={image.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: weekIdx * 0.1 + imgIdx * 0.05 }}
+                      className="relative aspect-square rounded-lg overflow-hidden border border-[var(--card-border)] shadow-sm
+                        hover:shadow-md hover:scale-105 transition-all cursor-pointer group"
+                    >
+                      <img
+                        src={imageUrl(image.filePath)}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      {image.terms.length > 0 && (
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity
+                          flex items-end p-1.5">
+                          <span className="text-[10px] text-white font-term truncate">
+                            {image.terms[0].keyword.split(' / ')[0]}
+                          </span>
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+
+                  {videos.map((video, videoIdx) => (
+                    <motion.div
+                      key={video.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: weekIdx * 0.1 + (weekData.images.length + videoIdx) * 0.05 }}
+                    >
+                      <VideoCard video={video} onOpen={onOpenVideo} onRefresh={() => loadMonth(currentMonth)} />
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-[var(--text-muted)] font-handwriting opacity-50">
+                  {locale === 'zh' ? '本周无灵感' : 'No inspirations this week'}
+                </p>
+              )}
+            </motion.div>
+          );
+        })}
 
         {data?.weeks.length === 0 && (
           <div className="text-center py-16 text-[var(--text-muted)]">

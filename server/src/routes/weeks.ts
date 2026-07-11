@@ -411,32 +411,7 @@ router.get('/month/:yearMonth', async (req: Request, res: Response) => {
       return;
     }
 
-    const monthImages = await db
-      .select()
-      .from(images)
-      .where(inArray(images.weekId, weekIds))
-      .orderBy(images.createdAt);
-
-    const imageIds = monthImages.map((img) => img.id);
-
-    const allTerms = imageIds.length > 0
-      ? await db.select().from(termsTable).where(inArray(termsTable.imageId, imageIds)).orderBy(termsTable.position)
-      : [];
-
-    const termsByImage: Record<string, any[]> = {};
-    for (const t of allTerms) {
-      const imgId = t.imageId;
-      if (!imgId) continue;
-      if (!termsByImage[imgId]) termsByImage[imgId] = [];
-      termsByImage[imgId].push(t);
-    }
-
-    const weeksData = monthWeeks.map((week) => ({
-      week,
-      images: monthImages
-        .filter((img) => img.weekId === week.id)
-        .map((img) => ({ ...img, terms: termsByImage[img.id] || [] })),
-    }));
+    const weeksData = await Promise.all(monthWeeks.map(loadWeekPayload));
 
     res.json({ month: yearMonth, weeks: weeksData });
   } catch (err: any) {
