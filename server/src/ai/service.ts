@@ -26,6 +26,10 @@ export interface AiServiceDependencies {
   imageProcessor: ImageProcessor;
 }
 
+export interface RawModelOutputError extends Error {
+  rawResponse?: string;
+}
+
 const defaultDependencies: AiServiceDependencies = {
   readFile,
   imageProcessor: {
@@ -82,6 +86,9 @@ export class AiService {
       try {
         return { analysis: parseVideoResponse(repaired), rawResponse };
       } catch {
+        if (firstError instanceof Error) {
+          (firstError as RawModelOutputError).rawResponse = rawResponse;
+        }
         throw firstError;
       }
     }

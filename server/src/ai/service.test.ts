@@ -196,4 +196,14 @@ describe('AiService', () => {
     await expect(harness.service.generateTerms('/uploads/design.jpg'))
       .rejects.toThrow('provider failed');
   });
+
+  it('attaches raw video output when parsing and repair both fail', async () => {
+    const raw = '{"summary":"truncated';
+    const harness = createHarness();
+    vi.mocked(harness.provider.analyzeVideo).mockResolvedValue(raw);
+    vi.mocked(harness.provider.generateText).mockResolvedValue('still invalid');
+
+    await expect(harness.service.analyzeVideo({ videoUrl: 'https://cdn.test/demo.mp4', fps: 3 }))
+      .rejects.toMatchObject({ rawResponse: raw });
+  });
 });

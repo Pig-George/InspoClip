@@ -90,6 +90,24 @@ describe('VideoWorker', () => {
     expect(await ctx.repo.getJob(ctx.job.id)).toMatchObject({ status: 'failed' });
   });
 
+  it('stores raw model output when video parsing fails', async () => {
+    const error = Object.assign(new Error('Unterminated string in JSON at position 1030'), { rawResponse: '{"summary":"truncated' });
+    const repo = new InMemoryVideoRepository();
+    const video = await repo.createVideo({ filePath: 'demo.mp4', originalName: 'demo.mp4', mimeType: 'video/mp4', sizeBytes: 1, durationMs: 10_000, width: 100, height: 100, source: 'client' });
+    const job = await repo.createJob(video.id, 'qwen3.7-plus', 4);
+    const worker = new VideoWorker(repo, { analyzeVideo: async () => { throw error; } }, {
+      videoUrlFor: () => 'https://tunnel.example/api/model-videos/demo/content?token=abc',
+      ensureVideoUrlAvailable: async () => undefined,
+    });
+
+    await worker.runOnce();
+
+    expect(await repo.getJob(job.id)).toMatchObject({
+      status: 'failed',
+      rawResponse: '{"summary":"truncated',
+    });
+  });
+
   it('recovers processing jobs before starting', async () => {
     const ctx = await setup(new FakeProvider([JSON.stringify(validAnalysis)]));
     await ctx.repo.claimPendingJob();

@@ -61,7 +61,10 @@ export class VideoWorker {
       await this.repository.completeJob(job.id, result.analysis, result.rawResponse.slice(0, 100_000));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await this.repository.failJob(job.id, message.slice(0, 2_000));
+      const rawResponse = typeof (error as { rawResponse?: unknown })?.rawResponse === 'string'
+        ? (error as { rawResponse: string }).rawResponse.slice(0, 100_000)
+        : undefined;
+      await this.repository.failJob(job.id, message.slice(0, 2_000), rawResponse);
       if (isTransient(error) && job.attemptCount < this.maxAttempts) {
         await this.wait(this.backoffBaseMs * 2 ** Math.max(0, job.attemptCount - 1));
         await this.repository.retryJob(job.id);

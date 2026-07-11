@@ -26,7 +26,7 @@ describe('createLangChainProvider', () => {
     expect(factory).toHaveBeenCalledWith({
       model: 'qwen3.7-plus',
       apiKey: 'test-key',
-      maxTokens: 300,
+      maxTokens: 8192,
       temperature: 0.7,
       configuration: { baseURL: 'https://example.test/v1' },
     });
@@ -273,7 +273,7 @@ describe('createLangChainProvider', () => {
         max_pixels: 12845056,
       },
     });
-    expect(body.max_tokens).toBe(300);
+    expect(body.max_tokens).toBe(8192);
     expect(body.temperature).toBe(0.7);
   });
 });

@@ -39,6 +39,8 @@ type OpenAICompatibleVideoPart = {
   };
 };
 
+const DEFAULT_MAX_TOKENS = 8192;
+
 const defaultInvokerFactory: InvokerFactory = (options) => {
   const model = new ChatOpenAI(options);
   return {
@@ -118,7 +120,7 @@ export function createLangChainProvider(
   const invoker = factory({
     model: validatedConfig.model,
     apiKey: validatedConfig.apiKey,
-    maxTokens: 300,
+    maxTokens: DEFAULT_MAX_TOKENS,
     temperature: 0.7,
     configuration: {
       baseURL: validatedConfig.baseURL,
