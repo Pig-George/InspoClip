@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildExportJson, buildExportMarkdown } from './export.js';
+import { buildAllExportJson, buildAllExportMarkdown, buildExportJson, buildExportMarkdown } from './export.js';
 
 const week = { weekStart: '2026-07-06' };
 const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -101,5 +101,48 @@ describe('week export video content', () => {
     expect(markdown).toContain('Card expansion motion / 卡片展开动效');
     expect(markdown).toContain('Open card / 打开卡片');
     expect(markdown).toContain('Card / 卡片: Scales up / 放大');
+  });
+});
+
+describe('all-content export range', () => {
+  it('keeps non-adjacent content weeks instead of only exporting the cursor week', () => {
+    const firstWeek = buildExportJson({
+      week,
+      mondayStr: '2026-05-04',
+      dayNames,
+      weekImages: [{ ...image, id: 'image-old', filePath: 'old.png' }],
+      termsByImage: { 'image-old': ['Old'] },
+      weekVideos: [],
+      videoAnalysisById: new Map(),
+      videoTagsById: {},
+      latestJobByVideo: new Map(),
+    });
+    const latestWeek = buildExportJson({
+      week,
+      mondayStr: '2026-07-06',
+      dayNames,
+      weekImages: [],
+      termsByImage: {},
+      weekVideos: [video],
+      videoAnalysisById: new Map([['video-a', { summary: '卡片展开动效', analysis: videoAnalysis }]]),
+      videoTagsById: {},
+      latestJobByVideo: new Map(),
+    });
+
+    const json = buildAllExportJson({
+      exportedAt: '2026-07-11T00:00:00.000Z',
+      weeks: [firstWeek, latestWeek],
+    });
+    const markdown = buildAllExportMarkdown({
+      exportedAt: '2026-07-11T00:00:00.000Z',
+      weeks: [
+        { mondayStr: '2026-05-04', markdown: buildExportMarkdown({ ...firstWeek, mondayStr: '2026-05-04', dayNames, weekImages: [{ ...image, id: 'image-old', filePath: 'old.png' }], termsByImage: { 'image-old': ['Old'] }, weekVideos: [], videoAnalysisById: new Map(), videoTagsById: {}, latestJobByVideo: new Map() }) },
+        { mondayStr: '2026-07-06', markdown: buildExportMarkdown({ ...latestWeek, mondayStr: '2026-07-06', dayNames, weekImages: [], termsByImage: {}, weekVideos: [video], videoAnalysisById: new Map([['video-a', { summary: '卡片展开动效', analysis: videoAnalysis }]]), videoTagsById: {}, latestJobByVideo: new Map() }) },
+      ],
+    });
+
+    expect(json.weeks.map((item) => item.week)).toEqual(['2026-05-04', '2026-07-06']);
+    expect(markdown).toContain('Week of 2026-05-04');
+    expect(markdown).toContain('Week of 2026-07-06');
   });
 });

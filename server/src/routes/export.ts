@@ -76,6 +76,13 @@ interface ExportBuildInput {
   latestJobByVideo: Map<string, ExportVideoJob>;
 }
 
+interface WeekExportData {
+  week: string;
+  exportedAt: string;
+  images: ReturnType<typeof buildExportJson>['images'];
+  videos: ReturnType<typeof buildExportJson>['videos'];
+}
+
 function getMonday(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
@@ -144,6 +151,25 @@ export function buildExportJson(input: ExportBuildInput) {
     })),
     videos: input.weekVideos.map((video) => videoExportItem(input, video)),
   };
+}
+
+export function buildAllExportJson(input: { exportedAt?: string; weeks: WeekExportData[] }) {
+  return {
+    exportedAt: input.exportedAt ?? new Date().toISOString(),
+    weeks: input.weeks,
+  };
+}
+
+export function buildAllExportMarkdown(input: { exportedAt?: string; weeks: { mondayStr: string; markdown: string }[] }): string {
+  let md = '# InspoClip - All Inspirations\n\n';
+  md += `> Exported on ${input.exportedAt ?? new Date().toISOString()}\n\n`;
+  for (const week of input.weeks) {
+    md += `---\n\n`;
+    md += week.markdown.replace(/^# InspoClip - Week of /, '# Week of ');
+    if (!md.endsWith('\n')) md += '\n';
+    md += '\n';
+  }
+  return md;
 }
 
 export function buildExportMarkdown(input: ExportBuildInput): string {
@@ -284,6 +310,18 @@ async function getWeekData(dateStr: string) {
   };
 }
 
+async function getAllExportWeeks() {
+  const allWeeks = await db.select().from(weeks).orderBy(weeks.weekStart);
+  const result: NonNullable<Awaited<ReturnType<typeof getWeekData>>>[] = [];
+  for (const week of allWeeks) {
+    const data = await getWeekData(week.weekStart);
+    if (!data) continue;
+    if (data.weekImages.length === 0 && data.weekVideos.length === 0) continue;
+    result.push(data);
+  }
+  return result;
+}
+
 async function addImagesToArchive(archive: any, weekImages: ExportImage[], uploadDir: string) {
   const added: string[] = [];
   for (const img of weekImages) {
@@ -358,6 +396,47 @@ router.get('/week/:date', async (req: Request, res: Response) => {
       archive.append(buildExportMarkdown(buildInput), { name: 'inspoclip.md' });
     } else {
       archive.append(buildExportMarkdown(buildInput), { name: 'inspoclip.md' });
+    }
+
+    await archive.finalize();
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/all', async (req: Request, res: Response) => {
+  try {
+    const format = (req.query.format as string) || 'markdown';
+    const weeksData = await getAllExportWeeks();
+    const uploadDir = process.env.UPLOAD_DIR || './uploads';
+    const videoDir = process.env.VIDEO_UPLOAD_DIR || './videos';
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const exportedAt = new Date().toISOString();
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="inspoclip-all.zip"`);
+
+    const archive = new ZipArchive();
+    archive.pipe(res);
+
+    const weekJsons: WeekExportData[] = [];
+    const weekMarkdowns: { mondayStr: string; markdown: string }[] = [];
+
+    for (const data of weeksData) {
+      await addImagesToArchive(archive, data.weekImages, uploadDir);
+      await addVideosToArchive(archive, data.weekVideos, videoDir);
+      const buildInput: ExportBuildInput = { ...data, dayNames, exportedAt };
+      weekJsons.push(buildExportJson(buildInput));
+      weekMarkdowns.push({ mondayStr: data.mondayStr, markdown: buildExportMarkdown(buildInput) });
+    }
+
+    if (format === 'json') {
+      archive.append(JSON.stringify(buildAllExportJson({ exportedAt, weeks: weekJsons }), null, 2), { name: 'data.json' });
+    } else if (format === 'zip') {
+      archive.append(JSON.stringify(buildAllExportJson({ exportedAt, weeks: weekJsons }), null, 2), { name: 'data.json' });
+      archive.append(buildAllExportMarkdown({ exportedAt, weeks: weekMarkdowns }), { name: 'inspoclip.md' });
+    } else {
+      archive.append(buildAllExportMarkdown({ exportedAt, weeks: weekMarkdowns }), { name: 'inspoclip.md' });
     }
 
     await archive.finalize();

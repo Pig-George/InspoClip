@@ -157,7 +157,12 @@ export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onN
 
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} onOpenVideo={onOpenVideo} />
-      <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} weekDate={formatISODate(monday)} />
+      <ExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        weekDate={formatISODate(monday)}
+        scope={viewMode === 'week' ? 'week' : 'all'}
+      />
     </>
   );
 }

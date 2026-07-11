@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileJson, FileText, FolderDown, X } from 'lucide-react';
-import { exportWeekUrl } from '@/lib/api';
+import { exportUrl } from '@/lib/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useScrollLock } from '@/hooks/useScrollLock';
 
@@ -8,9 +8,10 @@ interface ExportDialogProps {
   open: boolean;
   onClose: () => void;
   weekDate: string;
+  scope?: 'week' | 'all';
 }
 
-export function ExportDialog({ open, onClose, weekDate }: ExportDialogProps) {
+export function ExportDialog({ open, onClose, weekDate, scope = 'week' }: ExportDialogProps) {
   const overlayRef = useScrollLock(open);
   const { locale } = useLanguage();
 
@@ -36,7 +37,7 @@ export function ExportDialog({ open, onClose, weekDate }: ExportDialogProps) {
   ];
 
   const handleExport = (format: 'zip' | 'json' | 'markdown') => {
-    const url = exportWeekUrl(weekDate, format);
+    const url = exportUrl({ scope, weekDate, format });
     window.open(url, '_blank');
     onClose();
   };

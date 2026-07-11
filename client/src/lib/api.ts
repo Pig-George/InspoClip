@@ -212,6 +212,19 @@ export function exportWeekUrl(dateStr: string, format: 'json' | 'markdown' | 'zi
   return `${BASE}/export/week/${dateStr}?format=${format}`;
 }
 
+export function exportUrl({
+  scope,
+  weekDate,
+  format,
+}: {
+  scope: 'week' | 'all';
+  weekDate: string;
+  format: 'json' | 'markdown' | 'zip';
+}): string {
+  if (scope === 'all') return `${BASE}/export/all?format=${format}`;
+  return exportWeekUrl(weekDate, format);
+}
+
 export async function fetchDesignPrompt(imageId: string): Promise<DesignPrompt | null> {
   const res = await fetch(`${BASE}/images/${imageId}/prompt`);
   if (!res.ok) return null;
