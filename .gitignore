@@ -12,3 +12,6 @@ testdata
 server/test_image.png
 .worktrees/
 *.tsbuildinfo
+.agents/
+cloudflared.exe
+cloudflared.log
