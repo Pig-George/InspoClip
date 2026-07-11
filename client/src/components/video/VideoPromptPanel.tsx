@@ -45,65 +45,76 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
   };
 
   return (
-    <section className="rounded-2xl border border-[var(--card-border)] bg-[var(--card)] p-5">
-      <div className="flex items-center justify-between gap-3">
+    <section aria-label="复刻输出" className="border-t border-[var(--card-border)] pt-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h2 className="font-heading text-lg text-[var(--text)]">复刻输出</h2>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">选择用途后生成可直接复制的提示词或结构化数据。</p>
+          <h3 className="text-xs font-heading uppercase tracking-wide text-[var(--text-muted)]">复刻输出</h3>
+          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">按用途整理成可复制提示词，或导出结构化结果。</p>
         </div>
-        <span className="rounded-full bg-[var(--muted)] px-2 py-1 text-[10px] text-[var(--text-muted)]">
+        <span className="rounded-md border border-[var(--card-border)] px-2 py-1 text-[10px] text-[var(--text-muted)]">
           {effectiveLocale}
         </span>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {purposes.map(([value, label]) => (
-          <button
-            key={value}
-            onClick={() => { setPurpose(value); setOutput(null); }}
-            className={`rounded-full px-3 py-1 text-sm transition-colors ${purpose === value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--muted)] text-[var(--text)] hover:bg-[var(--accent)]/10'}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-xs text-[var(--text-muted)]">Prompt 语言</span>
-        <div className="flex items-center rounded-md bg-[var(--muted)] p-0.5">
-          {languageModes.map(([value, label]) => (
-            <button
-              key={value}
-              onClick={() => { setLangMode(value); setOutput(null); }}
-              className={`rounded px-2 py-0.5 text-[10px] font-heading transition-colors ${
-                langMode === value
-                  ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      <div className="space-y-3 rounded-xl border border-[var(--card-border)] bg-[var(--muted)]/35 p-3">
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-heading text-[var(--text-muted)]">用途</span>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {purposes.map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => { setPurpose(value); setOutput(null); }}
+                className={`rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+                  purpose === value
+                    ? 'bg-[var(--accent)] text-white shadow-sm'
+                    : 'bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs font-heading text-[var(--text-muted)]">Prompt 语言</span>
+          <div className="flex items-center rounded-lg bg-[var(--card)] p-0.5">
+            {languageModes.map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => { setLangMode(value); setOutput(null); }}
+                className={`rounded-md px-2 py-1 text-[10px] font-heading transition-colors ${
+                  langMode === value
+                    ? 'bg-[var(--accent)] text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {purpose !== 'general' && purpose !== 'json' && (
+          <input
+            aria-label="目标平台"
+            value={target}
+            onChange={(event) => setTarget(event.target.value)}
+            placeholder="可选：Sora、React、After Effects…"
+            className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
+          />
+        )}
+
+        <button
+          onClick={generate}
+          disabled={loading}
+          className="w-full rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-50"
+        >
+          {loading ? '生成中…' : '生成输出'}
+        </button>
       </div>
-
-      {purpose !== 'general' && purpose !== 'json' && (
-        <input
-          aria-label="目标平台"
-          value={target}
-          onChange={(event) => setTarget(event.target.value)}
-          placeholder="可选：Sora、React、After Effects…"
-          className="mt-3 w-full rounded-lg border border-[var(--card-border)] bg-[var(--muted)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
-        />
-      )}
-
-      <button
-        onClick={generate}
-        disabled={loading}
-        className="mt-3 rounded-lg bg-[var(--accent)] px-4 py-2 text-white transition-opacity disabled:opacity-50"
-      >
-        {loading ? '生成中…' : '生成输出'}
-      </button>
 
       {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
       {output && <PromptOutputCard output={output} />}
@@ -116,27 +127,27 @@ function PromptOutputCard({ output }: { output: VideoPromptOutput }) {
   const formatted = isJson ? formatJson(output.content) : output.content.trim();
 
   return (
-    <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--muted)]/70">
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--card-border)] px-4 py-3">
-        <div>
-          <h3 className="text-sm font-heading text-[var(--text)]">{isJson ? '结构化 JSON' : '可复刻提示词'}</h3>
-          <p className="text-xs text-[var(--text-muted)]">{isJson ? '用于调试、导出或二次处理。' : '已整理为更适合阅读和复制的内容。'}</p>
+    <div className="mt-3 overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card)]">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--card-border)] px-3 py-2.5">
+        <div className="min-w-0">
+          <h4 className="truncate text-sm font-heading text-[var(--text)]">{isJson ? '结构化 JSON' : '可复刻提示词'}</h4>
+          <p className="text-xs text-[var(--text-muted)]">{isJson ? '用于调试、导出或二次处理。' : '可直接复制到目标工具中使用。'}</p>
         </div>
         <button
-          className="rounded-full bg-[var(--card)] px-3 py-1 text-xs text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white"
+          className="shrink-0 rounded-md px-2 py-1 text-xs text-[var(--accent)] hover:bg-[var(--muted)]"
           onClick={() => navigator.clipboard.writeText(output.content)}
         >
-          复制全部
+          复制
         </button>
       </div>
       {isJson ? (
-        <pre className="max-h-96 overflow-auto whitespace-pre-wrap p-4 font-mono text-xs leading-5 text-[var(--text)]">
+        <pre className="max-h-80 overflow-auto whitespace-pre-wrap bg-[var(--muted)]/35 p-3 font-mono text-xs leading-5 text-[var(--text)]">
           {formatted}
         </pre>
       ) : (
-        <div className="max-h-96 space-y-3 overflow-auto p-4 text-sm leading-6 text-[var(--text)]">
+        <div className="max-h-80 overflow-auto p-3 text-sm leading-6 text-[var(--text)]">
           {splitReadableBlocks(formatted).map((block, index) => (
-            <p key={index} className="whitespace-pre-wrap rounded-xl bg-[var(--card)]/70 p-3">
+            <p key={index} className={index === 0 ? 'whitespace-pre-wrap' : 'mt-3 whitespace-pre-wrap'}>
               {block}
             </p>
           ))}

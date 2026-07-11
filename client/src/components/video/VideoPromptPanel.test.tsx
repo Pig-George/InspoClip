@@ -20,6 +20,15 @@ describe('VideoPromptPanel', () => {
     expect(screen.getByText('可复刻提示词')).toBeInTheDocument();
   });
 
+  it('renders as an integrated sidebar section instead of a standalone card', () => {
+    render(<VideoPromptPanel videoId="v" />);
+
+    const section = screen.getByLabelText('复刻输出');
+    expect(section).toHaveClass('border-t');
+    expect(section).not.toHaveClass('rounded-2xl');
+    expect(screen.getByText('用途')).toBeInTheDocument();
+  });
+
   it('supports bilingual video prompts from the language toggle', async () => {
     vi.mocked(generateVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', locale: 'both', content: 'bilingual result' });
 
