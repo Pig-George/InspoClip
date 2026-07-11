@@ -12,6 +12,28 @@ export async function fetchWeek(dateStr: string, contentOnly?: boolean): Promise
   return res.json();
 }
 
+export interface ContentWeeksResponse {
+  weeks: WeekData[];
+}
+
+export async function fetchContentWeeks(
+  cursor: string,
+  direction: 'previous' | 'next',
+  limit = 8,
+): Promise<ContentWeeksResponse> {
+  const params = new URLSearchParams({
+    cursor,
+    direction,
+    limit: String(limit),
+  });
+  const res = await fetch(`${BASE}/weeks/content-days?${params.toString()}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }));
+    throw new Error(err.error || 'Failed to fetch content weeks');
+  }
+  return res.json();
+}
+
 export interface SimilarImage {
   id: string;
   filePath: string;

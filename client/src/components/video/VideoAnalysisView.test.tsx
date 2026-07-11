@@ -28,6 +28,8 @@ const detail = {
     createdAt: new Date().toISOString(),
   },
   job: { id: 'job-a', videoId: 'video-a', status: 'completed' as const, progress: 100, model: 'qwen3.7-plus', fps: 3, attemptCount: 1, errorMessage: null },
+  summary: 'A compact UI transition',
+  tags: [],
   analysis: {
     summary: 'A compact UI transition',
     visualStyle: { colors: [], typography: '', layout: '', effects: [] },

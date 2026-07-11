@@ -5,7 +5,7 @@ import { DayColumn } from './DayColumn';
 import { NotesArea } from './NotesArea';
 import { ALL_DAYS, type WeekData, getTodayIndex } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
-import { fetchWeek, saveNotes } from '@/lib/api';
+import { fetchContentWeeks, fetchWeek, saveNotes } from '@/lib/api';
 import { getMonday, formatISODate } from '@/lib/utils';
 
 const COL_WIDTH = 340;
@@ -17,6 +17,7 @@ const SCROLL_THRESHOLD = COL_STEP * 2;
 const LINE_STEP = 28;
 const NOTES_MIN_H = 84;
 const NOTES_MAX_H = 420;
+const CONTENT_WEEK_LIMIT = 8;
 
 interface DayViewProps {
   initialMonday: Date;
@@ -140,16 +141,36 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
     const promises = [loadWeek(prevMondayStr, true, hideEmpty), loadWeek(initMonday, false, hideEmpty)];
     if (hasNext) promises.push(loadWeek(nextMondayStr, false, hideEmpty));
 
-    Promise.all(promises).then(() => {
+    Promise.all(promises).then(async () => {
+      let loadedMondays = [...mondays];
+      if (hideEmpty) {
+        const todayIso = formatISODate(new Date());
+        const [previousContent, nextContent] = await Promise.all([
+          fetchContentWeeks(todayIso, 'previous', CONTENT_WEEK_LIMIT).catch(() => ({ weeks: [] })),
+          fetchContentWeeks(todayIso, 'next', CONTENT_WEEK_LIMIT).catch(() => ({ weeks: [] })),
+        ]);
+        const contentWeeks = [...previousContent.weeks, ...nextContent.weeks]
+          .sort((a, b) => a.week.weekStart.localeCompare(b.week.weekStart));
+        if (contentWeeks.length > 0) {
+          loadedMondays = [...new Set([...loadedMondays, ...contentWeeks.map((data) => data.week.weekStart)])].sort();
+          setWeekDataMap((prev) => {
+            const next = new Map(prev);
+            for (const data of contentWeeks) next.set(data.week.weekStart, data);
+            return next;
+          });
+          setWeekMondays(loadedMondays);
+        }
+      }
+
       const todayIso = formatISODate(new Date());
-      // Find today's index (it's in the current week, which is at position 7 in the flat list)
+      const todayWeekOffset = Math.max(0, loadedMondays.indexOf(initMonday));
       const monday = new Date(initMonday + 'T00:00:00');
-      let todayIdx = 7; // starts at first day of initMonday (index 7 after prev week)
+      let todayIdx = todayWeekOffset * 7;
       for (let i = 0; i < 7; i++) {
         const d = new Date(monday);
         d.setDate(monday.getDate() + i);
         if (formatISODate(d) === todayIso) {
-          todayIdx = 7 + i;
+          todayIdx = todayWeekOffset * 7 + i;
           break;
         }
       }
@@ -222,9 +243,34 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
 
     // Don't load more if content fits within viewport
     const el = scrollRef.current;
-    if (el && el.scrollWidth <= el.clientWidth + 10) return;
+    if (!hideEmpty && el && el.scrollWidth <= el.clientWidth + 10) return;
 
     setLoadingMore(true);
+
+    if (hideEmpty) {
+      const cursor = dayEntries[0]?.isoDate ?? weekMondays[0];
+      const response = await fetchContentWeeks(cursor, 'previous', CONTENT_WEEK_LIMIT).catch(() => ({ weeks: [] }));
+      const newWeeks = response.weeks
+        .filter((data) => !weekDataMap.has(data.week.weekStart))
+        .sort((a, b) => a.week.weekStart.localeCompare(b.week.weekStart));
+
+      if (newWeeks.length === 0) {
+        noMorePreviousRef.current = true;
+      } else {
+        setWeekDataMap((prev) => {
+          const next = new Map(prev);
+          for (const data of newWeeks) next.set(data.week.weekStart, data);
+          return next;
+        });
+        setWeekMondays((prev) => [...newWeeks.map((data) => data.week.weekStart), ...prev]);
+        scrollAdjustRef.current += newWeeks.length * WEEK_SCROLL;
+        setActiveDayIndex((prev) => prev + newWeeks.length * 7);
+      }
+
+      setLoadingMore(false);
+      return;
+    }
+
     // Start from the furthest searched week, or the first loaded week
     const startMonday = furthestSearchedPrevRef.current ?? weekMondays[0];
     let searchDate = new Date(startMonday + 'T00:00:00');
@@ -252,7 +298,7 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
     }
 
     setLoadingMore(false);
-  }, [loadingMore, weekMondays, weekDataMap, loadWeek, hideEmpty]);
+  }, [loadingMore, weekMondays, weekDataMap, loadWeek, hideEmpty, dayEntries]);
 
   // Load next week when scrolling near right edge (only if not in the future)
   const loadNextWeek = useCallback(async () => {
@@ -260,11 +306,34 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
 
     // Don't load more if content fits within viewport
     const el = scrollRef.current;
-    if (el && el.scrollWidth <= el.clientWidth + 10) return;
+    if (!hideEmpty && el && el.scrollWidth <= el.clientWidth + 10) return;
 
     const todayMonday = formatISODate(getMonday(new Date()));
 
     setLoadingMore(true);
+
+    if (hideEmpty) {
+      const cursor = dayEntries[dayEntries.length - 1]?.isoDate ?? weekMondays[weekMondays.length - 1];
+      const response = await fetchContentWeeks(cursor, 'next', CONTENT_WEEK_LIMIT).catch(() => ({ weeks: [] }));
+      const newWeeks = response.weeks
+        .filter((data) => !weekDataMap.has(data.week.weekStart))
+        .sort((a, b) => a.week.weekStart.localeCompare(b.week.weekStart));
+
+      if (newWeeks.length === 0) {
+        noMoreNextRef.current = true;
+      } else {
+        setWeekDataMap((prev) => {
+          const next = new Map(prev);
+          for (const data of newWeeks) next.set(data.week.weekStart, data);
+          return next;
+        });
+        setWeekMondays((prev) => [...prev, ...newWeeks.map((data) => data.week.weekStart)]);
+      }
+
+      setLoadingMore(false);
+      return;
+    }
+
     const startMonday = furthestSearchedNextRef.current ?? weekMondays[weekMondays.length - 1];
     let searchDate = new Date(startMonday + 'T00:00:00');
 
@@ -290,7 +359,7 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
     }
 
     setLoadingMore(false);
-  }, [loadingMore, weekMondays, weekDataMap, loadWeek, hideEmpty]);
+  }, [loadingMore, weekMondays, weekDataMap, loadWeek, hideEmpty, dayEntries]);
 
   // Scroll handler: detect edges for infinite loading + track active day
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -325,7 +394,7 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
       let closestDist = Infinity;
       for (let i = 0; i < dayEntries.length; i++) {
         const entry = dayEntries[i];
-        if (hideEmpty && !entry.isToday && entry.images.length === 0) continue;
+        if (hideEmpty && !entry.isToday && entry.images.length === 0 && entry.videos.length === 0) continue;
         const child = el.querySelector(`[data-date="${entry.isoDate}"]`) as HTMLElement | null;
         if (!child) continue;
         const dist = Math.abs(child.offsetLeft + child.offsetWidth / 2 - centerX);
@@ -402,7 +471,7 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
   // Filtered entries (hide empty days when enabled, always keep today)
   const visibleEntries = useMemo(() => {
     if (!hideEmpty) return dayEntries;
-    return dayEntries.filter((e) => e.isToday || e.images.length > 0);
+    return dayEntries.filter((e) => e.isToday || e.images.length > 0 || e.videos.length > 0);
   }, [dayEntries, hideEmpty]);
 
   // Map active day index to visible index
