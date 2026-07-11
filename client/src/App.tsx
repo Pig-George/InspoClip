@@ -210,6 +210,7 @@ function AppInner() {
         onNextWeek={viewMode === 'week' ? goToNextWeek : undefined}
         searchOpen={searchOpen}
         onSearchOpenChange={setSearchOpen}
+        onOpenVideo={openVideo}
       />
       {viewMode === 'timeline' ? (
         <TimelineView />
@@ -289,7 +290,7 @@ function AppInner() {
         onCancel={handlePasteCancel}
       />
 
-      <VideoAnalysisView open={videoOpen} videoId={videoId} initialJobId={videoJobId} onBack={closeVideo} />
+      <VideoAnalysisView open={videoOpen} videoId={videoId} initialJobId={videoJobId} onBack={closeVideo} onRefresh={refresh} />
     </div>
   );
 }

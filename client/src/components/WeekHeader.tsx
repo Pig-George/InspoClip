@@ -16,9 +16,10 @@ interface WeekHeaderProps {
   onNextWeek?: () => void;
   searchOpen?: boolean;
   onSearchOpenChange?: (open: boolean) => void;
+  onOpenVideo?: (videoId: string, jobId?: string) => void;
 }
 
-export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onNextWeek, searchOpen: searchOpenProp, onSearchOpenChange }: WeekHeaderProps) {
+export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onNextWeek, searchOpen: searchOpenProp, onSearchOpenChange, onOpenVideo }: WeekHeaderProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [searchOpenLocal, setSearchOpenLocal] = useState(false);
@@ -155,7 +156,7 @@ export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onN
       </div>
 
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} onOpenVideo={onOpenVideo} />
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} weekDate={formatISODate(monday)} />
     </>
   );

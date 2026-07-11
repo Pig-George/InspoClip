@@ -3,16 +3,18 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
 import { fetchTags, createTag, addTagToImage, removeTagFromImage } from '@/lib/api';
+import { addTagToVideo, removeTagFromVideo } from '@/lib/video-api';
 import { toast } from '@/components/Toast';
 import type { Tag } from '@/types';
 
 interface TagManagerProps {
-  imageId: string;
+  imageId?: string;
+  videoId?: string;
   imageTags: Tag[];
   onTagsChange: () => void;
 }
 
-export function TagManager({ imageId, imageTags, onTagsChange }: TagManagerProps) {
+export function TagManager({ imageId, videoId, imageTags, onTagsChange }: TagManagerProps) {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [newTagName, setNewTagName] = useState('');
@@ -20,6 +22,7 @@ export function TagManager({ imageId, imageTags, onTagsChange }: TagManagerProps
   const triggerRef = useRef<HTMLButtonElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const targetId = imageId ?? videoId ?? '';
 
   useEffect(() => {
     fetchTags().then(setAllTags).catch(console.error);
@@ -29,7 +32,6 @@ export function TagManager({ imageId, imageTags, onTagsChange }: TagManagerProps
     if (showPicker) inputRef.current?.focus();
   }, [showPicker]);
 
-  // Close picker on outside click
   useEffect(() => {
     if (!showPicker) return;
     const handler = (e: MouseEvent) => {
@@ -42,19 +44,19 @@ export function TagManager({ imageId, imageTags, onTagsChange }: TagManagerProps
     return () => document.removeEventListener('mousedown', handler);
   }, [showPicker]);
 
-  // Position picker below trigger
   useLayoutEffect(() => {
     if (!showPicker || !triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
     setPickerPos({ top: rect.bottom + 4, left: rect.left });
   }, [showPicker]);
 
-  const imageTagIds = new Set(imageTags.map((t) => t.id));
-  const availableTags = allTags.filter((t) => !imageTagIds.has(t.id));
+  const currentTagIds = new Set(imageTags.map((t) => t.id));
+  const availableTags = allTags.filter((t) => !currentTagIds.has(t.id));
 
   const handleAdd = async (tagId: string) => {
     try {
-      await addTagToImage(imageId, tagId);
+      if (imageId) await addTagToImage(imageId, tagId);
+      else if (videoId) await addTagToVideo(videoId, tagId);
       onTagsChange();
     } catch {
       toast('error', 'Failed to add tag');
@@ -63,7 +65,8 @@ export function TagManager({ imageId, imageTags, onTagsChange }: TagManagerProps
 
   const handleRemove = async (tagId: string) => {
     try {
-      await removeTagFromImage(imageId, tagId);
+      if (imageId) await removeTagFromImage(imageId, tagId);
+      else if (videoId) await removeTagFromVideo(videoId, tagId);
       onTagsChange();
     } catch {
       toast('error', 'Failed to remove tag');
@@ -76,7 +79,8 @@ export function TagManager({ imageId, imageTags, onTagsChange }: TagManagerProps
     try {
       const tag = await createTag(name);
       setAllTags((prev) => [...prev, tag]);
-      await addTagToImage(imageId, tag.id);
+      if (imageId) await addTagToImage(imageId, tag.id);
+      else if (videoId) await addTagToVideo(videoId, tag.id);
       setNewTagName('');
       onTagsChange();
     } catch {
@@ -106,7 +110,6 @@ export function TagManager({ imageId, imageTags, onTagsChange }: TagManagerProps
         <Plus className="w-4 h-4 text-[var(--text-muted)]" />
       </button>
 
-      {/* Picker — portaled to body */}
       {createPortal(
         <AnimatePresence>
           {showPicker && (

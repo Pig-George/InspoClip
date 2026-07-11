@@ -2,19 +2,23 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search } from 'lucide-react';
 import { ImageCard } from './ImageCard';
+import { VideoCard } from './video/VideoCard';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { useLanguage } from '@/context/LanguageContext';
 import { fetchTags } from '@/lib/api';
 import type { Image as ImageType, Tag } from '@/types';
+import type { WeekVideo } from '@/types/video';
 
 interface SearchDialogProps {
   open: boolean;
   onClose: () => void;
+  onOpenVideo?: (videoId: string, jobId?: string) => void;
 }
 
-export function SearchDialog({ open, onClose }: SearchDialogProps) {
+export function SearchDialog({ open, onClose, onOpenVideo }: SearchDialogProps) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ImageType[]>([]);
+  const [imageResults, setImageResults] = useState<ImageType[]>([]);
+  const [videoResults, setVideoResults] = useState<WeekVideo[]>([]);
   const [loading, setLoading] = useState(false);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -34,26 +38,31 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   }, [open, onClose]);
 
   const doSearch = useCallback(async (q: string) => {
-    if (!q.trim()) { setResults([]); return; }
+    if (!q.trim()) { setImageResults([]); setVideoResults([]); return; }
     setLoading(true);
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
       if (res.ok) {
         const data = await res.json();
-        // Reorder terms so matching term is first
         const lq = q.toLowerCase();
-        for (const img of data) {
+        // Reorder terms so matching term is first
+        for (const img of data.images ?? []) {
           const matchIdx = img.terms.findIndex((t: any) => t.keyword.toLowerCase().includes(lq));
           if (matchIdx > 0) {
             const [match] = img.terms.splice(matchIdx, 1);
             img.terms.unshift(match);
           }
         }
-        setResults(data);
+        setImageResults(data.images ?? []);
+        setVideoResults(data.videos ?? []);
       }
-    } catch { setResults([]); }
+    } catch { setImageResults([]); setVideoResults([]); }
     finally { setLoading(false); }
   }, []);
+
+  const filteredImages = imageResults.filter((img) => !selectedTag || img.tags?.some((t) => t.id === selectedTag));
+  const filteredVideos = videoResults.filter((v) => !selectedTag || v.tags?.some((t) => t.id === selectedTag));
+  const hasResults = filteredImages.length > 0 || filteredVideos.length > 0;
 
   return (
     <AnimatePresence>
@@ -118,18 +127,19 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                   {locale === 'zh' ? '搜索中...' : 'Searching...'}
                 </p>
               )}
-              {!loading && query && results.length === 0 && (
+              {!loading && query && !hasResults && (
                 <p className="text-center text-sm text-[var(--text-muted)] py-8">
                   {locale === 'zh' ? '未找到匹配结果' : 'No results found'}
                 </p>
               )}
-              {!loading && results.length > 0 && (
+              {!loading && hasResults && (
                 <div className="grid grid-cols-2 gap-3">
-                  {results
-                    .filter((img) => !selectedTag || img.tags?.some((t) => t.id === selectedTag))
-                    .map((img) => (
-                      <ImageCard key={img.id} image={img} onRefresh={() => doSearch(query)} />
-                    ))}
+                  {filteredImages.map((img) => (
+                    <ImageCard key={img.id} image={img} onRefresh={() => doSearch(query)} />
+                  ))}
+                  {filteredVideos.map((v) => (
+                    <VideoCard key={v.id} video={v} onOpen={(vid, jid) => { onClose(); onOpenVideo?.(vid, jid); }} onRefresh={() => doSearch(query)} />
+                  ))}
                 </div>
               )}
             </div>

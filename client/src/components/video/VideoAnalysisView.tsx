@@ -7,17 +7,19 @@ import type { VideoDetail, VideoJob, VideoStage } from '@/types/video';
 import { useLanguage } from '@/context/LanguageContext';
 import { localizedText } from '@/lib/localized-text';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { TagManager } from '@/components/TagManager';
 import { VideoJobProgress } from './VideoJobProgress';
 import { VideoTimeline } from './VideoTimeline';
 import { VideoPromptPanel } from './VideoPromptPanel';
 
-export function VideoAnalysisView({ open = true, videoId, initialJobId, onBack }: { open?: boolean; videoId?: string | null; initialJobId?: string; onBack: () => void }) {
+export function VideoAnalysisView({ open = true, videoId, initialJobId, onBack, onRefresh }: { open?: boolean; videoId?: string | null; initialJobId?: string; onBack: () => void; onRefresh?: () => void }) {
   const [detail, setDetail] = useState<VideoDetail | null>(null);
   const [job, setJob] = useState<VideoJob | null>(null);
   const [error, setError] = useState('');
   const player = useRef<HTMLVideoElement>(null);
   const overlayRef = useScrollLock(open);
   const { locale } = useLanguage();
+  const prevJobStatus = useRef<string | null>(null);
   const load = useCallback(async () => {
     if (!videoId) return;
     const value = await fetchVideo(videoId);
@@ -40,12 +42,26 @@ export function VideoAnalysisView({ open = true, videoId, initialJobId, onBack }
     load().then(poll).catch((value)=>setError(value.message));
     return()=>{cancelled=true;if(timer)clearTimeout(timer);};
   },[open,videoId,initialJobId,load]);
+
+  // Notify parent when job transitions to completed so video cards refresh
+  useEffect(() => {
+    if (job?.status === 'completed' && prevJobStatus.current !== 'completed') {
+      onRefresh?.();
+    }
+    prevJobStatus.current = job?.status ?? null;
+  }, [job?.status, onRefresh]);
+
+  // Notify parent when dialog closes (tags may have changed or analysis completed)
+  const handleBack = useCallback(() => {
+    onRefresh?.();
+    onBack();
+  }, [onBack, onRefresh]);
   useEffect(() => {
     if (!open) return;
-    const handler = (event: KeyboardEvent) => { if (event.key === 'Escape') onBack(); };
+    const handler = (event: KeyboardEvent) => { if (event.key === 'Escape') handleBack(); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [open, onBack]);
+  }, [open, handleBack]);
   const selectStage=(stage:VideoStage)=>{if(player.current){player.current.currentTime=stage.startTime;void player.current.play();}};
   return createPortal(
     <AnimatePresence>
@@ -56,7 +72,7 @@ export function VideoAnalysisView({ open = true, videoId, initialJobId, onBack }
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
-        onClick={(event) => { if (event.target === event.currentTarget) onBack(); }}
+        onClick={(event) => { if (event.target === event.currentTarget) handleBack(); }}
       >
         <motion.div
           role="dialog"
@@ -78,7 +94,7 @@ export function VideoAnalysisView({ open = true, videoId, initialJobId, onBack }
               <button
                 type="button"
                 aria-label="关闭"
-                onClick={onBack}
+                onClick={handleBack}
                 className="p-1 rounded-full hover:bg-[var(--muted)] transition-colors"
               >
                 <X className="w-4 h-4 text-[var(--text-muted)]" />
@@ -88,6 +104,10 @@ export function VideoAnalysisView({ open = true, videoId, initialJobId, onBack }
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
               {error&&<p className="text-sm text-red-500">{error}</p>}
               {job&&job.status!=='completed'&&<VideoJobProgress job={job} onRetry={async()=>setJob(await retryVideo(videoId))}/>}
+              <div>
+                <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">标签</h3>
+                <TagManager videoId={videoId} imageTags={detail?.tags ?? []} onTagsChange={load} />
+              </div>
               <div>
                 <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">阶段分析</h3>
                 {detail?.analysis

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
-import { tags, imageTags } from '../db/schema.js';
+import { tags, imageTags, videoTags } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
 const router = Router();
@@ -88,6 +88,40 @@ router.get('/:tagId/images', async (req: Request, res: Response) => {
     const tagId = req.params.tagId as string;
     const links = await db.select().from(imageTags).where(eq(imageTags.tagId, tagId));
     res.json(links.map((l) => l.imageId));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/tags/video/:videoId — add tag to video
+router.post('/video/:videoId', async (req: Request, res: Response) => {
+  try {
+    const { tagId } = req.body;
+    const videoId = req.params.videoId as string;
+    if (!tagId) {
+      res.status(400).json({ error: 'tagId is required' });
+      return;
+    }
+    const [link] = await db.insert(videoTags).values({ videoId, tagId }).returning();
+    res.json(link);
+  } catch (err: any) {
+    if (err.code === '23505') {
+      res.json({ success: true, message: 'Already tagged' });
+      return;
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/tags/video/:videoId/:tagId — remove tag from video
+router.delete('/video/:videoId/:tagId', async (req: Request, res: Response) => {
+  try {
+    const videoId = req.params.videoId as string;
+    const tagId = req.params.tagId as string;
+    await db.delete(videoTags).where(
+      and(eq(videoTags.videoId, videoId), eq(videoTags.tagId, tagId))
+    );
+    res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

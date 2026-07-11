@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
-import { weeks, images, terms as termsTable, notes, tags as tagsTable, imageTags, imageColors as imageColorsTable, videos, videoAnalysisJobs } from '../db/schema.js';
+import { weeks, images, terms as termsTable, notes, tags as tagsTable, imageTags, imageColors as imageColorsTable, videos, videoAnalysisJobs, videoAnalyses, videoTags } from '../db/schema.js';
 import { eq, inArray, and, gte, lt, desc } from 'drizzle-orm';
 
 const router = Router();
@@ -51,6 +51,34 @@ router.get('/:date', async (req: Request, res: Response) => {
       : [];
     const latestJobByVideo = new Map<string, typeof videoJobs[number]>();
     for (const job of videoJobs) if (!latestJobByVideo.has(job.videoId)) latestJobByVideo.set(job.videoId, job);
+
+    // Fetch video analyses (summary) for the week's videos
+    let videoAnalysesList: any[] = [];
+    if (videoIds.length > 0) {
+      videoAnalysesList = await db.select().from(videoAnalyses).where(inArray(videoAnalyses.videoId, videoIds));
+    }
+    const analysisByVideo = new Map<string, any>();
+    for (const va of videoAnalysesList) analysisByVideo.set(va.videoId, va);
+
+    // Fetch video tags for the week's videos
+    let allVideoTags: any[] = [];
+    if (videoIds.length > 0) {
+      allVideoTags = await db
+        .select({
+          videoId: videoTags.videoId,
+          tagId: tagsTable.id,
+          tagName: tagsTable.name,
+          tagColor: tagsTable.color,
+        })
+        .from(videoTags)
+        .innerJoin(tagsTable, eq(videoTags.tagId, tagsTable.id))
+        .where(inArray(videoTags.videoId, videoIds));
+    }
+    const tagsByVideo: Record<string, any[]> = {};
+    for (const vt of allVideoTags) {
+      if (!tagsByVideo[vt.videoId]) tagsByVideo[vt.videoId] = [];
+      tagsByVideo[vt.videoId].push({ id: vt.tagId, name: vt.tagName, color: vt.tagColor });
+    }
 
     // In contentOnly mode, return empty if no images
     if (contentOnly && weekImages.length === 0 && weekVideos.length === 0) {
@@ -123,7 +151,12 @@ router.get('/:date', async (req: Request, res: Response) => {
         tags: tagsByImage[img.id] || [],
         colors: colorsByImage[img.id] || [],
       })),
-      videos: weekVideos.map((video) => ({ ...video, job: latestJobByVideo.get(video.id) ?? null })),
+      videos: weekVideos.map((video) => ({
+        ...video,
+        job: latestJobByVideo.get(video.id) ?? null,
+        summary: analysisByVideo.get(video.id)?.summary ?? null,
+        tags: tagsByVideo[video.id] || [],
+      })),
       notes: weekNotes[0] || null,
     });
   } catch (err: any) {
