@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { LanguageProvider } from '@/context/LanguageContext';
 import { generateVideoOutput, fetchVideoOutput } from '@/lib/video-api';
 import { getInflight, setInflight } from '@/lib/video-prompt-cache';
 
@@ -17,10 +18,20 @@ vi.mock('@/lib/video-prompt-cache', () => ({
   setInflight: vi.fn(),
 }));
 
+function renderWithLocale(locale: 'zh' | 'en' = 'zh') {
+  localStorage.setItem('inspoclip-locale', locale);
+  return render(
+    <LanguageProvider>
+      <VideoPromptPanel videoId="v" />
+    </LanguageProvider>,
+  );
+}
+
 describe('VideoPromptPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    localStorage.clear();
     vi.mocked(fetchVideoOutput).mockResolvedValue(null);
     vi.mocked(generateVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', contentEn: '', contentZh: '' });
     vi.mocked(getInflight).mockReturnValue(undefined);
@@ -33,25 +44,34 @@ describe('VideoPromptPanel', () => {
   it('auto-loads existing prompt on mount and shows content for the UI locale', async () => {
     vi.mocked(fetchVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', contentEn: 'hello', contentZh: '你好' });
 
-    render(<VideoPromptPanel videoId="v" />);
+    renderWithLocale();
 
     await waitFor(() => expect(fetchVideoOutput).toHaveBeenCalledWith('v', 'general'));
     expect(await screen.findByText('你好')).toBeInTheDocument();
   });
 
   it('renders as an integrated sidebar section', () => {
-    render(<VideoPromptPanel videoId="v" />);
+    renderWithLocale();
 
     const section = screen.getByLabelText('复刻输出');
     expect(section).toHaveClass('border-t');
     expect(screen.getByText('用途')).toBeInTheDocument();
   });
 
+  it('localizes the prompt output controls in English', async () => {
+    renderWithLocale('en');
+
+    expect(screen.getByLabelText('Replication output')).toBeInTheDocument();
+    expect(screen.getByText('Purpose')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'General' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Generate output' })).toBeInTheDocument();
+  });
+
   it('shows generate button when no existing prompt', async () => {
     vi.mocked(fetchVideoOutput).mockResolvedValue(null);
     vi.mocked(generateVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', contentEn: 'gen en', contentZh: '生成中文' });
 
-    render(<VideoPromptPanel videoId="v" />);
+    renderWithLocale();
 
     await waitFor(() => expect(fetchVideoOutput).toHaveBeenCalled());
     const generateBtn = await screen.findByRole('button', { name: '生成输出' });
@@ -66,7 +86,7 @@ describe('VideoPromptPanel', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'p2', purpose: 'frontend', target: '', contentEn: 'react en', contentZh: 'React 中文' });
 
-    render(<VideoPromptPanel videoId="v" />);
+    renderWithLocale();
 
     await waitFor(() => expect(fetchVideoOutput).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByRole('button', { name: '前端实现' }));
@@ -77,7 +97,7 @@ describe('VideoPromptPanel', () => {
   it('toggles language display without calling the API again', async () => {
     vi.mocked(fetchVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', contentEn: 'english text', contentZh: '中文内容' });
 
-    render(<VideoPromptPanel videoId="v" />);
+    renderWithLocale();
 
     expect(await screen.findByText('中文内容')).toBeInTheDocument();
     const initialCallCount = vi.mocked(fetchVideoOutput).mock.calls.length;
@@ -92,7 +112,7 @@ describe('VideoPromptPanel', () => {
     const json = '{"summary":"demo"}';
     vi.mocked(fetchVideoOutput).mockResolvedValue({ id: 'p', purpose: 'json', target: '', contentEn: json, contentZh: json });
 
-    render(<VideoPromptPanel videoId="v" />);
+    renderWithLocale();
 
     await userEvent.click(screen.getByRole('button', { name: '结构化 JSON' }));
     await waitFor(() => expect(fetchVideoOutput).toHaveBeenCalledWith('v', 'json'));
@@ -103,7 +123,7 @@ describe('VideoPromptPanel', () => {
     const pending = new Promise<{ id: string; purpose: 'general'; target: string; contentEn: string; contentZh: string }>(() => {});
     vi.mocked(getInflight).mockReturnValue(pending as never);
 
-    render(<VideoPromptPanel videoId="v" />);
+    renderWithLocale();
 
     expect(await screen.findByText('生成中…')).toBeInTheDocument();
     expect(fetchVideoOutput).not.toHaveBeenCalled();
@@ -114,7 +134,7 @@ describe('VideoPromptPanel', () => {
     const pending = new Promise<{ id: string; purpose: 'general'; target: string; contentEn: string; contentZh: string }>(() => {});
     vi.mocked(getInflight).mockReturnValue(pending as never);
 
-    render(<VideoPromptPanel videoId="v" />);
+    renderWithLocale();
 
     await waitFor(() => expect(getInflight).toHaveBeenCalled());
     expect(screen.queryByRole('button', { name: '生成输出' })).not.toBeInTheDocument();
@@ -122,23 +142,19 @@ describe('VideoPromptPanel', () => {
   });
 
   it('recovers generating state from backend after page refresh', async () => {
-    // Simulate: GET returns { generating: true } first, then returns the output after polling
     const output = { id: 'p', purpose: 'general' as const, target: '', contentEn: 'refreshed en', contentZh: '刷新后中文' };
     vi.mocked(fetchVideoOutput)
       .mockResolvedValueOnce({ generating: true })
       .mockResolvedValueOnce({ generating: true })
       .mockResolvedValueOnce(output);
 
-    render(<VideoPromptPanel videoId="v" />);
+    renderWithLocale();
 
-    // Should show generating state
     expect(await screen.findByText('生成中…')).toBeInTheDocument();
 
-    // Advance timers to trigger polling
     await vi.advanceTimersByTimeAsync(3000);
     await vi.advanceTimersByTimeAsync(3000);
 
-    // Should show the output after polling
     await waitFor(() => expect(screen.getByText('刷新后中文')).toBeInTheDocument());
   });
 });

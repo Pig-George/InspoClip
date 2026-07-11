@@ -9,12 +9,26 @@ interface VideoTimelineProps {
   locale?: Locale;
 }
 
+const timelineCopy = {
+  zh: {
+    ariaLabel: '视频阶段时间线',
+    stepSeparator: ' → ',
+    actionSeparator: '：',
+  },
+  en: {
+    ariaLabel: 'Video stage timeline',
+    stepSeparator: ' → ',
+    actionSeparator: ': ',
+  },
+} as const;
+
 export function VideoTimeline({ stages, onSelect, locale: localeOverride }: VideoTimelineProps) {
   const { locale: currentLocale } = useLanguage();
   const locale = localeOverride ?? currentLocale;
+  const copy = timelineCopy[locale];
 
   return (
-    <div className="space-y-2" aria-label="视频阶段时间线">
+    <div className="space-y-2" aria-label={copy.ariaLabel}>
       {stages.map((stage, index) => (
         <button
           key={`${stage.startTime}-${index}`}
@@ -26,15 +40,21 @@ export function VideoTimeline({ stages, onSelect, locale: localeOverride }: Vide
               {index + 1}. {localizedText(stage.title, locale)}
             </strong>
             <span className="shrink-0 text-xs text-[var(--text-muted)]">
-              {stage.startTime.toFixed(1)}s — {stage.endTime.toFixed(1)}s
+              {stage.startTime.toFixed(1)}s - {stage.endTime.toFixed(1)}s
             </span>
           </div>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            {localizedText(stage.initialState, locale)} → {localizedText(stage.trigger, locale)} → {localizedText(stage.resultState, locale)}
+            {localizedText(stage.initialState, locale)}
+            {copy.stepSeparator}
+            {localizedText(stage.trigger, locale)}
+            {copy.stepSeparator}
+            {localizedText(stage.resultState, locale)}
           </p>
           {stage.actions.map((action, actionIndex) => (
             <p key={actionIndex} className="mt-1 text-xs text-[var(--text)]">
-              {localizedText(action.subject, locale)}：{localizedText(action.action, locale)} · {action.durationMs}ms · {action.easing}
+              {localizedText(action.subject, locale)}
+              {copy.actionSeparator}
+              {localizedText(action.action, locale)} · {action.durationMs}ms · {action.easing}
             </p>
           ))}
         </button>

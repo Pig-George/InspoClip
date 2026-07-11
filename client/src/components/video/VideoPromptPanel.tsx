@@ -7,23 +7,69 @@ import { generateVideoOutput, fetchVideoOutput } from '@/lib/video-api';
 import { getInflight, setInflight } from '@/lib/video-prompt-cache';
 import type { VideoPromptOutput, VideoPurpose } from '@/types/video';
 
-const purposes: Array<[VideoPurpose, string]> = [
-  ['general', '通用'],
-  ['video-generation', '视频生成'],
-  ['frontend', '前端实现'],
-  ['motion-design', 'AE / Figma'],
-  ['storyboard', '分镜脚本'],
-  ['json', '结构化 JSON'],
-];
-
 type LangMode = 'auto' | 'en' | 'zh' | 'both';
 
-const languageModes: Array<[LangMode, string]> = [
-  ['auto', 'Auto'],
-  ['en', 'EN'],
-  ['zh', '中'],
-  ['both', 'EN/中'],
-];
+const promptCopy = {
+  zh: {
+    title: '复刻输出',
+    description: '按用途整理成可复制提示词，或导出结构化结果。',
+    purpose: '用途',
+    targetPlatform: '目标平台',
+    targetPlaceholder: '可选：Sora、React、After Effects…',
+    generating: '生成中…',
+    loading: '加载中…',
+    generateFailed: '生成失败',
+    generate: '生成输出',
+    copy: '复制',
+    copied: '已复制',
+    regenerate: '重新生成',
+    purposes: {
+      general: '通用',
+      'video-generation': '视频生成',
+      frontend: '前端实现',
+      'motion-design': 'AE / Figma',
+      storyboard: '分镜脚本',
+      json: '结构化 JSON',
+    },
+    languageModes: {
+      auto: 'Auto',
+      en: 'EN',
+      zh: '中',
+      both: 'EN/中',
+    },
+  },
+  en: {
+    title: 'Replication output',
+    description: 'Organize the analysis into reusable prompts by purpose, or export a structured result.',
+    purpose: 'Purpose',
+    targetPlatform: 'Target platform',
+    targetPlaceholder: 'Optional: Sora, React, After Effects…',
+    generating: 'Generating…',
+    loading: 'Loading…',
+    generateFailed: 'Generation failed',
+    generate: 'Generate output',
+    copy: 'Copy',
+    copied: 'Copied',
+    regenerate: 'Regenerate',
+    purposes: {
+      general: 'General',
+      'video-generation': 'Video generation',
+      frontend: 'Frontend implementation',
+      'motion-design': 'AE / Figma',
+      storyboard: 'Storyboard',
+      json: 'Structured JSON',
+    },
+    languageModes: {
+      auto: 'Auto',
+      en: 'EN',
+      zh: '中',
+      both: 'EN/中',
+    },
+  },
+} as const;
+
+const purposeValues: VideoPurpose[] = ['general', 'video-generation', 'frontend', 'motion-design', 'storyboard', 'json'];
+const languageModeValues: LangMode[] = ['auto', 'en', 'zh', 'both'];
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_ATTEMPTS = 100; // 5 minutes max
@@ -38,11 +84,12 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const { locale } = useLanguage();
+  const copy = promptCopy[locale];
   const cancelledRef = useRef(false);
 
   const effectiveLocale = langMode === 'auto' ? locale : langMode;
 
-  // Poll GET until the output is ready or absent
+  // Poll GET until the output is ready or absent.
   const pollOutput = useCallback(async (vid: string, pur: VideoPurpose): Promise<VideoPromptOutput | null> => {
     for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
       if (cancelledRef.current) return null;
@@ -51,18 +98,17 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
       try {
         const result = await fetchVideoOutput(vid, pur);
         if (cancelledRef.current) return null;
-        if (result && 'generating' in result) continue; // still generating
+        if (result && 'generating' in result) continue;
         return result;
       } catch {
-        // keep polling on transient errors
+        // Keep polling on transient errors.
       }
     }
     return null;
   }, []);
 
-  // Load existing output or recover generating state
+  // Load existing output or recover generating state.
   const loadExisting = useCallback(async (vid: string, pur: VideoPurpose) => {
-    // 1. Check frontend in-flight cache (covers close/reopen without refresh)
     const inflight = getInflight(vid, pur);
     if (inflight) {
       setGenerating(true);
@@ -78,7 +124,6 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
       return;
     }
 
-    // 2. Check backend via GET
     setLoading(true);
     setError('');
     try {
@@ -86,7 +131,6 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
       if (cancelledRef.current) return;
 
       if (result && 'generating' in result) {
-        // Generation is in progress on the backend (e.g., after page refresh)
         setLoading(false);
         setGenerating(true);
         const polled = await pollOutput(vid, pur);
@@ -108,11 +152,12 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
   useEffect(() => {
     cancelledRef.current = false;
     loadExisting(videoId, purpose);
-    return () => { cancelledRef.current = true; };
+    return () => {
+      cancelledRef.current = true;
+    };
   }, [videoId, purpose, loadExisting]);
 
   const handleGenerate = async () => {
-    // Reuse in-flight request if one exists
     const inflight = getInflight(videoId, purpose);
     if (inflight) {
       setGenerating(true);
@@ -120,7 +165,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
       try {
         setOutput(await inflight);
       } catch (value) {
-        setError(value instanceof Error ? value.message : '生成失败');
+        setError(value instanceof Error ? value.message : copy.generateFailed);
       } finally {
         setGenerating(false);
       }
@@ -134,7 +179,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
     try {
       setOutput(await promise);
     } catch (value) {
-      setError(value instanceof Error ? value.message : '生成失败');
+      setError(value instanceof Error ? value.message : copy.generateFailed);
     } finally {
       setGenerating(false);
     }
@@ -145,7 +190,9 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch { /* ignore */ }
+    } catch {
+      // Ignore clipboard permission failures.
+    }
   };
 
   const display = (() => {
@@ -164,31 +211,35 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
     : display.showEn ? display.en : display.zh;
 
   return (
-    <section aria-label="复刻输出" className="border-t border-[var(--card-border)] pt-4">
+    <section aria-label={copy.title} className="border-t border-[var(--card-border)] pt-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-xs font-heading uppercase tracking-wide text-[var(--text-muted)]">复刻输出</h3>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">按用途整理成可复制提示词，或导出结构化结果。</p>
+          <h3 className="text-xs font-heading uppercase tracking-wide text-[var(--text-muted)]">{copy.title}</h3>
+          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{copy.description}</p>
         </div>
       </div>
 
       <div className="space-y-3 rounded-xl border border-[var(--card-border)] bg-[var(--muted)]/35 p-3">
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-heading text-[var(--text-muted)]">用途</span>
+            <span className="text-xs font-heading text-[var(--text-muted)]">{copy.purpose}</span>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
-            {purposes.map(([value, label]) => (
+            {purposeValues.map((value) => (
               <button
                 key={value}
-                onClick={() => { setPurpose(value); setTarget(''); setOutput(null); }}
+                onClick={() => {
+                  setPurpose(value);
+                  setTarget('');
+                  setOutput(null);
+                }}
                 className={`rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
                   purpose === value
                     ? 'bg-[var(--accent)] text-white shadow-sm'
                     : 'bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)]'
                 }`}
               >
-                {label}
+                {copy.purposes[value]}
               </button>
             ))}
           </div>
@@ -196,10 +247,13 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
 
         {purpose !== 'general' && purpose !== 'json' && (
           <input
-            aria-label="目标平台"
+            aria-label={copy.targetPlatform}
             value={target}
-            onChange={(event) => { setTarget(event.target.value); setOutput(null); }}
-            placeholder="可选：Sora、React、After Effects…"
+            onChange={(event) => {
+              setTarget(event.target.value);
+              setOutput(null);
+            }}
+            placeholder={copy.targetPlaceholder}
             className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
           />
         )}
@@ -208,7 +262,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
       {(loading || generating) && (
         <div className="mt-3 flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <Loader2 className="h-4 w-4 animate-spin" />
-          {generating ? '生成中…' : '加载中…'}
+          {generating ? copy.generating : copy.loading}
         </div>
       )}
 
@@ -220,17 +274,15 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
           className="mt-3 flex items-center gap-1.5 rounded-full bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-heading text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20"
         >
           <Sparkles className="h-3.5 w-3.5" />
-          生成输出
+          {copy.generate}
         </button>
       )}
 
       {output && (
         <div className="mt-3 space-y-2">
-          {/* Toolbar */}
           <div className="flex items-center justify-between">
-            {/* Language toggle */}
             <div className="flex items-center rounded-md bg-[var(--muted)] p-0.5">
-              {languageModes.map(([value, label]) => (
+              {languageModeValues.map((value) => (
                 <button
                   key={value}
                   onClick={() => setLangMode(value)}
@@ -240,17 +292,17 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
                       : 'text-[var(--text-muted)] hover:text-[var(--text)]'
                   }`}
                 >
-                  {label}
+                  {copy.languageModes[value]}
                 </button>
               ))}
             </div>
 
-            {/* Actions */}
             <div className="flex items-center gap-1">
               <button
                 onClick={() => handleCopy(copyText)}
                 className="rounded p-1 transition-colors hover:bg-[var(--muted)]"
-                title="复制"
+                title={copied ? copy.copied : copy.copy}
+                aria-label={copied ? copy.copied : copy.copy}
               >
                 {copied
                   ? <Check className="h-3.5 w-3.5 text-green-500" />
@@ -261,14 +313,14 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
                 onClick={handleGenerate}
                 disabled={generating}
                 className="rounded p-1 transition-colors hover:bg-[var(--muted)] disabled:opacity-40"
-                title="重新生成"
+                title={copy.regenerate}
+                aria-label={copy.regenerate}
               >
                 <RefreshCw className={`h-3.5 w-3.5 text-[var(--text-muted)] ${generating ? 'animate-spin' : ''}`} />
               </button>
             </div>
           </div>
 
-          {/* Content */}
           {isJson ? (
             <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border border-[var(--card-border)] bg-[var(--muted)]/35 p-3 font-mono text-xs leading-5 text-[var(--text)]">
               {formatJson(display.showEn ? display.en : display.zh)}

@@ -47,9 +47,16 @@ describe('VideoTimeline', () => {
 
     render(<VideoTimeline stages={[stage]} onSelect={vi.fn()} locale="zh" />);
 
+    expect(screen.getByLabelText('视频阶段时间线')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /面板打开/ })).toBeInTheDocument();
     expect(screen.getByText(/关闭 → 点击 → 打开/)).toBeInTheDocument();
     expect(screen.getByText(/卡片：向上滑入/)).toBeInTheDocument();
     expect(screen.queryByText(/Panel opens/)).not.toBeInTheDocument();
+  });
+
+  it('localizes timeline chrome for English', () => {
+    render(<VideoTimeline stages={[]} onSelect={vi.fn()} locale="en" />);
+
+    expect(screen.getByLabelText('Video stage timeline')).toBeInTheDocument();
   });
 });
