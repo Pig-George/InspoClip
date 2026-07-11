@@ -2,6 +2,14 @@ import { z } from 'zod';
 
 import type { VideoAnalysis } from './types.js';
 
+const localizedStringSchema = z.union([
+  z.string(),
+  z.object({
+    en: z.string(),
+    zh: z.string(),
+  }).strict(),
+]);
+
 const visualStyleSchema = z
   .object({
     colors: z.array(z.string()),
@@ -13,8 +21,8 @@ const visualStyleSchema = z
 
 const actionSchema = z
   .object({
-    subject: z.string(),
-    action: z.string(),
+    subject: localizedStringSchema,
+    action: localizedStringSchema,
     from: z.record(z.unknown()),
     to: z.record(z.unknown()),
     durationMs: z.number().nonnegative(),
@@ -27,11 +35,11 @@ const stageSchema = z
   .object({
     startTime: z.number().nonnegative(),
     endTime: z.number().nonnegative(),
-    title: z.string(),
-    initialState: z.string(),
-    trigger: z.string(),
+    title: localizedStringSchema,
+    initialState: localizedStringSchema,
+    trigger: localizedStringSchema,
     actions: z.array(actionSchema),
-    resultState: z.string(),
+    resultState: localizedStringSchema,
   })
   .strict()
   .refine((stage) => stage.endTime >= stage.startTime, {
@@ -41,7 +49,7 @@ const stageSchema = z
 
 const videoAnalysisSchema: z.ZodType<VideoAnalysis> = z
   .object({
-    summary: z.string(),
+    summary: localizedStringSchema,
     visualStyle: visualStyleSchema,
     stages: z.array(stageSchema),
     assets: z.array(z.string()),

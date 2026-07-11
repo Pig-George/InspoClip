@@ -151,8 +151,26 @@ describe('video prompts', () => {
     );
   });
 
+  it('asks video analysis to return localized user-facing text fields', () => {
+    expect(VIDEO_ANALYSIS_PROMPT).toContain('localized object');
+    expect(VIDEO_ANALYSIS_PROMPT).toContain('"title": {"en": "string", "zh": "string"}');
+    expect(VIDEO_ANALYSIS_PROMPT).toContain('"subject": {"en": "string", "zh": "string"}');
+  });
+
   it('uses the general purpose by default', () => {
     expect(createPurposeTransformationPrompt()).toContain('"general"');
+  });
+
+  it('does not ask non-json purpose outputs to return raw JSON', () => {
+    const prompt = createPurposeTransformationPrompt('frontend', { locale: 'zh' });
+
+    expect(prompt).toContain('ready-to-copy');
+    expect(prompt).toContain('Do not return raw JSON');
+    expect(prompt).not.toContain('Return strict JSON only');
+  });
+
+  it('keeps strict JSON output for the json purpose', () => {
+    expect(createPurposeTransformationPrompt('json')).toContain('Return strict JSON only');
   });
 
   it.each([

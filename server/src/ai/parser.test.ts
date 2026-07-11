@@ -40,6 +40,52 @@ describe('parseVideoAnalysis', () => {
     expect(parseVideoAnalysis(validAnalysis)).toEqual(validAnalysis);
   });
 
+  it('parses localized stage and action descriptions', () => {
+    const localizedAnalysis = {
+      ...validAnalysis,
+      summary: {
+        en: 'A product interface animation',
+        zh: '一个产品界面动效演示',
+      },
+      stages: [
+        {
+          ...validAnalysis.stages[0],
+          title: {
+            en: 'Landing page entrance',
+            zh: '落地页入场',
+          },
+          initialState: {
+            en: 'The page is blank',
+            zh: '页面为空白',
+          },
+          trigger: {
+            en: 'Page load',
+            zh: '页面加载',
+          },
+          actions: [
+            {
+              ...validAnalysis.stages[0].actions[0],
+              subject: {
+                en: 'Headline',
+                zh: '标题',
+              },
+              action: {
+                en: 'Fade in and move upward',
+                zh: '淡入并向上移动',
+              },
+            },
+          ],
+          resultState: {
+            en: 'The headline is visible',
+            zh: '标题可见',
+          },
+        },
+      ],
+    };
+
+    expect(parseVideoAnalysis(localizedAnalysis)).toEqual(localizedAnalysis);
+  });
+
   it('rejects an analysis without stages', () => {
     const { stages: _stages, ...input } = validAnalysis;
 

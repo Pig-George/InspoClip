@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { VideoAnalysis } from '../ai/types.js';
+import type { LocalizedString, VideoAnalysis } from '../ai/types.js';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { videoAnalyses, videoAnalysisJobs, videoPromptOutputs, videos } from '../db/schema.js';
@@ -66,6 +66,10 @@ export interface VideoPromptOutputRecord {
   locale: string;
   content: string;
   createdAt: Date;
+}
+
+function localizedSummary(value: LocalizedString): string {
+  return typeof value === 'string' ? value : value.zh || value.en;
 }
 
 export interface VideoRepository {
@@ -141,7 +145,7 @@ export class InMemoryVideoRepository implements VideoRepository {
     const now = new Date();
     this.analyses.set(job.videoId, {
       id: this.analyses.get(job.videoId)?.id ?? randomUUID(), videoId: job.videoId,
-      summary: analysis.summary, visualStyle: analysis.visualStyle, analysis,
+      summary: localizedSummary(analysis.summary), visualStyle: analysis.visualStyle, analysis,
       createdAt: this.analyses.get(job.videoId)?.createdAt ?? now, updatedAt: now,
     });
     Object.assign(job, { status: 'completed', progress: 100, completedAt: now, rawResponse: rawResponse ?? null, errorMessage: null });
@@ -260,11 +264,11 @@ export class DrizzleVideoRepository implements VideoRepository {
       const [job] = await tx.select().from(videoAnalysisJobs).where(eq(videoAnalysisJobs.id, jobId)).limit(1);
       if (!job || job.status !== 'processing') throw new Error('Processing job not found');
       await tx.insert(videoAnalyses).values({
-        videoId: job.videoId, summary: analysis.summary,
+        videoId: job.videoId, summary: localizedSummary(analysis.summary),
         visualStyle: analysis.visualStyle, analysis,
       }).onConflictDoUpdate({
         target: videoAnalyses.videoId,
-        set: { summary: analysis.summary, visualStyle: analysis.visualStyle, analysis, updatedAt: new Date() },
+        set: { summary: localizedSummary(analysis.summary), visualStyle: analysis.visualStyle, analysis, updatedAt: new Date() },
       });
       await tx.update(videoAnalysisJobs).set({
         status: 'completed', progress: 100, completedAt: new Date(),

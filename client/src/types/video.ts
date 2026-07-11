@@ -1,10 +1,13 @@
 export type VideoJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export type VideoPurpose = 'general' | 'video-generation' | 'frontend' | 'motion-design' | 'storyboard' | 'json';
 
-export interface VideoAction { subject: string; action: string; from: Record<string, unknown>; to: Record<string, unknown>; durationMs: number; delayMs: number; easing: string }
-export interface VideoStage { startTime: number; endTime: number; title: string; initialState: string; trigger: string; actions: VideoAction[]; resultState: string }
+export interface LocalizedText { en: string; zh: string }
+export type LocalizedString = string | LocalizedText;
+
+export interface VideoAction { subject: LocalizedString; action: LocalizedString; from: Record<string, unknown>; to: Record<string, unknown>; durationMs: number; delayMs: number; easing: string }
+export interface VideoStage { startTime: number; endTime: number; title: LocalizedString; initialState: LocalizedString; trigger: LocalizedString; actions: VideoAction[]; resultState: LocalizedString }
 export interface VideoAnalysis {
-  summary: string;
+  summary: LocalizedString;
   visualStyle: { colors: string[]; typography: string; layout: string; effects: string[] };
   stages: VideoStage[];
   assets: string[];

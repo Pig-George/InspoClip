@@ -67,6 +67,25 @@ describe('InMemoryVideoRepository', () => {
     expect(await repo.getJob(job.id)).toMatchObject({ status: 'completed', progress: 100 });
   });
 
+  it('stores a plain searchable summary for localized analysis summaries', async () => {
+    const repo = new InMemoryVideoRepository();
+    const video = await repo.createVideo({ filePath: 'v.mp4', originalName: 'v.mp4', mimeType: 'video/mp4', sizeBytes: 1, durationMs: 10_000, width: 1, height: 1, source: 'client' });
+    const job = await repo.createJob(video.id, 'qwen3.7-plus', 3);
+    const localizedAnalysis: VideoAnalysis = {
+      ...analysis,
+      summary: { en: 'Dashboard interaction', zh: '仪表盘交互动效' },
+    };
+
+    await repo.claimPendingJob();
+    await repo.completeJob(job.id, localizedAnalysis);
+
+    expect(await repo.getAnalysis(video.id)).toMatchObject({
+      videoId: video.id,
+      analysis: localizedAnalysis,
+      summary: '仪表盘交互动效',
+    });
+  });
+
   it('recovers interrupted jobs and caches prompt outputs by compound key', async () => {
     const repo = new InMemoryVideoRepository();
     const video = await repo.createVideo({ filePath: 'v.mp4', originalName: 'v.mp4', mimeType: 'video/mp4', sizeBytes: 1, durationMs: 10_000, width: 1, height: 1, source: 'extension' });

@@ -1,3 +1,10 @@
+export interface LocalizedText {
+  en: string;
+  zh: string;
+}
+
+export type LocalizedString = string | LocalizedText;
+
 export interface VisualStyle {
   colors: string[];
   typography: string;
@@ -6,8 +13,8 @@ export interface VisualStyle {
 }
 
 export interface VideoAction {
-  subject: string;
-  action: string;
+  subject: LocalizedString;
+  action: LocalizedString;
   from: Record<string, unknown>;
   to: Record<string, unknown>;
   durationMs: number;
@@ -18,15 +25,15 @@ export interface VideoAction {
 export interface VideoStage {
   startTime: number;
   endTime: number;
-  title: string;
-  initialState: string;
-  trigger: string;
+  title: LocalizedString;
+  initialState: LocalizedString;
+  trigger: LocalizedString;
   actions: VideoAction[];
-  resultState: string;
+  resultState: LocalizedString;
 }
 
 export interface VideoAnalysis {
-  summary: string;
+  summary: LocalizedString;
   visualStyle: VisualStyle;
   stages: VideoStage[];
   assets: string[];

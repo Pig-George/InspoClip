@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { fetchVideo, fetchVideoJob, retryVideo, videoContentUrl } from '@/lib/video-api';
 import type { VideoDetail, VideoJob, VideoStage } from '@/types/video';
+import { useLanguage } from '@/context/LanguageContext';
+import { localizedText } from '@/lib/localized-text';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { VideoJobProgress } from './VideoJobProgress';
 import { VideoTimeline } from './VideoTimeline';
@@ -15,6 +17,7 @@ export function VideoAnalysisView({ open = true, videoId, initialJobId, onBack }
   const [error, setError] = useState('');
   const player = useRef<HTMLVideoElement>(null);
   const overlayRef = useScrollLock(open);
+  const { locale } = useLanguage();
   const load = useCallback(async () => {
     if (!videoId) return;
     const value = await fetchVideo(videoId);
@@ -88,7 +91,7 @@ export function VideoAnalysisView({ open = true, videoId, initialJobId, onBack }
               <div>
                 <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">阶段分析</h3>
                 {detail?.analysis
-                  ? <><h4 className="mb-3 text-sm font-heading text-[var(--text)]">{detail.analysis.summary}</h4><VideoTimeline stages={detail.analysis.stages} onSelect={selectStage}/></>
+                  ? <><h4 className="mb-3 text-sm font-heading text-[var(--text)]">{localizedText(detail.analysis.summary, locale)}</h4><VideoTimeline stages={detail.analysis.stages} onSelect={selectStage} locale={locale}/></>
                   : <p className="text-sm text-[var(--text-muted)]">分析完成后将在此显示阶段时间线。</p>}
               </div>
               {detail?.analysis&&<VideoPromptPanel videoId={videoId}/>}
