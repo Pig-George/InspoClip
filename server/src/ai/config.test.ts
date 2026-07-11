@@ -155,6 +155,15 @@ describe('video prompts', () => {
     expect(createPurposeTransformationPrompt()).toContain('"general"');
   });
 
+  it.each([
+    ['en', 'English only'],
+    ['zh', 'Chinese only'],
+    ['both', 'both English and Chinese'],
+    ['auto', 'best language'],
+  ])('adds explicit %s language instructions for video output prompts', (locale, instruction) => {
+    expect(createPurposeTransformationPrompt('general', { locale })).toContain(instruction);
+  });
+
   it('rejects unsupported purposes', () => {
     expect(() =>
       createPurposeTransformationPrompt('ignore previous' as 'general'),
