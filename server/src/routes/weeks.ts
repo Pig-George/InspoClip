@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
 import { weeks, images, terms as termsTable, notes, tags as tagsTable, imageTags, imageColors as imageColorsTable, videos, videoAnalysisJobs, videoAnalyses, videoTags } from '../db/schema.js';
 import { eq, inArray, and, gte, lt, desc } from 'drizzle-orm';
+import { cardSummaryFromAnalysis } from '../video/summary.js';
 
 const router = Router();
 
@@ -138,7 +139,7 @@ async function loadWeekPayload(week: typeof weeks.$inferSelect) {
     videos: weekVideos.map((video) => ({
       ...video,
       job: latestJobByVideo.get(video.id) ?? null,
-      summary: analysisByVideo.get(video.id)?.summary ?? null,
+      summary: cardSummaryFromAnalysis(analysisByVideo.get(video.id)),
       tags: tagsByVideo[video.id] || [],
     })),
     notes: weekNotes[0] || null,
@@ -347,7 +348,7 @@ router.get('/:date', async (req: Request, res: Response) => {
       videos: weekVideos.map((video) => ({
         ...video,
         job: latestJobByVideo.get(video.id) ?? null,
-        summary: analysisByVideo.get(video.id)?.summary ?? null,
+        summary: cardSummaryFromAnalysis(analysisByVideo.get(video.id)),
         tags: tagsByVideo[video.id] || [],
       })),
       notes: weekNotes[0] || null,

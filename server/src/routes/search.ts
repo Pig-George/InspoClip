@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../db/index.js';
 import { images as imagesTable, terms as termsTable, tags as tagsTable, imageTags, imageColors as imageColorsTable, videos as videosTable, videoAnalyses, videoTags, videoAnalysisJobs } from '../db/schema.js';
 import { ilike, inArray, eq, desc, or, sql } from 'drizzle-orm';
+import { cardSummaryFromAnalysis } from '../video/summary.js';
 
 const router = Router();
 
@@ -132,7 +133,7 @@ router.get('/', async (req: Request, res: Response) => {
     const videoResults = matchingVideos.map((video) => ({
       ...video,
       job: latestJobByVideo.get(video.id) ?? null,
-      summary: analysisByVideo.get(video.id)?.summary ?? null,
+      summary: cardSummaryFromAnalysis(analysisByVideo.get(video.id)),
       tags: tagsByVideo[video.id] || [],
     }));
 

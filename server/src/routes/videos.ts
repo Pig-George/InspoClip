@@ -6,6 +6,7 @@ import type { VideoAnalysis } from '../ai/types.js';
 import { videoUpload } from '../middleware/video-upload.js';
 import { generateVideoThumbnail, inspectVideo, type VideoMetadata } from '../video/media.js';
 import { DrizzleVideoRepository, type VideoRepository, type VideoSource } from '../video/repository.js';
+import { cardSummaryFromAnalysis } from '../video/summary.js';
 import { createVideoAiService, getVideoModelConfig } from '../services/video-ai.js';
 import { db } from '../db/index.js';
 import { weeks, videoTags, tags as tagsTable } from '../db/schema.js';
@@ -202,7 +203,7 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
     res.json({
       video, job,
       analysis: analysis?.analysis ?? null,
-      summary: analysis?.summary ?? null,
+      summary: cardSummaryFromAnalysis(analysis),
       tags: videoTagRows.map((t) => ({ id: t.tagId, name: t.tagName, color: t.tagColor })),
     });
   });

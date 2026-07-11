@@ -5,7 +5,9 @@ import { Trash2, AlertTriangle, X, RotateCcw, Video } from 'lucide-react';
 import { deleteVideo, retryVideo, videoThumbnailUrl } from '@/lib/video-api';
 import { DecorElement } from '@/components/DecorElement';
 import { toast } from '@/components/Toast';
+import { useLanguage } from '@/context/LanguageContext';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { localizedText } from '@/lib/localized-text';
 import type { DecorationType } from '@/types';
 import type { WeekVideo } from '@/types/video';
 
@@ -39,6 +41,7 @@ function videoCardStyle(videoId: string): { rotate: number; decoration: Decorati
 
 export function VideoCard({ video, onOpen, onRefresh }: VideoCardProps) {
   const { rotate, decoration } = videoCardStyle(video.id);
+  const { locale } = useLanguage();
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -112,7 +115,7 @@ export function VideoCard({ video, onOpen, onRefresh }: VideoCardProps) {
     onRefresh();
   };
 
-  const title = video.summary || video.originalName;
+  const title = video.summary ? localizedText(video.summary, locale) : video.originalName;
 
   return (
     <motion.div
