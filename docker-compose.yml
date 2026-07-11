@@ -58,6 +58,14 @@ services:
     ports:
       - '${PORT:-8080}:80'
 
+  video-public-proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - server
+    volumes:
+      - ./video-public-proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
 volumes:
   pgdata:
   uploads:
