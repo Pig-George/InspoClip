@@ -36,6 +36,10 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
   const [loadingMore, setLoadingMore] = useState(false);
   const noMorePreviousRef = useRef(false);
   const noMoreNextRef = useRef(false);
+  const furthestSearchedPrevRef = useRef<string | null>(null);
+  const furthestSearchedNextRef = useRef<string | null>(null);
+  const MIN_DATE = '2020-01-01'; // Don't search before this date
+  const SEARCH_BATCH = 4; // Weeks to search per edge trigger
   const scrollRef = useRef<HTMLDivElement>(null);
   const dotsRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<HTMLDivElement>(null);
@@ -220,22 +224,34 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
     const el = scrollRef.current;
     if (el && el.scrollWidth <= el.clientWidth + 10) return;
 
-    const firstMonday = weekMondays[0];
-    const prevDate = new Date(firstMonday + 'T00:00:00');
-    prevDate.setDate(prevDate.getDate() - 7);
-    const prevMonday = formatISODate(prevDate);
+    setLoadingMore(true);
+    // Start from the furthest searched week, or the first loaded week
+    const startMonday = furthestSearchedPrevRef.current ?? weekMondays[0];
+    let searchDate = new Date(startMonday + 'T00:00:00');
 
-    if (!weekDataMap.has(prevMonday)) {
-      setLoadingMore(true);
-      const data = await loadWeek(prevMonday, true, hideEmpty);
-      if (data) {
-        setWeekMondays((prev) => [prevMonday, ...prev]);
-        setActiveDayIndex((prev) => prev + 7);
-      } else if (hideEmpty) {
+    for (let attempt = 0; attempt < SEARCH_BATCH; attempt++) {
+      searchDate.setDate(searchDate.getDate() - 7);
+      const searchMonday = formatISODate(searchDate);
+
+      // Stop if we've gone too far back
+      if (searchMonday < MIN_DATE) {
         noMorePreviousRef.current = true;
+        break;
       }
-      setLoadingMore(false);
+
+      furthestSearchedPrevRef.current = searchMonday;
+      if (weekDataMap.has(searchMonday)) continue;
+
+      const data = await loadWeek(searchMonday, true, hideEmpty);
+      if (data) {
+        setWeekMondays((prev) => [searchMonday, ...prev]);
+        setActiveDayIndex((prev) => prev + 7);
+        break;
+      }
+      // Empty week — keep searching
     }
+
+    setLoadingMore(false);
   }, [loadingMore, weekMondays, weekDataMap, loadWeek, hideEmpty]);
 
   // Load next week when scrolling near right edge (only if not in the future)
@@ -246,25 +262,34 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
     const el = scrollRef.current;
     if (el && el.scrollWidth <= el.clientWidth + 10) return;
 
-    const lastMonday = weekMondays[weekMondays.length - 1];
-    const nextDate = new Date(lastMonday + 'T00:00:00');
-    nextDate.setDate(nextDate.getDate() + 7);
-    const nextMonday = formatISODate(nextDate);
-
-    // Don't load weeks beyond the current week
     const todayMonday = formatISODate(getMonday(new Date()));
-    if (nextMonday > todayMonday) return;
 
-    if (!weekDataMap.has(nextMonday)) {
-      setLoadingMore(true);
-      const data = await loadWeek(nextMonday, false, hideEmpty);
-      if (data) {
-        setWeekMondays((prev) => [...prev, nextMonday]);
-      } else if (hideEmpty) {
+    setLoadingMore(true);
+    const startMonday = furthestSearchedNextRef.current ?? weekMondays[weekMondays.length - 1];
+    let searchDate = new Date(startMonday + 'T00:00:00');
+
+    for (let attempt = 0; attempt < SEARCH_BATCH; attempt++) {
+      searchDate.setDate(searchDate.getDate() + 7);
+      const searchMonday = formatISODate(searchDate);
+
+      // Stop if we've gone into the future
+      if (searchMonday > todayMonday) {
         noMoreNextRef.current = true;
+        break;
       }
-      setLoadingMore(false);
+
+      furthestSearchedNextRef.current = searchMonday;
+      if (weekDataMap.has(searchMonday)) continue;
+
+      const data = await loadWeek(searchMonday, false, hideEmpty);
+      if (data) {
+        setWeekMondays((prev) => [...prev, searchMonday]);
+        break;
+      }
+      // Empty week — keep searching
     }
+
+    setLoadingMore(false);
   }, [loadingMore, weekMondays, weekDataMap, loadWeek, hideEmpty]);
 
   // Scroll handler: detect edges for infinite loading + track active day
@@ -481,6 +506,8 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
             onClick={() => {
               noMorePreviousRef.current = false;
               noMoreNextRef.current = false;
+              furthestSearchedPrevRef.current = null;
+              furthestSearchedNextRef.current = null;
               setHideEmpty(!hideEmpty);
             }}
             className={`ml-1 px-1.5 py-0.5 text-[10px] font-heading rounded-sm border transition-colors
