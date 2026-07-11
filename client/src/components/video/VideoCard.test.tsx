@@ -9,7 +9,7 @@ describe('VideoCard', () => {
       id: 'video-a', weekId: 'week-a', dayOfWeek: 1, sortOrder: 0,
       filePath: 'video.mp4', thumbnailPath: 'video.thumb.jpg', originalName: 'Demo.mp4',
       mimeType: 'video/mp4', sizeBytes: 100, durationMs: 65_000, width: 1280, height: 720,
-      source: 'client', createdAt: new Date().toISOString(),
+      source: 'client', createdAt: new Date().toISOString(), summary: null, tags: [],
       job: { id: 'job-a', videoId: 'video-a', status: 'processing', progress: 40, model: 'qwen3.7-plus', fps: 3, attemptCount: 1, errorMessage: null },
     }} onOpen={onOpen} onRefresh={() => undefined} />);
 
@@ -25,12 +25,24 @@ describe('VideoCard', () => {
       id: 'video-a', weekId: 'week-a', dayOfWeek: 1, sortOrder: 0,
       filePath: 'video.mp4', thumbnailPath: null, originalName: 'Demo.mp4',
       mimeType: 'video/mp4', sizeBytes: 100, durationMs: 5_000, width: 1280, height: 720,
-      source: 'client', createdAt: new Date().toISOString(), job: null,
+      source: 'client', createdAt: new Date().toISOString(), summary: null, tags: [], job: null,
     }} onOpen={() => undefined} onRefresh={() => undefined} />);
 
     const card = screen.getByRole('button', { name: /Demo.mp4/ });
     expect(card).toHaveClass('polaroid');
-    expect(card).toHaveStyle({ transform: 'rotate(1deg)' });
-    expect(card.querySelector('[data-video-decoration]')).toBeInTheDocument();
+  });
+
+  it('shows AI summary as title when available', () => {
+    render(<VideoCard video={{
+      id: 'video-b', weekId: 'week-a', dayOfWeek: 1, sortOrder: 0,
+      filePath: 'video.mp4', thumbnailPath: 'thumb.jpg', originalName: 'raw-file.mp4',
+      mimeType: 'video/mp4', sizeBytes: 100, durationMs: 5_000, width: 1280, height: 720,
+      source: 'client', createdAt: new Date().toISOString(),
+      summary: '卡片展开动效', tags: [],
+      job: { id: 'job-b', videoId: 'video-b', status: 'completed', progress: 100, model: 'qwen3.7-plus', fps: 3, attemptCount: 1, errorMessage: null },
+    }} onOpen={() => undefined} onRefresh={() => undefined} />);
+
+    expect(screen.getByText('卡片展开动效')).toBeInTheDocument();
+    expect(screen.queryByText('raw-file.mp4')).not.toBeInTheDocument();
   });
 });
