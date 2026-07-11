@@ -15,9 +15,11 @@ import searchRouter from './routes/search.js';
 import tagsRouter from './routes/tags.js';
 import exportRouter from './routes/export.js';
 import { createVideosRouter } from './routes/videos.js';
+import { createModelVideosRouter } from './routes/model-videos.js';
 import { createVideoJobsRouter } from './routes/video-jobs.js';
 import { DrizzleVideoRepository } from './video/repository.js';
 import { VideoWorker } from './video/worker.js';
+import { ModelVideoAccessTokens } from './video/public-access.js';
 import { createVideoAiService } from './services/video-ai.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -157,7 +159,11 @@ app.use('/api/search', searchRouter);
 app.use('/api/tags', tagsRouter);
 app.use('/api/export', exportRouter);
 const videoRepository = new DrizzleVideoRepository();
+const modelVideoAccessTokens = new ModelVideoAccessTokens({
+  ttlMs: parseInt(process.env.MODEL_VIDEO_ACCESS_TTL_MS || `${2 * 60 * 60 * 1_000}`, 10),
+});
 app.use('/api/videos', createVideosRouter({ repository: videoRepository }));
+app.use('/api/model-videos', createModelVideosRouter({ repository: videoRepository, tokens: modelVideoAccessTokens }));
 app.use('/api/video-jobs', createVideoJobsRouter(videoRepository));
 
 app.get('/api/health', (_req, res) => {
@@ -184,10 +190,35 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`InspoClip server running on http://localhost:${PORT}`);
   });
-  const publicBaseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+  const modelVideoPublicBaseUrl = process.env.MODEL_VIDEO_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
+  const ensurePublicVideoUrlAvailable = async (url: string) => {
+    let lastError = '';
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const response = await fetch(url, { method: 'HEAD' });
+        if (response.ok) return;
+        lastError = `HTTP ${response.status}`;
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+      }
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 1_000 * attempt));
+    }
+    throw Object.assign(new Error(`Public video URL is not reachable before model analysis: ${lastError}`), { status: 503 });
+  };
   const worker = new VideoWorker(videoRepository, {
     analyzeVideo: async (input) => (await createVideoAiService()).analyzeVideo(input),
-  }, { videoUrlFor: (video) => `${publicBaseUrl}/api/videos/${video.id}/content` });
+  }, {
+    videoUrlFor: (video) => {
+      const issued = modelVideoAccessTokens.issue(video.id);
+      const baseUrl = modelVideoPublicBaseUrl.replace(/\/+$/, '');
+      return `${baseUrl}/api/model-videos/${video.id}/content?token=${encodeURIComponent(issued.token)}`;
+    },
+    ensureVideoUrlAvailable: ensurePublicVideoUrlAvailable,
+    releaseVideoUrl: (url) => {
+      const token = new URL(url).searchParams.get('token');
+      modelVideoAccessTokens.revoke(token);
+    },
+  });
   void worker.start().catch((error) => console.error('Video worker stopped:', error));
 }
 

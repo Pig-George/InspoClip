@@ -30,11 +30,13 @@ async function setup(provider: FakeProvider) {
   const video = await repo.createVideo({ filePath: 'demo.mp4', originalName: 'demo.mp4', mimeType: 'video/mp4', sizeBytes: 1, durationMs: 10_000, width: 100, height: 100, source: 'client' });
   const job = await repo.createJob(video.id, 'qwen3.7-plus', 4);
   const waits: number[] = [];
+  const checkedUrls: string[] = [];
   const worker = new VideoWorker(repo, new AiService(provider), {
     videoUrlFor: (record) => `http://localhost:3001/api/videos/${record.id}/content`,
+    ensureVideoUrlAvailable: async (url) => { checkedUrls.push(url); },
     maxAttempts: 3, pollIntervalMs: 1, backoffBaseMs: 100, wait: async (ms) => { waits.push(ms); },
   });
-  return { repo, video, job, worker, provider, waits };
+  return { repo, video, job, worker, provider, waits, checkedUrls };
 }
 
 describe('VideoWorker', () => {
@@ -44,6 +46,26 @@ describe('VideoWorker', () => {
     expect(await ctx.repo.getJob(ctx.job.id)).toMatchObject({ status: 'completed', progress: 100 });
     expect((await ctx.repo.getAnalysis(ctx.video.id))?.analysis.summary).toBe('UI demo');
     expect(ctx.provider.videoCalls[0]).toMatchObject({ fps: 4, videoUrl: expect.stringContaining(ctx.video.id) });
+    expect(ctx.checkedUrls).toHaveLength(1);
+  });
+
+  it('preflights the public video URL before calling the model', async () => {
+    const provider = new FakeProvider([JSON.stringify(validAnalysis)]);
+    const repo = new InMemoryVideoRepository();
+    const video = await repo.createVideo({ filePath: 'demo.mp4', originalName: 'demo.mp4', mimeType: 'video/mp4', sizeBytes: 1, durationMs: 10_000, width: 100, height: 100, source: 'client' });
+    const job = await repo.createJob(video.id, 'qwen3.7-plus', 4);
+    const error = Object.assign(new Error('public video URL is not reachable'), { status: 503 });
+    const worker = new VideoWorker(repo, new AiService(provider), {
+      videoUrlFor: () => 'https://tunnel.example/api/model-videos/demo/content?token=abc',
+      ensureVideoUrlAvailable: async () => { throw error; },
+      maxAttempts: 3,
+      wait: async () => undefined,
+    });
+
+    await worker.runOnce();
+
+    expect(provider.videoCalls).toHaveLength(0);
+    expect(await repo.getJob(job.id)).toMatchObject({ status: 'pending', attemptCount: 1 });
   });
 
   it('repairs malformed JSON exactly once', async () => {

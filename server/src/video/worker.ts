@@ -3,7 +3,9 @@ import type { VideoAnalysis } from '../ai/types.js';
 import type { VideoRecord, VideoRepository } from './repository.js';
 
 export interface VideoWorkerOptions {
-  videoUrlFor(video: VideoRecord): string;
+  videoUrlFor(video: VideoRecord): string | Promise<string>;
+  ensureVideoUrlAvailable?(url: string): Promise<void>;
+  releaseVideoUrl?(url: string, video: VideoRecord): Promise<void> | void;
   maxAttempts?: number;
   pollIntervalMs?: number;
   backoffBaseMs?: number;
@@ -46,11 +48,15 @@ export class VideoWorker {
   async runOnce(): Promise<boolean> {
     const job = await this.repository.claimPendingJob();
     if (!job) return false;
+    let video: VideoRecord | null = null;
+    let videoUrl: string | null = null;
     try {
-      const video = await this.repository.getVideo(job.videoId);
+      video = await this.repository.getVideo(job.videoId);
       if (!video) throw new Error('Video not found');
+      videoUrl = await this.options.videoUrlFor(video);
+      await this.options.ensureVideoUrlAvailable?.(videoUrl);
       const result = await this.aiService.analyzeVideo({
-        videoUrl: this.options.videoUrlFor(video), fps: job.fps,
+        videoUrl, fps: job.fps,
       });
       await this.repository.completeJob(job.id, result.analysis, result.rawResponse.slice(0, 100_000));
     } catch (error) {
@@ -60,6 +66,8 @@ export class VideoWorker {
         await this.wait(this.backoffBaseMs * 2 ** Math.max(0, job.attemptCount - 1));
         await this.repository.retryJob(job.id);
       }
+    } finally {
+      if (videoUrl && video) await this.options.releaseVideoUrl?.(videoUrl, video);
     }
     return true;
   }
