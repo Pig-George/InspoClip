@@ -1,6 +1,7 @@
 ﻿// @ts-nocheck
 import type { PlasmoCSConfig } from "plasmo"
 
+import { claimContentRuntime, removeExistingContentRoot } from "../src/content/bootstrap"
 import { formatDate, getMonday } from "../src/content/date"
 import { dataUrlToBlob } from "../src/content/image"
 import { getPromptText as resolvePromptText } from "../src/content/prompt"
@@ -17,7 +18,8 @@ export const config: PlasmoCSConfig = {
 
 (() => {
   const INSPOCLIP_ID = 'inspoclip-root';
-  if (document.getElementById(INSPOCLIP_ID)) return; // already injected
+  if (!claimContentRuntime(globalThis)) return; // already initialized in this extension context
+  removeExistingContentRoot(document, INSPOCLIP_ID); // remove stale root left after extension reload
 
   // Create isolated container
   const root = document.createElement('div');
