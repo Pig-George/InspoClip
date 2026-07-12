@@ -1,0 +1,60 @@
+{
+  "name": "inspoclip-extension",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "plasmo dev --src-path=.",
+    "build": "plasmo build --src-path=.",
+    "package": "plasmo package --src-path=.",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@plasmohq/storage": "^1.15.0",
+    "plasmo": "^0.90.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.329",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.10"
+  },
+  "manifest": {
+    "manifest_version": 3,
+    "name": "InspoClip Saver",
+    "description": "Save design inspiration from any webpage to InspoClip",
+    "permissions": [
+      "contextMenus",
+      "activeTab",
+      "storage",
+      "notifications",
+      "scripting"
+    ],
+    "host_permissions": [
+      "http://localhost:3001/*",
+      "<all_urls>"
+    ],
+    "commands": {
+      "area-analyze": {
+        "suggested_key": {
+          "default": "Ctrl+Shift+A",
+          "mac": "Command+Shift+A"
+        },
+        "description": "Area Analyze"
+      },
+      "area-save": {
+        "suggested_key": {
+          "default": "Ctrl+Shift+S",
+          "mac": "Command+Shift+S"
+        },
+        "description": "Area Save"
+      }
+    }
+  }
+}

@@ -9,9 +9,13 @@ testdata
 *.png
 !client/public/favicon.png
 !docs/images/*.png
+!extension/assets/
+!extension/assets/*.png
 server/test_image.png
 .worktrees/
 *.tsbuildinfo
+extension/.plasmo/
+extension/build/
 .agents/
 cloudflared.exe
 cloudflared.log

@@ -2,18 +2,33 @@
 
 Save design inspiration from any webpage directly to your InspoClip collection.
 
+## Development
+
+Install dependencies once:
+
+```bash
+npm install
+```
+
+Run checks:
+
+```bash
+npm test
+npm run typecheck
+npm run build
+```
+
 ## Installation
 
 ### Chrome
 1. Open `chrome://extensions/`
 2. Enable "Developer mode" (top right)
 3. Click "Load unpacked"
-4. Select this `extension/` folder
+4. Run `npm run build`
+5. Select `extension/build/chrome-mv3-prod`
 
 ### Firefox
-1. Open `about:debugging#/runtime/this-firefox`
-2. Click "Load Temporary Add-on"
-3. Select `extension/manifest.json`
+Firefox packaging is handled by Plasmo browser targets. The current default build target is Chrome MV3.
 
 ## Usage
 
