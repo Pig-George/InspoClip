@@ -1,15 +1,20 @@
 import { describe, expect, test } from "vitest"
 
-import { getCopyButtonLabel } from "./copy"
+import { getCopyButtonIcon, getCopyButtonTitle } from "./copy"
 
 describe("content copy button labels", () => {
-  test("uses stable English text instead of emoji icons", () => {
-    expect(getCopyButtonLabel("en")).toBe("Copy")
-    expect(getCopyButtonLabel("en", "copied")).toBe("Copied")
+  test("uses localized accessible titles", () => {
+    expect(getCopyButtonTitle("en")).toBe("Copy")
+    expect(getCopyButtonTitle("en", "copied")).toBe("Copied")
+    expect(getCopyButtonTitle("zh")).toBe("复制")
+    expect(getCopyButtonTitle("zh", "copied")).toBe("已复制")
   })
 
-  test("uses stable Chinese text instead of emoji icons", () => {
-    expect(getCopyButtonLabel("zh")).toBe("复制")
-    expect(getCopyButtonLabel("zh", "copied")).toBe("已复制")
+  test("uses inline SVG icons instead of emoji glyphs", () => {
+    expect(getCopyButtonIcon()).toContain("<svg")
+    expect(getCopyButtonIcon()).toContain("<rect")
+    expect(getCopyButtonIcon("copied")).toContain("<svg")
+    expect(getCopyButtonIcon("copied")).toContain("<path")
+    expect(getCopyButtonIcon()).not.toContain("📋")
   })
 })

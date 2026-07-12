@@ -306,15 +306,26 @@
     .inspoclip-copy-all {
       background: #fff8ef;
       border: 1px solid #ead8bd;
-      border-radius: 999px;
+      border-radius: 8px;
       color: #9a6546;
-      font-size: 11px;
-      font-weight: 600;
       cursor: pointer;
-      line-height: 1;
-      min-width: 40px;
-      padding: 4px 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 24px;
+      width: 24px;
+      padding: 0;
       transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+
+    .inspoclip-copy-all svg {
+      width: 14px;
+      height: 14px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.7;
     }
 
     .inspoclip-copy-all:hover {
