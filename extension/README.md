@@ -7,15 +7,15 @@ Save design inspiration from any webpage directly to your InspoClip collection.
 Install dependencies once:
 
 ```bash
-npm install
+pnpm install
 ```
 
 Run checks:
 
 ```bash
-npm test
-npm run typecheck
-npm run build
+pnpm test
+pnpm typecheck
+pnpm build
 ```
 
 ## Installation
@@ -24,7 +24,7 @@ npm run build
 1. Open `chrome://extensions/`
 2. Enable "Developer mode" (top right)
 3. Click "Load unpacked"
-4. Run `npm run build`
+4. Run `pnpm build`
 5. Select `extension/build/chrome-mv3-prod`
 
 ### Firefox

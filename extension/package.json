@@ -2,6 +2,7 @@
   "name": "inspoclip-extension",
   "private": true,
   "version": "1.0.0",
+  "packageManager": "pnpm@10.26.2",
   "type": "module",
   "scripts": {
     "dev": "plasmo dev --src-path=.",
