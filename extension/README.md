@@ -25,7 +25,7 @@ pnpm build
 - `src/popup/hooks/` contains popup state and orchestration logic.
 - `src/popup/services/` wraps browser APIs used by the popup.
 - `background.ts` is the service worker entry and delegates to `src/background/`.
-- `contents/inspoclip.ts` is still the legacy content-script implementation wrapped as a Plasmo content entry.
+- `contents/inspoclip.ts` is the Plasmo content-script entry. UI orchestration still lives here while shared content helpers/styles are extracted under `src/content/`.
 
 ## Installation
 

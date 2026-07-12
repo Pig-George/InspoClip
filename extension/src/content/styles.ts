@@ -1,0 +1,673 @@
+﻿export function getContentStyles(): string {
+  return `
+    :host { all: initial; }
+
+    .inspoclip-container {
+      position: fixed;
+      top: 0;
+      right: 0;
+      z-index: 2147483647;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      color: #4a3028;
+      font-size: 13px;
+      line-height: 1.5;
+      pointer-events: none;
+      width: 0;
+      height: 0;
+      overflow: visible;
+    }
+
+    /* Toast */
+    .inspoclip-toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
+      opacity: 0;
+      transform: translateX(30px);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: auto;
+      max-width: 320px;
+    }
+
+    .inspoclip-toast-visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .inspoclip-toast-success {
+      border-left: 4px solid #4caf50;
+      background: #f0faf0;
+    }
+
+    .inspoclip-toast-error {
+      border-left: 4px solid #f44336;
+      background: #fef0f0;
+    }
+
+    .inspoclip-toast-loading {
+      border-left: 4px solid #c0784a;
+    }
+
+    .inspoclip-toast-icon {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .inspoclip-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #e0d0c0;
+      border-top-color: #c0784a;
+      border-radius: 50%;
+      animation: inspoclip-spin 0.7s linear infinite;
+    }
+
+    @keyframes inspoclip-spin { to { transform: rotate(360deg); } }
+
+    .inspoclip-toast-text {
+      font-size: 13px;
+      font-weight: 500;
+      color: #4a3028;
+      white-space: nowrap;
+    }
+
+    /* Modal Overlay */
+    .inspoclip-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2147483647;
+      pointer-events: auto;
+      animation: inspoclip-fade-in 0.3s ease;
+    }
+
+    @keyframes inspoclip-fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* Modal */
+    .inspoclip-modal {
+      position: fixed;
+      left: var(--target-x);
+      top: var(--target-y);
+      width: 380px;
+      max-height: calc(100vh - 40px);
+      background: #faf3e6;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      /* Start from origin position */
+      opacity: 0;
+      transform: scale(0.5) translate(calc(var(--origin-x) - var(--target-x)), calc(var(--origin-y) - var(--target-y)));
+      transform-origin: top right;
+      transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .inspoclip-modal-visible {
+      opacity: 1;
+      transform: scale(1) translate(0, 0);
+    }
+
+    .inspoclip-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px dashed #e8d5b0;
+      flex-shrink: 0;
+    }
+
+    .inspoclip-modal-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Similar badge */
+    .inspoclip-similar-badge {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 8px;
+      background: #ff980018;
+      color: #e65100;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .inspoclip-similar-badge:hover {
+      background: #ff980030;
+    }
+
+    .inspoclip-similar-icon { font-size: 11px; }
+    .inspoclip-similar-count { font-variant-numeric: tabular-nums; }
+
+    /* Tooltip */
+    .inspoclip-similar-tooltip {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.15);
+      padding: 10px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+      pointer-events: none;
+      z-index: 10;
+      min-width: 160px;
+    }
+
+    .inspoclip-similar-badge:hover .inspoclip-similar-tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .inspoclip-similar-tooltip-title {
+      display: block;
+      font-size: 10px;
+      color: #8a7060;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .inspoclip-similar-previews {
+      display: flex;
+      gap: 4px;
+    }
+
+    .inspoclip-similar-thumb {
+      width: 40px;
+      height: 40px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #e8d5b0;
+      background: #f0e6d6;
+    }
+
+    .inspoclip-modal-header h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #c0784a;
+      margin: 0;
+    }
+
+    .inspoclip-modal-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .inspoclip-nav-btn {
+      background: none;
+      border: none;
+      font-size: 10px;
+      color: #8a7060;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 4px;
+      transition: background 0.2s, color 0.2s;
+      line-height: 1;
+    }
+
+    .inspoclip-nav-btn:hover { background: #e8d5b0; color: #4a3028; }
+    .inspoclip-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .inspoclip-nav-btn:disabled:hover { background: transparent; color: #8a7060; }
+
+    .inspoclip-nav-index {
+      font-size: 10px;
+      color: #8a7060;
+      min-width: 28px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .inspoclip-modal-close {
+      background: none;
+      border: none;
+      font-size: 16px;
+      color: #8a7060;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+
+    .inspoclip-modal-close:hover { background: #e8d5b0; }
+
+    /* Preview */
+    .inspoclip-preview {
+      max-height: 140px;
+      overflow: hidden;
+      background: #f0e6d6;
+    }
+
+    .inspoclip-preview img {
+      width: 100%;
+      height: auto;
+      max-height: 140px;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Body */
+    .inspoclip-modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 18px;
+    }
+
+    .inspoclip-modal-body::-webkit-scrollbar { width: 4px; }
+    .inspoclip-modal-body::-webkit-scrollbar-thumb { background: #d4c4b0; border-radius: 2px; }
+
+    /* Sections */
+    .inspoclip-section {
+      margin-bottom: 14px;
+    }
+
+    .inspoclip-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .inspoclip-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #8a7060;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .inspoclip-copy-all {
+      background: none;
+      border: none;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 2px 4px;
+      opacity: 0.4;
+      transition: opacity 0.2s;
+    }
+
+    .inspoclip-copy-all:hover { opacity: 1; }
+
+    /* Terms */
+    .inspoclip-terms {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .inspoclip-term {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 4px 8px;
+      background: #c0784a12;
+      color: #c0784a;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .inspoclip-term-part {
+      cursor: pointer;
+      padding: 0 2px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .inspoclip-term-part:hover { background: #c0784a20; text-decoration: underline; }
+    .inspoclip-copied { background: #4caf5020 !important; color: #4caf50 !important; text-decoration: none !important; }
+    .inspoclip-check-mark { color: #4caf50; font-weight: 600; font-size: 12px; animation: inspoclip-check-in 0.25s ease; }
+    @keyframes inspoclip-check-in { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+    .inspoclip-term-sep { opacity: 0.35; user-select: none; }
+
+    /* Colors */
+    .inspoclip-colors {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .inspoclip-color {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px 4px 5px;
+      background: white;
+      border: 1px solid #e8d5b0;
+      border-radius: 8px;
+      font-size: 11px;
+      font-family: 'SF Mono', 'Consolas', monospace;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .inspoclip-color:hover { border-color: #c0784a; }
+
+    .inspoclip-color-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 5px;
+      border: 1px solid rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+
+    /* Prompt */
+    .inspoclip-prompt-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .inspoclip-lang-group {
+      display: flex;
+      background: #f0e6d6;
+      border-radius: 6px;
+      padding: 2px;
+      gap: 1px;
+    }
+
+    .inspoclip-lang-btn {
+      padding: 2px 6px;
+      border: none;
+      background: transparent;
+      font-size: 10px;
+      font-weight: 600;
+      color: #8a7060;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .inspoclip-lang-btn.active {
+      background: white;
+      color: #c0784a;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .inspoclip-prompt {
+      font-size: 12px;
+      line-height: 1.6;
+      color: #4a3028;
+      background: white;
+      padding: 10px 12px;
+      border-radius: 10px;
+      max-height: 100px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Footer */
+    .inspoclip-modal-footer {
+      display: flex;
+      gap: 8px;
+      padding: 14px 18px;
+      border-top: 1px dashed #e8d5b0;
+      flex-shrink: 0;
+    }
+
+    .inspoclip-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .inspoclip-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .inspoclip-btn:active { transform: translateY(0); }
+    .inspoclip-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    .inspoclip-btn-primary { background: #c0784a; color: white; }
+    .inspoclip-btn-secondary { background: #e8d5b0; color: #4a3028; }
+
+    /* Confirm Dialog */
+    .inspoclip-confirm-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2147483647;
+      pointer-events: auto;
+      animation: inspoclip-fade-in 0.2s ease;
+    }
+
+    .inspoclip-confirm {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      width: 340px;
+      background: #faf3e6;
+      border-radius: 14px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+      padding: 18px;
+      opacity: 0;
+      transform: scale(0.9) translateY(-10px);
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .inspoclip-confirm-visible {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+
+    .inspoclip-confirm-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .inspoclip-confirm-icon { font-size: 18px; }
+
+    .inspoclip-confirm-header h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #4a3028;
+      margin: 0;
+    }
+
+    .inspoclip-confirm-desc {
+      font-size: 12px;
+      color: #8a7060;
+      margin: 0 0 12px 0;
+      line-height: 1.5;
+    }
+
+    .inspoclip-confirm-previews {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .inspoclip-confirm-previews img {
+      width: 56px;
+      height: 56px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid #e8d5b0;
+    }
+
+    .inspoclip-confirm-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Area Capture Overlay */
+    .inspoclip-area-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2147483647;
+      cursor: crosshair;
+      pointer-events: auto;
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .inspoclip-area-instructions {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .inspoclip-area-selection {
+      position: fixed;
+      border: 2px solid #c0784a;
+      background: rgba(192, 120, 74, 0.1);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .inspoclip-area-hover {
+      position: fixed;
+      border: 2px dashed #4caf50;
+      background: rgba(76, 175, 80, 0.08);
+      pointer-events: none;
+      z-index: 1;
+      transition: left 0.1s ease, top 0.1s ease, width 0.1s ease, height 0.1s ease;
+      border-radius: 2px;
+    }
+
+    .inspoclip-area-loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    /* Floating Tab */
+    .inspoclip-tab {
+      position: fixed;
+      right: 0;
+      top: 50%;
+      z-index: 2147483646;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 10px 10px 10px 10px;
+      background: #c0784a;
+      color: white;
+      border-radius: 10px 0 0 10px;
+      cursor: pointer;
+      box-shadow: -2px 2px 12px rgba(0,0,0,0.15);
+      user-select: none;
+      pointer-events: auto;
+      /* Start fully hidden behind right edge */
+      transform: translateY(-50%) translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .inspoclip-tab-visible {
+      transform: translateY(-50%) translateX(0);
+    }
+
+    .inspoclip-tab-visible:hover {
+      transform: translateY(-50%) translateX(0);
+    }
+
+    .inspoclip-tab-arrow {
+      font-size: 14px;
+      line-height: 1;
+      flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+
+    .inspoclip-tab-visible:hover .inspoclip-tab-arrow {
+      transform: translateX(-2px);
+    }
+
+    .inspoclip-tab-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      overflow: hidden;
+      max-width: 0;
+      opacity: 0;
+      transition: max-width 0.25s ease, opacity 0.2s ease;
+    }
+
+    .inspoclip-tab-visible:hover .inspoclip-tab-label {
+      max-width: 80px;
+      opacity: 1;
+    }
+
+    /* Context Menu */
+    .inspoclip-ctx-menu {
+      position: fixed;
+      z-index: 2147483647;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      padding: 4px;
+      pointer-events: auto;
+      animation: inspoclip-fade-in 0.15s ease;
+    }
+
+    .inspoclip-ctx-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      font-size: 12px;
+      color: #4a3028;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .inspoclip-ctx-item:hover {
+      background: #f0e6d6;
+    }
+
+    .inspoclip-ctx-item-icon {
+      font-size: 13px;
+      width: 16px;
+      text-align: center;
+    }
+  `;
+}
+
