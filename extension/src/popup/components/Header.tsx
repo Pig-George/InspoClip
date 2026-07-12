@@ -1,4 +1,5 @@
 import type { ConnectionState, Locale, I18nMessages } from "../types"
+import { getExtensionIconUrl } from "../services/assets"
 
 type HeaderProps = {
   connectionLabel: string
@@ -13,7 +14,7 @@ export function Header({ connectionLabel, connectionState, locale, t, onTestConn
   return (
     <div className="header">
       <div className="logo-row">
-        <img src={chrome.runtime.getURL("assets/icon48.png")} alt="Logo" className="logo" />
+        <img src={getExtensionIconUrl(48)} alt="Logo" className="logo" />
         <div>
           <h1>InspoClip</h1>
           <p className="subtitle">{t.subtitle}</p>
