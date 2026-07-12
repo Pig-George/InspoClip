@@ -18,6 +18,15 @@ pnpm typecheck
 pnpm build
 ```
 
+## Source layout
+
+- `popup.tsx` is the Plasmo popup entry and delegates to `src/popup/PopupApp.tsx`.
+- `src/popup/components/` contains presentational popup components.
+- `src/popup/hooks/` contains popup state and orchestration logic.
+- `src/popup/services/` wraps browser APIs used by the popup.
+- `background.ts` is the service worker entry and delegates to `src/background/`.
+- `contents/inspoclip.ts` is still the legacy content-script implementation wrapped as a Plasmo content entry.
+
 ## Installation
 
 ### Chrome
