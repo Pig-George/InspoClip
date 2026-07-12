@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, type Router as ExpressRouter } from 'express';
 import { db } from '../db/index.js';
 import { images, terms as termsTable, imageColors, imageCritiques } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
@@ -11,7 +11,7 @@ import { sql } from 'drizzle-orm';
 import fs from 'fs/promises';
 import path from 'path';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 // POST /api/images/check-similarity — check for similar images before upload
 router.post('/check-similarity', upload.single('image'), async (req: Request, res: Response) => {

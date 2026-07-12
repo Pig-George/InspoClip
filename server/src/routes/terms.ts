@@ -1,9 +1,9 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, type Router as ExpressRouter } from 'express';
 import { db } from '../db/index.js';
 import { terms as termsTable } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {

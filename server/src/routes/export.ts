@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, type Router as ExpressRouter } from 'express';
 import { db } from '../db/index.js';
 import {
   weeks,
@@ -20,7 +20,7 @@ import { cardSummaryFromAnalysis } from '../video/summary.js';
 const require = createRequire(import.meta.url);
 const { ZipArchive } = require('archiver');
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 type ExportImage = {
   id: string;

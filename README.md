@@ -102,13 +102,13 @@ docker run -d --name inspoclip-postgres \
 
 # 启动后端
 cd server
-npm install
-npm run dev
+pnpm install
+pnpm dev
 
 # 启动前端
 cd client
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 访问 http://localhost:5173

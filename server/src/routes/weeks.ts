@@ -1,10 +1,10 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, type Router as ExpressRouter } from 'express';
 import { db } from '../db/index.js';
 import { weeks, images, terms as termsTable, notes, tags as tagsTable, imageTags, imageColors as imageColorsTable, videos, videoAnalysisJobs, videoAnalyses, videoTags } from '../db/schema.js';
 import { eq, inArray, and, gte, lt, desc } from 'drizzle-orm';
 import { cardSummaryFromAnalysis } from '../video/summary.js';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 type ContentDayDirection = 'previous' | 'next';
 type ContentDayCandidate = { weekStart: string; dayOfWeek: number | null };

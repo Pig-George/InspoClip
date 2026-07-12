@@ -1,10 +1,10 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, type Router as ExpressRouter } from 'express';
 import { db } from '../db/index.js';
 import { config as configTable } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { maskApiKey } from '../ai/config.js';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 // GET /api/config — return current config (mask API key)
 router.get('/', async (_req: Request, res: Response) => {

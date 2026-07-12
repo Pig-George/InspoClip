@@ -1,9 +1,9 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, type Router as ExpressRouter } from 'express';
 import { db } from '../db/index.js';
 import { tags, imageTags, videoTags } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 // GET /api/tags — list all tags
 router.get('/', async (_req: Request, res: Response) => {

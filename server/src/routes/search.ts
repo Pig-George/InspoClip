@@ -1,10 +1,10 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, type Router as ExpressRouter } from 'express';
 import { db } from '../db/index.js';
 import { images as imagesTable, terms as termsTable, tags as tagsTable, imageTags, imageColors as imageColorsTable, videos as videosTable, videoAnalyses, videoTags, videoAnalysisJobs } from '../db/schema.js';
 import { ilike, inArray, eq, desc, or, sql } from 'drizzle-orm';
 import { cardSummaryFromAnalysis } from '../video/summary.js';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 router.get('/', async (req: Request, res: Response) => {
   try {
