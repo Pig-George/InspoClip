@@ -1,10 +1,10 @@
 import { ActionButtons } from "./components/ActionButtons"
+import { AssetSection } from "./components/AssetSection"
 import { Footer } from "./components/Footer"
 import { Header } from "./components/Header"
 import { ModeToggle } from "./components/ModeToggle"
 import { SettingsSection } from "./components/SettingsSection"
 import { StatusBanner } from "./components/StatusBanner"
-import { VideoSection } from "./components/VideoSection"
 import { usePopupController } from "./hooks/usePopupController"
 
 export function PopupApp() {
@@ -29,14 +29,14 @@ export function PopupApp() {
         onAnalyze={popup.triggerAnalyze}
         onSave={popup.triggerSave}
       />
-      <VideoSection
+      <AssetSection
         t={popup.t}
-        videoProgress={popup.videoProgress}
-        videoResultUrl={popup.videoResultUrl}
-        videoUrl={popup.videoUrl}
-        onFileChange={popup.handleVideoFile}
-        onUrlChange={popup.setVideoUrl}
-        onUrlSubmit={popup.handleVideoUrl}
+        assetProgress={popup.assetProgress}
+        assetResultUrl={popup.assetResultUrl}
+        assetUrl={popup.assetUrl}
+        onFileSelect={popup.handleAssetFile}
+        onUrlChange={popup.setAssetUrl}
+        onUrlSubmit={popup.handleAssetUrl}
       />
       <SettingsSection
         appUrl={popup.appUrl}

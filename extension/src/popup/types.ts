@@ -41,10 +41,17 @@ export type I18nMessages = {
   connected: string
   offline: string
   error: string
-  uploadVideo: string
-  analyzeVideo: string
+  assetAnalysis: string
+  assetDropTitle: string
+  assetDropHint: string
+  assetUrlHint: string
+  chooseAsset: string
+  analyzeAssetUrl: string
   viewAnalysis: string
   uploading: string
+  analyzingAsset: string
+  imageAnalysisCompleted: string
+  unsupportedAsset: string
   fetchingVideo: string
   waitingAnalysis: string
   analysisCompleted: string

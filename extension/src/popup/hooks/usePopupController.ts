@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import { buildClientVideoUrl, pollVideoJob, uploadVideoBlob } from "../../video"
 import { DEFAULT_APP_URL, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS, I18N, MAX_VIDEO_SIZE_BYTES, detectBrowserLocale } from "../constants"
+import { detectAssetKind, uploadImageForAnalysis, type ImageAnalysisResult } from "../services/assets"
 import { loadPopupSettings, normalizeAppUrl, normalizeServerUrl, savePopupSettings } from "../services/settings"
 import { openOrFocusApp, sendCurrentTabMessage } from "../services/tabs"
 import type { CaptureMode, ConnectionState, Locale, ShortcutTarget, StatusMessage } from "../types"
@@ -20,9 +21,9 @@ export function usePopupController() {
   const [shortcutAnalyze, setShortcutAnalyze] = useState(DEFAULT_SHORTCUTS.analyze)
   const [shortcutSave, setShortcutSave] = useState(DEFAULT_SHORTCUTS.save)
   const [recordingShortcut, setRecordingShortcut] = useState<ShortcutTarget | null>(null)
-  const [videoUrl, setVideoUrl] = useState("")
-  const [videoProgress, setVideoProgress] = useState("")
-  const [videoResultUrl, setVideoResultUrl] = useState("")
+  const [assetUrl, setAssetUrl] = useState("")
+  const [assetProgress, setAssetProgress] = useState("")
+  const [assetResultUrl, setAssetResultUrl] = useState("")
 
   const t = useMemo(() => I18N[locale], [locale])
 
@@ -121,35 +122,49 @@ export function usePopupController() {
   }
 
   async function trackVideo(result: { videoId: string; jobId: string }) {
-    setVideoProgress(t.waitingAnalysis)
-    setVideoResultUrl("")
+    setAssetProgress(t.waitingAnalysis)
+    setAssetResultUrl("")
     const job = await pollVideoJob<{ status: string; progress?: number; errorMessage?: string }>(fetch, serverUrl, result.jobId, {
-      onUpdate: (value) => setVideoProgress(`${value.status} · ${value.progress || 0}%`)
+      onUpdate: (value) => setAssetProgress(`${value.status} · ${value.progress || 0}%`)
     })
     if (job.status === "failed") throw new Error(job.errorMessage || "Video analysis failed")
-    setVideoProgress(t.analysisCompleted)
-    setVideoResultUrl(buildClientVideoUrl(appUrl, result.videoId))
+    setAssetProgress(t.analysisCompleted)
+    setAssetResultUrl(buildClientVideoUrl(appUrl, result.videoId))
   }
 
-  async function handleVideoFile(file?: File) {
+  async function analyzeImage(file: File) {
+    setAssetProgress(t.analyzingAsset)
+    setAssetResultUrl("")
+    const result = await uploadImageForAnalysis<ImageAnalysisResult>(fetch, serverUrl, file)
+    const terms = (result.terms || []).slice(0, 3).join(", ")
+    setAssetProgress(terms ? `${t.imageAnalysisCompleted}: ${terms}` : t.imageAnalysisCompleted)
+  }
+
+  async function handleAssetFile(file?: File) {
     if (!file) return
-    setVideoProgress(t.uploading)
+    setAssetProgress(t.uploading)
     try {
+      const assetKind = detectAssetKind(file)
+      if (assetKind === "image") {
+        await analyzeImage(file)
+        return
+      }
+      if (assetKind === "unsupported") throw new Error(t.unsupportedAsset)
       if (file.size > MAX_VIDEO_SIZE_BYTES) throw new Error("Video exceeds 200MB")
       await trackVideo(await uploadVideoBlob<{ videoId: string; jobId: string }>(fetch, serverUrl, file, file.name))
     } catch (err) {
-      setVideoProgress(err instanceof Error ? err.message : "Upload failed")
+      setAssetProgress(err instanceof Error ? err.message : "Upload failed")
     }
   }
 
-  async function handleVideoUrl() {
-    setVideoProgress(t.fetchingVideo)
+  async function handleAssetUrl() {
+    setAssetProgress(t.fetchingVideo)
     try {
-      const response = await chrome.runtime.sendMessage({ type: "UPLOAD_VIDEO_URL", url: videoUrl, serverUrl })
+      const response = await chrome.runtime.sendMessage({ type: "UPLOAD_VIDEO_URL", url: assetUrl, serverUrl })
       if (!response?.success) throw new Error(response?.error || "Upload failed")
       await trackVideo(response)
     } catch (err) {
-      setVideoProgress(err instanceof Error ? err.message : "Upload failed")
+      setAssetProgress(err instanceof Error ? err.message : "Upload failed")
     }
   }
 
@@ -168,11 +183,11 @@ export function usePopupController() {
     shortcutSave,
     status,
     t,
-    videoProgress,
-    videoResultUrl,
-    videoUrl,
-    handleVideoFile,
-    handleVideoUrl,
+    assetProgress,
+    assetResultUrl,
+    assetUrl,
+    handleAssetFile,
+    handleAssetUrl,
     openApp,
     saveSettings,
     setAppUrl,
@@ -182,7 +197,7 @@ export function usePopupController() {
     setSettingsOpen,
     setShortcutAnalyze,
     setShortcutSave,
-    setVideoUrl,
+    setAssetUrl,
     testServerConnection,
     toggleLanguage,
     triggerAnalyze,
