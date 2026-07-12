@@ -11,12 +11,12 @@ import { getContentStyles } from "../src/content/styles"
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
   run_at: "document_idle"
-}
+};
 
 // InspoClip Content Script — injected into web pages
 // Shows analysis notification and result modal on the page itself
 
-(() => {
+;(() => {
   const INSPOCLIP_ID = 'inspoclip-root';
   if (!claimContentRuntime(globalThis)) return; // already initialized in this extension context
   removeExistingContentRoot(document, INSPOCLIP_ID); // remove stale root left after extension reload
