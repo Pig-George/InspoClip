@@ -304,16 +304,30 @@
     }
 
     .inspoclip-copy-all {
-      background: none;
-      border: none;
-      font-size: 12px;
+      background: #fff8ef;
+      border: 1px solid #ead8bd;
+      border-radius: 999px;
+      color: #9a6546;
+      font-size: 11px;
+      font-weight: 600;
       cursor: pointer;
-      padding: 2px 4px;
-      opacity: 0.4;
-      transition: opacity 0.2s;
+      line-height: 1;
+      min-width: 40px;
+      padding: 4px 8px;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
     }
 
-    .inspoclip-copy-all:hover { opacity: 1; }
+    .inspoclip-copy-all:hover {
+      background: #fff;
+      border-color: #d8b184;
+      color: #c0784a;
+    }
+
+    .inspoclip-copy-all-copied {
+      background: #eef8ef;
+      border-color: #b8dfbd;
+      color: #3f9a4c;
+    }
 
     /* Terms */
     .inspoclip-terms {

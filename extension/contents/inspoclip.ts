@@ -2,6 +2,7 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 import { claimContentRuntime, removeExistingContentRoot } from "../src/content/bootstrap"
+import { getCopyButtonLabel } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
 import { dataUrlToBlob } from "../src/content/image"
 import { getPromptText as resolvePromptText } from "../src/content/prompt"
@@ -712,7 +713,7 @@ export const config: PlasmoCSConfig = {
           <div class="inspoclip-section">
             <div class="inspoclip-section-header">
               <span class="inspoclip-section-title">${locale === 'zh' ? '设计术语' : 'Design Terms'}</span>
-              <button class="inspoclip-copy-all" data-type="terms">📋</button>
+              <button class="inspoclip-copy-all" data-type="terms" title="${getCopyButtonLabel(locale)}">${getCopyButtonLabel(locale)}</button>
             </div>
             <div class="inspoclip-terms" id="inspoclip-terms"></div>
           </div>
@@ -721,7 +722,7 @@ export const config: PlasmoCSConfig = {
           <div class="inspoclip-section">
             <div class="inspoclip-section-header">
               <span class="inspoclip-section-title">${locale === 'zh' ? '配色方案' : 'Color Palette'}</span>
-              <button class="inspoclip-copy-all" data-type="colors">📋</button>
+              <button class="inspoclip-copy-all" data-type="colors" title="${getCopyButtonLabel(locale)}">${getCopyButtonLabel(locale)}</button>
             </div>
             <div class="inspoclip-colors" id="inspoclip-colors"></div>
           </div>
@@ -737,7 +738,7 @@ export const config: PlasmoCSConfig = {
                   <button class="inspoclip-lang-btn" data-lang="zh">中</button>
                   <button class="inspoclip-lang-btn" data-lang="both">EN/中</button>
                 </div>
-                <button class="inspoclip-copy-all" data-type="prompt">📋</button>
+                <button class="inspoclip-copy-all" data-type="prompt" title="${getCopyButtonLabel(locale)}">${getCopyButtonLabel(locale)}</button>
               </div>
             </div>
             <div class="inspoclip-prompt" id="inspoclip-prompt"></div>
@@ -812,8 +813,12 @@ export const config: PlasmoCSConfig = {
         if (!text) return;
         try {
           await navigator.clipboard.writeText(text);
-          btn.textContent = '✓';
-          setTimeout(() => btn.textContent = '📋', 1500);
+          btn.textContent = getCopyButtonLabel(locale, 'copied');
+          btn.classList.add('inspoclip-copy-all-copied');
+          setTimeout(() => {
+            btn.textContent = getCopyButtonLabel(locale);
+            btn.classList.remove('inspoclip-copy-all-copied');
+          }, 1500);
         } catch {}
       });
     });
