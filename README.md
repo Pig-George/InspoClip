@@ -139,6 +139,8 @@ docker compose up -d --build
 | `AI_API_KEY` | API 密钥 | `sk-placeholder` |
 | `AI_API_BASE` | API 地址 | `https://api.openai.com/v1` |
 | `AI_MODEL` | 模型名称 | `gpt-5.4` |
+| `MODEL_VIDEO_PUBLIC_BASE_URL` | 云端视频模型实际访问的视频公网地址；用于 `/api/model-videos/:id/content` 临时授权链接 | `PUBLIC_BASE_URL` |
+| `MODEL_VIDEO_VERIFY_BASE_URL` | 可选：视频公网地址预检覆盖值；默认留空并跟随 `MODEL_VIDEO_PUBLIC_BASE_URL`，避免只验证内网代理 | 空 |
 | `PORT` | 前端端口 | `8080` |
 
 ## 项目结构

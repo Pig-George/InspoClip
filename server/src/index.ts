@@ -20,6 +20,7 @@ import { createVideoJobsRouter } from './routes/video-jobs.js';
 import { DrizzleVideoRepository } from './video/repository.js';
 import { VideoWorker } from './video/worker.js';
 import { ModelVideoAccessTokens } from './video/public-access.js';
+import { getModelVideoBaseUrls, modelVideoAccessPath } from './video/public-url.js';
 import { createVideoAiService } from './services/video-ai.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -198,8 +199,7 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`InspoClip server running on http://localhost:${PORT}`);
   });
-  const modelVideoPublicBaseUrl = process.env.MODEL_VIDEO_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`;
-  const modelVideoVerifyBaseUrl = (process.env.MODEL_VIDEO_VERIFY_BASE_URL || modelVideoPublicBaseUrl).replace(/\/+$/, '');
+  const { publicBaseUrl: modelVideoPublicBaseUrl, verifyBaseUrl: modelVideoVerifyBaseUrl } = getModelVideoBaseUrls(process.env, PORT);
   const ensurePublicVideoUrlAvailable = async (url: string) => {
     let lastError = '';
     for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -219,12 +219,10 @@ async function start() {
   }, {
     videoUrlFor: (video) => {
       const issued = modelVideoAccessTokens.issue(video.id);
-      const baseUrl = modelVideoPublicBaseUrl.replace(/\/+$/, '');
-      return `${baseUrl}/api/model-videos/${video.id}/content?token=${encodeURIComponent(issued.token)}`;
+      return `${modelVideoPublicBaseUrl}/api/model-videos/${video.id}/content?token=${encodeURIComponent(issued.token)}`;
     },
     ensureVideoUrlAvailable: async (url) => {
-      const pathAndQuery = url.substring(url.indexOf('/api/model-videos/'));
-      await ensurePublicVideoUrlAvailable(`${modelVideoVerifyBaseUrl}${pathAndQuery}`);
+      await ensurePublicVideoUrlAvailable(`${modelVideoVerifyBaseUrl}${modelVideoAccessPath(url)}`);
     },
     releaseVideoUrl: (url) => {
       const token = new URL(url).searchParams.get('token');
