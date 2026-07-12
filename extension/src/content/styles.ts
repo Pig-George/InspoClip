@@ -602,6 +602,127 @@
       transform: translate(-50%, -50%);
     }
 
+    /* Video analysis modal */
+    .inspoclip-video-modal {
+      width: 460px;
+      max-height: calc(100vh - 40px);
+    }
+
+    .inspoclip-video-preview {
+      padding: 10px 12px 0;
+      background: #fffaf2;
+    }
+
+    .inspoclip-video-preview video {
+      width: 100%;
+      max-height: 210px;
+      border-radius: 12px;
+      background: #111;
+      box-shadow: 0 4px 14px rgba(74,48,40,0.12);
+    }
+
+    .inspoclip-video-summary {
+      color: #4a3028;
+      font-size: 12px;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .inspoclip-video-stages {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .inspoclip-video-stage {
+      border: 1px solid #ead8ba;
+      border-radius: 12px;
+      padding: 10px;
+      background: linear-gradient(135deg, #fffaf2, #f7ead6);
+    }
+
+    .inspoclip-video-stage-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      color: #4a3028;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .inspoclip-video-stage-head em {
+      color: #9a8070;
+      font-size: 10px;
+      font-style: normal;
+      white-space: nowrap;
+    }
+
+    .inspoclip-video-stage-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .inspoclip-video-stage-grid div {
+      display: grid;
+      grid-template-columns: 46px 1fr;
+      gap: 8px;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .inspoclip-video-stage-grid b {
+      color: #c0784a;
+      font-weight: 700;
+    }
+
+    .inspoclip-video-stage-grid span {
+      color: #5c463c;
+    }
+
+    .inspoclip-video-actions,
+    .inspoclip-video-uncertainties {
+      margin: 0;
+      padding-left: 18px;
+      color: #6b5448;
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .inspoclip-video-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      color: #5c463c;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .inspoclip-video-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .inspoclip-video-chips span {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #f0e2ca;
+      color: #8a5b3f;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .inspoclip-empty {
+      color: #9a8070;
+      font-size: 11px;
+      margin: 0;
+    }
+
     /* Floating Tab */
     .inspoclip-tab {
       position: fixed;

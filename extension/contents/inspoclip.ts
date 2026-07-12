@@ -82,6 +82,10 @@ export const config: PlasmoCSConfig = {
       startAreaCapture(msg.mode);
       sendResponse({ ok: true });
     }
+    if (msg.type === 'START_ASSET_ANALYSIS') {
+      handleAssetAnalysis(msg);
+      sendResponse({ ok: true });
+    }
   });
 
   // ---- Custom Keyboard Shortcuts ----
@@ -590,6 +594,117 @@ export const config: PlasmoCSConfig = {
     }
   }
 
+  async function handleAssetAnalysis(asset) {
+    removeFloatingTab();
+    analyzedData = null;
+    capturedBlob = null;
+
+    if (asset.serverUrl) serverUrl = asset.serverUrl;
+
+    try {
+      if (asset.assetKind === 'image') {
+        await analyzeAssetImage(asset);
+        return;
+      }
+      if (asset.assetKind === 'video') {
+        await analyzeAssetVideo(asset);
+        return;
+      }
+      throw new Error(locale === 'zh' ? '暂不支持此素材类型' : 'Unsupported asset type');
+    } catch (err) {
+      showToast(locale === 'zh' ? `素材分析失败: ${err.message}` : `Asset analysis failed: ${err.message}`, 'error');
+      setTimeout(() => removeToast(), 5000);
+    }
+  }
+
+  async function analyzeAssetImage(asset) {
+    showToast(locale === 'zh' ? '正在分析素材...' : 'Analyzing asset...');
+
+    capturedBlob = dataUrlToBlob(asset.dataUrl);
+    const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
+    const formData = new FormData();
+    formData.append('image', capturedBlob, asset.fileName || 'asset' + ext);
+
+    const res = await fetch(`${serverUrl}/api/images/analyze`, { method: 'POST', body: formData });
+    if (!res.ok) throw new Error(await readableError(res, 'Analysis failed'));
+    analyzedData = await res.json();
+
+    try {
+      const simForm = new FormData();
+      simForm.append('image', capturedBlob, 'check' + ext);
+      const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, { method: 'POST', body: simForm });
+      if (simRes.ok) {
+        const simData = await simRes.json();
+        analyzedData.similarImages = simData.similar || [];
+      }
+    } catch {
+      analyzedData.similarImages = [];
+    }
+
+    lastPreviewUrl = URL.createObjectURL(capturedBlob);
+    const entryId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    analysisHistory.push({ id: entryId, data: analyzedData, previewUrl: lastPreviewUrl, timestamp: Date.now(), saved: false });
+    historyIndex = analysisHistory.length - 1;
+    transitionToModal(analyzedData, lastPreviewUrl);
+  }
+
+  async function analyzeAssetVideo(asset) {
+    showToast(locale === 'zh' ? '正在上传视频素材...' : 'Uploading video asset...');
+    let uploadResult;
+    if (asset.videoUrl) {
+      uploadResult = await uploadVideoUrlFromBackground(asset.videoUrl);
+    } else {
+      const videoBlob = dataUrlToBlob(asset.dataUrl);
+      const formData = new FormData();
+      formData.append('video', videoBlob, asset.fileName || 'asset-video.mp4');
+      formData.append('source', 'extension');
+      const res = await fetch(`${serverUrl}/api/videos`, { method: 'POST', body: formData });
+      if (!res.ok) throw new Error(await readableError(res, 'Video upload failed'));
+      uploadResult = await res.json();
+    }
+
+    showToast(locale === 'zh' ? '正在理解视频... 0%' : 'Understanding video... 0%');
+    const job = await pollVideoJob(uploadResult.jobId, (value) => {
+      const progress = value.progress || 0;
+      showToast(locale === 'zh' ? `正在理解视频... ${progress}%` : `Understanding video... ${progress}%`);
+    });
+    if (job.status === 'failed') throw new Error(job.errorMessage || 'Video analysis failed');
+
+    const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
+    if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
+    const detail = await detailRes.json();
+    transitionToVideoModal(detail, window.innerWidth - 20, 20);
+  }
+
+  async function uploadVideoUrlFromBackground(videoUrl) {
+    const response = await chrome.runtime.sendMessage({ type: 'UPLOAD_VIDEO_URL', url: videoUrl, serverUrl });
+    if (!response?.success) throw new Error(response?.error || 'Video upload failed');
+    return response;
+  }
+
+  async function pollVideoJob(jobId, onUpdate) {
+    for (let attempt = 0; attempt < 240; attempt += 1) {
+      const res = await fetch(`${serverUrl}/api/video-jobs/${jobId}`);
+      if (!res.ok) throw new Error(await readableError(res, 'Failed to poll video job'));
+      const job = await res.json();
+      onUpdate?.(job);
+      if (job.status === 'completed' || job.status === 'failed') return job;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    throw new Error('Video analysis timed out');
+  }
+
+  async function readableError(response, fallback) {
+    const text = await response.text().catch(() => '');
+    if (!text) return fallback;
+    try {
+      const json = JSON.parse(text);
+      return json.error || fallback;
+    } catch {
+      return text.slice(0, 240) || fallback;
+    }
+  }
+
   async function captureTabAsBlob() {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' }, (response) => {
@@ -653,6 +768,153 @@ export const config: PlasmoCSConfig = {
       removeToast();
       showModal(data, previewUrl, originX, originY);
     }, 300);
+  }
+
+  function transitionToVideoModal(detail, originX, originY) {
+    if (!currentToast) {
+      showVideoModal(detail, originX, originY);
+      return;
+    }
+
+    const toastRect = currentToast.getBoundingClientRect();
+    const toastOriginX = toastRect.right;
+    const toastOriginY = toastRect.top;
+    currentToast.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+    currentToast.style.opacity = '0';
+    currentToast.style.transform = 'translateX(20px) scale(0.8)';
+    setTimeout(() => {
+      removeToast();
+      showVideoModal(detail, toastOriginX, toastOriginY);
+    }, 300);
+  }
+
+  function localizedText(value) {
+    if (!value) return '';
+    if (typeof value === 'string') return value;
+    return locale === 'zh' ? (value.zh || value.en || '') : (value.en || value.zh || '');
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function formatMs(ms) {
+    const seconds = Math.max(0, Math.round((ms || 0) / 100) / 10);
+    return `${seconds.toFixed(seconds % 1 === 0 ? 0 : 1)}s`;
+  }
+
+  function showVideoModal(detail, originX, originY) {
+    removeModal();
+
+    const video = detail.video || {};
+    const analysis = detail.analysis || {};
+    const stages = Array.isArray(analysis.stages) ? analysis.stages : [];
+    const visualStyle = analysis.visualStyle || {};
+    const assets = Array.isArray(analysis.assets) ? analysis.assets : [];
+    const uncertainties = Array.isArray(analysis.uncertainties) ? analysis.uncertainties : [];
+    const title = localizedText(detail.summary) || localizedText(analysis.summary) || video.originalName || (locale === 'zh' ? '视频分析结果' : 'Video Analysis Result');
+    const videoSrc = `${serverUrl}/api/videos/${video.id}/content`;
+    const vw = window.innerWidth;
+    const targetX = Math.max(20, vw - 460 - 20);
+
+    const modal = document.createElement('div');
+    modal.className = 'inspoclip-modal-overlay';
+    modal.innerHTML = `
+      <div class="inspoclip-modal inspoclip-video-modal" style="
+        --origin-x: ${originX}px;
+        --origin-y: ${originY}px;
+        --target-x: ${targetX}px;
+        --target-y: 20px;
+      ">
+        <div class="inspoclip-modal-header">
+          <div class="inspoclip-modal-title-row">
+            <h3>${locale === 'zh' ? '视频分析结果' : 'Video Analysis Result'}</h3>
+          </div>
+          <div class="inspoclip-modal-actions">
+            <button class="inspoclip-modal-close">✕</button>
+          </div>
+        </div>
+
+        <div class="inspoclip-video-preview">
+          <video controls src="${escapeHtml(videoSrc)}"></video>
+        </div>
+
+        <div class="inspoclip-modal-body">
+          <div class="inspoclip-section">
+            <div class="inspoclip-section-header">
+              <span class="inspoclip-section-title">${locale === 'zh' ? '摘要' : 'Summary'}</span>
+            </div>
+            <p class="inspoclip-video-summary">${escapeHtml(title)}</p>
+          </div>
+
+          <div class="inspoclip-section">
+            <div class="inspoclip-section-header">
+              <span class="inspoclip-section-title">${locale === 'zh' ? '阶段分析' : 'Stage Analysis'}</span>
+            </div>
+            <div class="inspoclip-video-stages">
+              ${stages.length ? stages.map((stage, index) => `
+                <div class="inspoclip-video-stage">
+                  <div class="inspoclip-video-stage-head">
+                    <span>${index + 1}. ${escapeHtml(localizedText(stage.title) || stage.title || (locale === 'zh' ? '阶段' : 'Stage'))}</span>
+                    <em>${formatMs(stage.startTime)} – ${formatMs(stage.endTime)}</em>
+                  </div>
+                  <div class="inspoclip-video-stage-grid">
+                    <div><b>${locale === 'zh' ? '初始' : 'Initial'}</b><span>${escapeHtml(localizedText(stage.initialState) || stage.initialState || '-')}</span></div>
+                    <div><b>${locale === 'zh' ? '触发' : 'Trigger'}</b><span>${escapeHtml(localizedText(stage.trigger) || stage.trigger || '-')}</span></div>
+                    <div><b>${locale === 'zh' ? '结果' : 'Result'}</b><span>${escapeHtml(localizedText(stage.resultState) || stage.resultState || '-')}</span></div>
+                  </div>
+                  ${(stage.actions || []).length ? `<ul class="inspoclip-video-actions">
+                    ${(stage.actions || []).map((action) => `
+                      <li>${escapeHtml([action.subject, action.action].filter(Boolean).join(' · ') || JSON.stringify(action))}</li>
+                    `).join('')}
+                  </ul>` : ''}
+                </div>
+              `).join('') : `<p class="inspoclip-empty">${locale === 'zh' ? '暂无阶段分析' : 'No stage analysis yet'}</p>`}
+            </div>
+          </div>
+
+          <div class="inspoclip-section">
+            <div class="inspoclip-section-header">
+              <span class="inspoclip-section-title">${locale === 'zh' ? '视觉风格' : 'Visual Style'}</span>
+            </div>
+            <div class="inspoclip-video-meta">
+              <span>${locale === 'zh' ? '布局' : 'Layout'}：${escapeHtml(localizedText(visualStyle.layout) || visualStyle.layout || '-')}</span>
+              <span>${locale === 'zh' ? '字体' : 'Typography'}：${escapeHtml(localizedText(visualStyle.typography) || visualStyle.typography || '-')}</span>
+              ${Array.isArray(visualStyle.colors) && visualStyle.colors.length ? `<span>${locale === 'zh' ? '色彩' : 'Colors'}：${visualStyle.colors.map(escapeHtml).join(', ')}</span>` : ''}
+              ${Array.isArray(visualStyle.effects) && visualStyle.effects.length ? `<span>${locale === 'zh' ? '效果' : 'Effects'}：${visualStyle.effects.map((item) => escapeHtml(localizedText(item) || item)).join(', ')}</span>` : ''}
+            </div>
+          </div>
+
+          ${assets.length || uncertainties.length ? `
+            <div class="inspoclip-section">
+              <div class="inspoclip-section-header">
+                <span class="inspoclip-section-title">${locale === 'zh' ? '素材与不确定项' : 'Assets & Uncertainties'}</span>
+              </div>
+              ${assets.length ? `<div class="inspoclip-video-chips">${assets.map((item) => `<span>${escapeHtml(localizedText(item) || item)}</span>`).join('')}</div>` : ''}
+              ${uncertainties.length ? `<ul class="inspoclip-video-uncertainties">${uncertainties.map((item) => `<li>${escapeHtml(localizedText(item) || item)}</li>`).join('')}</ul>` : ''}
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="inspoclip-modal-footer">
+          <button class="inspoclip-btn inspoclip-btn-secondary inspoclip-close-btn">${locale === 'zh' ? '关闭' : 'Close'}</button>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(modal);
+    currentModal = modal;
+    requestAnimationFrame(() => {
+      modal.querySelector('.inspoclip-modal').classList.add('inspoclip-modal-visible');
+    });
+    modal.querySelector('.inspoclip-modal-close').addEventListener('click', removeModal);
+    modal.querySelector('.inspoclip-close-btn').addEventListener('click', removeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) removeModal(); });
   }
 
   // ---- Modal ----

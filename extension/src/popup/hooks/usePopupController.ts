@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 
-import { buildClientVideoUrl, pollVideoJob, uploadVideoBlob } from "../../video"
 import { DEFAULT_APP_URL, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS, I18N, MAX_VIDEO_SIZE_BYTES, detectBrowserLocale } from "../constants"
-import { detectAssetKind, uploadImageForAnalysis, type ImageAnalysisResult } from "../services/assets"
+import { buildAssetAnalysisMessage, detectAssetKind } from "../services/assets"
 import { loadPopupSettings, normalizeAppUrl, normalizeServerUrl, savePopupSettings } from "../services/settings"
 import { openOrFocusApp, sendCurrentTabMessage } from "../services/tabs"
 import type { CaptureMode, ConnectionState, Locale, ShortcutTarget, StatusMessage } from "../types"
@@ -22,8 +21,6 @@ export function usePopupController() {
   const [shortcutSave, setShortcutSave] = useState(DEFAULT_SHORTCUTS.save)
   const [recordingShortcut, setRecordingShortcut] = useState<ShortcutTarget | null>(null)
   const [assetUrl, setAssetUrl] = useState("")
-  const [assetProgress, setAssetProgress] = useState("")
-  const [assetResultUrl, setAssetResultUrl] = useState("")
 
   const t = useMemo(() => I18N[locale], [locale])
 
@@ -121,50 +118,34 @@ export function usePopupController() {
     setTimeout(() => setStatus(null), 3000)
   }
 
-  async function trackVideo(result: { videoId: string; jobId: string }) {
-    setAssetProgress(t.waitingAnalysis)
-    setAssetResultUrl("")
-    const job = await pollVideoJob<{ status: string; progress?: number; errorMessage?: string }>(fetch, serverUrl, result.jobId, {
-      onUpdate: (value) => setAssetProgress(`${value.status} · ${value.progress || 0}%`)
-    })
-    if (job.status === "failed") throw new Error(job.errorMessage || "Video analysis failed")
-    setAssetProgress(t.analysisCompleted)
-    setAssetResultUrl(buildClientVideoUrl(appUrl, result.videoId))
-  }
-
-  async function analyzeImage(file: File) {
-    setAssetProgress(t.analyzingAsset)
-    setAssetResultUrl("")
-    const result = await uploadImageForAnalysis<ImageAnalysisResult>(fetch, serverUrl, file)
-    const terms = (result.terms || []).slice(0, 3).join(", ")
-    setAssetProgress(terms ? `${t.imageAnalysisCompleted}: ${terms}` : t.imageAnalysisCompleted)
-  }
-
   async function handleAssetFile(file?: File) {
     if (!file) return
-    setAssetProgress(t.uploading)
     try {
       const assetKind = detectAssetKind(file)
-      if (assetKind === "image") {
-        await analyzeImage(file)
-        return
-      }
       if (assetKind === "unsupported") throw new Error(t.unsupportedAsset)
       if (file.size > MAX_VIDEO_SIZE_BYTES) throw new Error("Video exceeds 200MB")
-      await trackVideo(await uploadVideoBlob<{ videoId: string; jobId: string }>(fetch, serverUrl, file, file.name))
+      await sendCurrentTabMessage({
+        ...(await buildAssetAnalysisMessage(file)),
+        serverUrl
+      })
+      setTimeout(() => window.close(), 150)
     } catch (err) {
-      setAssetProgress(err instanceof Error ? err.message : "Upload failed")
+      showStatus(err instanceof Error ? err.message : "Upload failed", "error")
     }
   }
 
   async function handleAssetUrl() {
-    setAssetProgress(t.fetchingVideo)
     try {
-      const response = await chrome.runtime.sendMessage({ type: "UPLOAD_VIDEO_URL", url: assetUrl, serverUrl })
-      if (!response?.success) throw new Error(response?.error || "Upload failed")
-      await trackVideo(response)
+      await sendCurrentTabMessage({
+        type: "START_ASSET_ANALYSIS",
+        assetKind: "video",
+        videoUrl: assetUrl,
+        fileName: assetUrl.split("/").pop() || "web-video.mp4",
+        serverUrl
+      })
+      setTimeout(() => window.close(), 150)
     } catch (err) {
-      setAssetProgress(err instanceof Error ? err.message : "Upload failed")
+      showStatus(err instanceof Error ? err.message : "Upload failed", "error")
     }
   }
 
@@ -183,8 +164,6 @@ export function usePopupController() {
     shortcutSave,
     status,
     t,
-    assetProgress,
-    assetResultUrl,
     assetUrl,
     handleAssetFile,
     handleAssetUrl,

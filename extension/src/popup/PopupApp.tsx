@@ -31,8 +31,6 @@ export function PopupApp() {
       />
       <AssetSection
         t={popup.t}
-        assetProgress={popup.assetProgress}
-        assetResultUrl={popup.assetResultUrl}
         assetUrl={popup.assetUrl}
         onFileSelect={popup.handleAssetFile}
         onUrlChange={popup.setAssetUrl}

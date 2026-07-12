@@ -3,8 +3,6 @@ import { useEffect, useRef, useState } from "react"
 import type { I18nMessages } from "../types"
 
 type AssetSectionProps = {
-  assetProgress: string
-  assetResultUrl: string
   assetUrl: string
   t: I18nMessages
   onFileSelect: (file?: File) => void
@@ -24,8 +22,6 @@ function AssetIcon() {
 }
 
 export function AssetSection({
-  assetProgress,
-  assetResultUrl,
   assetUrl,
   t,
   onFileSelect,
@@ -102,8 +98,6 @@ export function AssetSection({
         </div>
       </div>
 
-      <div className="asset-progress">{assetProgress}</div>
-      <a className="asset-result-link" href={assetResultUrl || "#"} hidden={!assetResultUrl}>{t.viewAnalysis}</a>
     </div>
   )
 }

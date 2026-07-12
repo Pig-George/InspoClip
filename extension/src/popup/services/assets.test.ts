@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest"
 
-import { detectAssetKind, getExtensionIconPath, uploadImageForAnalysis } from "./assets"
+import { buildAssetAnalysisMessage, detectAssetKind, fileToDataUrl, getExtensionIconPath, uploadImageForAnalysis } from "./assets"
 
 describe("popup asset helpers", () => {
   test("uses the generated Plasmo icon path from the runtime manifest", () => {
@@ -34,5 +34,24 @@ describe("popup asset helpers", () => {
     expect(result.terms).toEqual(["motion"])
     expect(calls[0][0]).toBe("http://localhost:3001/api/images/analyze")
     expect((calls[0][1].body as FormData).get("image")).toBeInstanceOf(File)
+  })
+
+  test("converts a file into an asset analysis message for content script rendering", async () => {
+    const file = new File(["hello"], "demo.png", { type: "image/png" })
+
+    const message = await buildAssetAnalysisMessage(file)
+
+    expect(message).toMatchObject({
+      type: "START_ASSET_ANALYSIS",
+      assetKind: "image",
+      fileName: "demo.png",
+      mimeType: "image/png"
+    })
+    expect(message.dataUrl).toContain("data:image/png;base64,")
+  })
+
+  test("converts files to data URLs", async () => {
+    await expect(fileToDataUrl(new File(["hello"], "demo.txt", { type: "text/plain" })))
+      .resolves.toContain("data:text/plain;base64,")
   })
 })
