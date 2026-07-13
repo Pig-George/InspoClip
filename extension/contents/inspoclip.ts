@@ -52,7 +52,7 @@ export const config: PlasmoCSConfig = {
   let currentAssetResult = null;
 
   // Analysis history
-  let analysisHistory = []; // [{data, previewUrl, timestamp}]
+  let analysisHistory = []; // [{ kind: 'image'|'video', data/detail, previewUrl, blob, timestamp, saved }]
   let historyIndex = -1;
   let savedImageHashes = new Set(); // Track which analyses have been saved
   let serverUrl = 'http://localhost:3001';
@@ -299,8 +299,7 @@ export const config: PlasmoCSConfig = {
           capturedBlob = croppedBlob;
           lastPreviewUrl = URL.createObjectURL(croppedBlob);
           analyzedData = data;
-          analysisHistory.push({ data, previewUrl: lastPreviewUrl, timestamp: Date.now() });
-          historyIndex = analysisHistory.length - 1;
+          pushImageHistory(data, lastPreviewUrl, croppedBlob);
 
           transitionToModal(data, lastPreviewUrl);
         } else {
@@ -589,9 +588,7 @@ export const config: PlasmoCSConfig = {
 
       // Phase 2: Save to history and transition toast → modal
       lastPreviewUrl = imageUrl ? URL.createObjectURL(capturedBlob) : null;
-      const entryId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      analysisHistory.push({ id: entryId, data: analyzedData, previewUrl: lastPreviewUrl, timestamp: Date.now(), saved: false });
-      historyIndex = analysisHistory.length - 1;
+      pushImageHistory(analyzedData, lastPreviewUrl, capturedBlob);
       transitionToModal(analyzedData, lastPreviewUrl);
     } catch (err) {
       showToast(locale === 'zh' ? `分析失败: ${err.message}` : `Analysis failed: ${err.message}`, 'error');
@@ -648,9 +645,7 @@ export const config: PlasmoCSConfig = {
     }
 
     lastPreviewUrl = URL.createObjectURL(capturedBlob);
-    const entryId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    analysisHistory.push({ id: entryId, data: analyzedData, previewUrl: lastPreviewUrl, timestamp: Date.now(), saved: false });
-    historyIndex = analysisHistory.length - 1;
+    pushImageHistory(analyzedData, lastPreviewUrl, capturedBlob);
     transitionToModal(analyzedData, lastPreviewUrl);
   }
 
@@ -680,7 +675,7 @@ export const config: PlasmoCSConfig = {
     const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
     if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
     const detail = await detailRes.json();
-    currentAssetResult = { kind: 'video', detail };
+    pushVideoHistory(detail);
     transitionToVideoModal(detail, window.innerWidth - 20, 20);
   }
 
@@ -816,6 +811,60 @@ export const config: PlasmoCSConfig = {
     return `${seconds.toFixed(seconds % 1 === 0 ? 0 : 1)}s`;
   }
 
+  function newHistoryId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  function pushImageHistory(data, previewUrl, blob, saved = false) {
+    const entry = { id: newHistoryId(), kind: 'image', data, previewUrl, blob, timestamp: Date.now(), saved };
+    analysisHistory.push(entry);
+    historyIndex = analysisHistory.length - 1;
+    analyzedData = data;
+    lastPreviewUrl = previewUrl;
+    capturedBlob = blob || capturedBlob;
+    currentAssetResult = null;
+    return entry;
+  }
+
+  function pushVideoHistory(detail) {
+    const entry = { id: newHistoryId(), kind: 'video', detail, timestamp: Date.now(), saved: !!detail?.video?.isSaved };
+    analysisHistory.push(entry);
+    historyIndex = analysisHistory.length - 1;
+    currentAssetResult = { kind: 'video', detail };
+    analyzedData = null;
+    lastPreviewUrl = null;
+    capturedBlob = null;
+    return entry;
+  }
+
+  function currentHistoryEntry() {
+    return historyIndex >= 0 ? analysisHistory[historyIndex] : null;
+  }
+
+  function syncStateFromHistoryEntry(entry) {
+    if (!entry) return;
+    if (entry.kind === 'video') {
+      currentAssetResult = { kind: 'video', detail: entry.detail };
+      analyzedData = null;
+      lastPreviewUrl = null;
+      capturedBlob = null;
+      return;
+    }
+    analyzedData = entry.data;
+    lastPreviewUrl = entry.previewUrl;
+    capturedBlob = entry.blob || capturedBlob;
+    currentAssetResult = null;
+  }
+
+  function openHistoryEntry(entry, originX, originY) {
+    syncStateFromHistoryEntry(entry);
+    if (entry?.kind === 'video') {
+      showVideoModal(entry.detail, originX, originY);
+    } else if (entry?.kind === 'image') {
+      showModal(entry.data, entry.previewUrl, originX, originY);
+    }
+  }
+
   const videoPurposeOptions = [
     { value: 'general', zh: '通用', en: 'General' },
     { value: 'video-generation', zh: '视频生成', en: 'Video' },
@@ -938,7 +987,7 @@ export const config: PlasmoCSConfig = {
   }
 
   function showVideoModal(detail, originX, originY) {
-    removeModal();
+    removeModal(false);
     currentAssetResult = { kind: 'video', detail };
 
     const video = detail.video || {};
@@ -963,6 +1012,11 @@ export const config: PlasmoCSConfig = {
             <h3>${locale === 'zh' ? '视频分析结果' : 'Video Analysis Result'}</h3>
           </div>
           <div class="inspoclip-modal-actions">
+            ${analysisHistory.length > 1 ? `
+              <button class="inspoclip-nav-btn" id="inspoclip-prev" title="${locale === 'zh' ? '上一条' : 'Previous'}">▲</button>
+              <span class="inspoclip-nav-index">${historyIndex + 1}/${analysisHistory.length}</span>
+              <button class="inspoclip-nav-btn" id="inspoclip-next" title="${locale === 'zh' ? '下一条' : 'Next'}">▼</button>
+            ` : ''}
             <button class="inspoclip-modal-close">✕</button>
           </div>
         </div>
@@ -1053,6 +1107,10 @@ export const config: PlasmoCSConfig = {
     modal.querySelector('.inspoclip-modal-close').addEventListener('click', removeModal);
     modal.querySelector('.inspoclip-close-btn').addEventListener('click', removeModal);
     modal.addEventListener('click', (e) => { if (e.target === modal) removeModal(); });
+    const prevBtn = modal.querySelector('#inspoclip-prev');
+    const nextBtn = modal.querySelector('#inspoclip-next');
+    if (prevBtn) prevBtn.addEventListener('click', () => navigateHistory(-1));
+    if (nextBtn) nextBtn.addEventListener('click', () => navigateHistory(1));
     bindVideoPromptPanel(modal, video.id);
     const saveBtn = modal.querySelector('.inspoclip-video-save-btn');
     if (saveBtn) {
@@ -1065,6 +1123,11 @@ export const config: PlasmoCSConfig = {
           const saved = await res.json();
           detail.video = saved.video || { ...video, isSaved: true };
           currentAssetResult = { kind: 'video', detail };
+          const entry = currentHistoryEntry();
+          if (entry?.kind === 'video') {
+            entry.detail = detail;
+            entry.saved = true;
+          }
           saveBtn.textContent = locale === 'zh' ? '✓ 已保存' : '✓ Saved';
           saveBtn.style.background = '#4caf50';
           saveBtn.style.borderColor = '#4caf50';
@@ -1096,7 +1159,7 @@ export const config: PlasmoCSConfig = {
   // ---- Modal ----
 
   function showModal(data, previewUrl, originX, originY) {
-    removeModal();
+    removeModal(false);
 
     const modal = document.createElement('div');
     modal.className = 'inspoclip-modal-overlay';
@@ -1276,16 +1339,19 @@ export const config: PlasmoCSConfig = {
     });
 
     // Upload button — check similar images first
-    modal.querySelector('.inspoclip-upload-btn').addEventListener('click', async () => {
-      if (data.similarImages?.length > 0) {
-        // Show confirmation dialog before saving
-        showSaveConfirmDialog(capturedBlob, data.similarImages, async () => {
+    const uploadBtn = modal.querySelector('.inspoclip-upload-btn');
+    if (uploadBtn) {
+      uploadBtn.addEventListener('click', async () => {
+        if (data.similarImages?.length > 0) {
+          // Show confirmation dialog before saving
+          showSaveConfirmDialog(capturedBlob, data.similarImages, async () => {
+            await doModalUpload(modal);
+          });
+        } else {
           await doModalUpload(modal);
-        });
-      } else {
-        await doModalUpload(modal);
-      }
-    });
+        }
+      });
+    }
 
     async function doModalUpload(modalEl) {
       const btn = modalEl.querySelector('.inspoclip-upload-btn');
@@ -1354,7 +1420,7 @@ export const config: PlasmoCSConfig = {
     document.addEventListener('keydown', escHandler);
   }
 
-  function removeModal() {
+  function removeModal(showFloating = true) {
     if (currentModal) {
       const overlay = currentModal;
       const modal = overlay.querySelector('.inspoclip-modal');
@@ -1362,7 +1428,7 @@ export const config: PlasmoCSConfig = {
       setTimeout(() => {
         overlay.remove();
         // Show floating tab after modal is gone, if we have image or video analysis data
-        if (analyzedData || currentAssetResult) showFloatingTab();
+        if (showFloating && analysisHistory.length > 0) showFloatingTab();
       }, 350);
       currentModal = null;
     }
@@ -1372,87 +1438,13 @@ export const config: PlasmoCSConfig = {
     const newIndex = historyIndex + direction;
     if (newIndex < 0 || newIndex >= analysisHistory.length) return;
 
+    const modalEl = currentModal?.querySelector('.inspoclip-modal');
+    const rect = modalEl?.getBoundingClientRect();
+    const originX = rect ? rect.right : window.innerWidth - 20;
+    const originY = rect ? rect.top : 20;
     historyIndex = newIndex;
     const entry = analysisHistory[historyIndex];
-    analyzedData = entry.data;
-    lastPreviewUrl = entry.previewUrl;
-
-    // Re-render modal content
-    renderTerms(analyzedData.terms || []);
-    renderColors(analyzedData.colors || []);
-    renderPrompt(analyzedData.prompt);
-
-    // Update preview
-    const previewImg = currentModal?.querySelector('.inspoclip-preview img');
-    if (previewImg && entry.previewUrl) {
-      previewImg.src = entry.previewUrl;
-    }
-
-    // Update nav index
-    const navIndex = currentModal?.querySelector('.inspoclip-nav-index');
-    if (navIndex) navIndex.textContent = `${historyIndex + 1}/${analysisHistory.length}`;
-
-    // Update button states
-    const prevBtn = currentModal?.querySelector('#inspoclip-prev');
-    const nextBtn = currentModal?.querySelector('#inspoclip-next');
-    if (prevBtn) prevBtn.disabled = historyIndex === 0;
-    if (nextBtn) nextBtn.disabled = historyIndex === analysisHistory.length - 1;
-
-    // Update similar badge
-    const badge = currentModal?.querySelector('#inspoclip-similar-badge');
-    if (badge) {
-      const sims = analyzedData.similarImages || [];
-      if (sims.length > 0) {
-        badge.style.display = 'inline-flex';
-        badge.querySelector('.inspoclip-similar-count').textContent = sims.length;
-        // Reload thumbnails
-        const previews = badge.querySelector('.inspoclip-similar-previews');
-        if (previews) {
-          previews.innerHTML = sims.slice(0, 4).map((img) =>
-            `<img class="inspoclip-similar-thumb" data-fp="${img.filePath}" />`
-          ).join('');
-          sims.slice(0, 4).forEach((img) => {
-            const thumbEl = previews.querySelector(`img[data-fp="${img.filePath}"]`);
-            if (!thumbEl) return;
-            chrome.runtime.sendMessage(
-              { type: 'FETCH_IMAGE', url: `${serverUrl}/api/uploads/${img.filePath}` },
-              (response) => {
-                if (response?.dataUrl) {
-                  thumbEl.src = response.dataUrl;
-                } else {
-                  thumbEl.style.display = 'none';
-                }
-              }
-            );
-          });
-        }
-      } else {
-        badge.style.display = 'none';
-      }
-    }
-
-    // Update save button visibility based on saved state
-    const footer = currentModal?.querySelector('.inspoclip-modal-footer');
-    const existingBtn = footer?.querySelector('.inspoclip-upload-btn');
-    if (entry.saved) {
-      if (existingBtn) existingBtn.remove();
-    } else if (!existingBtn && footer) {
-      const closeBtn = footer.querySelector('.inspoclip-close-btn');
-      const newBtn = document.createElement('button');
-      newBtn.className = 'inspoclip-btn inspoclip-btn-primary inspoclip-upload-btn';
-      newBtn.textContent = locale === 'zh' ? '保存到 InspoClip' : 'Save to InspoClip';
-      newBtn.addEventListener('click', async () => {
-        if (analyzedData.similarImages?.length > 0) {
-          showSaveConfirmDialog(capturedBlob, analyzedData.similarImages, async () => {
-            await doModalUpload(currentModal);
-          });
-        } else {
-          await doModalUpload(currentModal);
-        }
-      });
-      if (closeBtn) closeBtn.after(newBtn);
-      else footer.appendChild(newBtn);
-    }
+    openHistoryEntry(entry, originX, originY);
   }
 
   function showFloatingTab() {
@@ -1460,10 +1452,7 @@ export const config: PlasmoCSConfig = {
 
     const tab = document.createElement('div');
     tab.className = 'inspoclip-tab';
-    const tabLabel = currentAssetResult?.kind === 'video'
-      ? (locale === 'zh' ? '视频分析' : 'Video')
-      : 'InspoClip';
-    tab.innerHTML = `<span class="inspoclip-tab-arrow">◂</span><span class="inspoclip-tab-label">${tabLabel}</span>`;
+    tab.innerHTML = `<span class="inspoclip-tab-arrow">◂</span><span class="inspoclip-tab-label">InspoClip</span>`;
 
     // Restore last position
     const savedTop = localStorage.getItem('inspoclip-tab-top');
@@ -1490,11 +1479,7 @@ export const config: PlasmoCSConfig = {
       currentTab = null;
       setTimeout(() => {
         tab.remove();
-        if (currentAssetResult?.kind === 'video') {
-          showVideoModal(currentAssetResult.detail, tabX, tabY);
-        } else {
-          showModal(analyzedData, lastPreviewUrl, tabX, tabY);
-        }
+        openHistoryEntry(currentHistoryEntry(), tabX, tabY);
       }, 280);
     });
 
@@ -1561,17 +1546,13 @@ export const config: PlasmoCSConfig = {
 
     const items = [
       { icon: '👁', label: locale === 'zh' ? '查看分析结果' : 'View results', action: () => {
-        if (!analyzedData && !currentAssetResult) { removeFloatingTab(); return; }
+        if (!currentHistoryEntry()) { removeFloatingTab(); return; }
         const tabEl = currentTab;
         const rect = tabEl ? tabEl.getBoundingClientRect() : { left: window.innerWidth - 20, top: 20, height: 40 };
         const tabX = rect.left;
         const tabY = rect.top + rect.height / 2;
         removeFloatingTab();
-        if (currentAssetResult?.kind === 'video') {
-          showVideoModal(currentAssetResult.detail, tabX, tabY);
-        } else {
-          showModal(analyzedData, lastPreviewUrl, tabX, tabY);
-        }
+        openHistoryEntry(currentHistoryEntry(), tabX, tabY);
       }},
       { icon: '🙈', label: locale === 'zh' ? '隐藏标签' : 'Hide tab', action: () => {
         removeFloatingTab();
