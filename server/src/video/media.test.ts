@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { inspectVideo, validateVideoMetadata, generateVideoThumbnail } from './media.js';
+import { inspectVideo, validateVideoMetadata, generateVideoThumbnail, ensureModelCompatibleVideo } from './media.js';
 
 describe('video media validation', () => {
   it('parses ffprobe output and accepts a supported UI demo', async () => {
@@ -58,5 +58,23 @@ describe('video media validation', () => {
     const run = vi.fn().mockResolvedValue({ stdout: '' });
     await expect(generateVideoThumbnail('input file.mp4', 'thumb.jpg', run)).resolves.toBe('thumb.jpg');
     expect(run).toHaveBeenCalledWith('ffmpeg', ['-y', '-ss', '00:00:01', '-i', 'input file.mp4', '-frames:v', '1', '-vf', 'scale=640:-2', 'thumb.jpg']);
+  });
+
+  it('transcodes browser-recorded webm into model-compatible mp4', async () => {
+    const run = vi.fn().mockResolvedValue({ stdout: '' });
+    await expect(ensureModelCompatibleVideo('recording.webm', 'recording.model.mp4', run)).resolves.toBe('recording.model.mp4');
+    expect(run).toHaveBeenCalledWith('ffmpeg', [
+      '-y',
+      '-i', 'recording.webm',
+      '-an',
+      '-r', '30',
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '23',
+      '-pix_fmt', 'yuv420p',
+      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+      '-movflags', '+faststart',
+      'recording.model.mp4',
+    ]);
   });
 });

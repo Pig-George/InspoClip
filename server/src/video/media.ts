@@ -92,3 +92,24 @@ export async function generateVideoThumbnail(
   await run('ffmpeg', ['-y', '-ss', '00:00:01', '-i', inputPath, '-frames:v', '1', '-vf', 'scale=640:-2', outputPath]);
   return outputPath;
 }
+
+export async function ensureModelCompatibleVideo(
+  inputPath: string,
+  outputPath: string,
+  run: CommandRunner = defaultRunner,
+): Promise<string> {
+  await run('ffmpeg', [
+    '-y',
+    '-i', inputPath,
+    '-an',
+    '-r', '30',
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-crf', '23',
+    '-pix_fmt', 'yuv420p',
+    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+    '-movflags', '+faststart',
+    outputPath,
+  ]);
+  return outputPath;
+}

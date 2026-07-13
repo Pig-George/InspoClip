@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import request from 'supertest';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createModelVideosRouter } from './model-videos.js';
 import { InMemoryVideoRepository } from '../video/repository.js';
 import { ModelVideoAccessTokens } from '../video/public-access.js';
@@ -47,5 +47,29 @@ describe('model video routes', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.toString()).toBe('video-bytes');
+  });
+
+  it('serves a model-compatible mp4 for webm videos', async () => {
+    const repo = new InMemoryVideoRepository();
+    const tokens = new ModelVideoAccessTokens({ ttlMs: 60_000, now: () => 1_000 });
+    await writeFile(path.join(tmpDir, 'recording.webm'), 'webm-bytes');
+    const video = await repo.createVideo({
+      filePath: 'recording.webm', originalName: 'recording.webm', mimeType: 'video/webm',
+      sizeBytes: 10, durationMs: 10_000, width: 399, height: 1149, source: 'extension',
+    });
+    const prepareModelVideo = vi.fn(async (_inputPath: string, outputPath: string) => {
+      await writeFile(outputPath, 'mp4-bytes');
+      return outputPath;
+    });
+    const app = express();
+    app.use('/api/model-videos', createModelVideosRouter({ repository: repo, tokens, videoRoot: tmpDir, prepareModelVideo }));
+    const issued = tokens.issue(video.id);
+
+    const response = await request(app).get(`/api/model-videos/${video.id}/content?token=${issued.token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.toString()).toBe('mp4-bytes');
+    expect(response.headers['content-type']).toContain('video/mp4');
+    expect(prepareModelVideo).toHaveBeenCalledWith(path.join(tmpDir, 'recording.webm'), path.join(tmpDir, 'recording.model.mp4'));
   });
 });
