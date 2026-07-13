@@ -611,14 +611,19 @@
     .inspoclip-video-preview {
       padding: 10px 12px 0;
       background: #fffaf2;
+      position: relative;
+      z-index: 1;
+      pointer-events: auto;
     }
 
     .inspoclip-video-preview video {
+      display: block;
       width: 100%;
       max-height: 210px;
       border-radius: 12px;
       background: #111;
       box-shadow: 0 4px 14px rgba(74,48,40,0.12);
+      pointer-events: auto;
     }
 
     .inspoclip-video-summary {

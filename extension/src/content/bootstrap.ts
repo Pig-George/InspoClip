@@ -6,6 +6,12 @@ type RemovableElement = {
   remove(): void
 }
 
+type ContentRootElement = {
+  style: {
+    cssText: string
+  }
+}
+
 type ContentDocument = {
   getElementById(rootId: string): RemovableElement | null
 }
@@ -21,4 +27,9 @@ export function removeExistingContentRoot(documentScope: ContentDocument, rootId
   if (!existingRoot) return false
   existingRoot.remove()
   return true
+}
+
+export function setContentRootInteractive(root: ContentRootElement, interactive: boolean): void {
+  const size = interactive ? "width:100vw;height:100vh" : "width:0;height:0"
+  root.style.cssText = `position:fixed;top:0;left:0;${size};overflow:visible;z-index:2147483647;pointer-events:none;`
 }

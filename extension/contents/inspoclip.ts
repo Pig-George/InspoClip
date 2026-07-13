@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
 import type { PlasmoCSConfig } from "plasmo"
 
-import { claimContentRuntime, removeExistingContentRoot } from "../src/content/bootstrap"
+import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
 import { dataUrlToBlob } from "../src/content/image"
@@ -25,7 +25,7 @@ export const config: PlasmoCSConfig = {
   // Create isolated container
   const root = document.createElement('div');
   root.id = INSPOCLIP_ID;
-  root.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:visible;z-index:2147483647;pointer-events:none;';
+  setContentRootInteractive(root, false);
   root.attachShadow({ mode: 'open' });
 
   // Inject styles
@@ -61,6 +61,10 @@ export const config: PlasmoCSConfig = {
   let videoPromptLangMode = 'auto';
   let videoPromptPurpose = 'general';
   let videoPromptTarget = '';
+
+  function syncContentRootInteractivity() {
+    setContentRootInteractive(root, Boolean(currentModal || areaOverlay));
+  }
 
   // Load server URL
   chrome.storage.sync.get(['serverUrl', 'lang'], (result) => {
@@ -149,6 +153,7 @@ export const config: PlasmoCSConfig = {
     overlay.appendChild(selection);
     container.appendChild(overlay);
     areaOverlay = overlay;
+    syncContentRootInteractivity();
 
     let startX = 0, startY = 0;
     let isDrawing = false;
@@ -328,6 +333,7 @@ export const config: PlasmoCSConfig = {
     if (areaOverlay) {
       areaOverlay.remove();
       areaOverlay = null;
+      syncContentRootInteractivity();
     }
   }
 
@@ -1114,6 +1120,7 @@ export const config: PlasmoCSConfig = {
 
     container.appendChild(modal);
     currentModal = modal;
+    syncContentRootInteractivity();
     requestAnimationFrame(() => {
       modal.querySelector('.inspoclip-modal').classList.add('inspoclip-modal-visible');
     });
@@ -1272,6 +1279,7 @@ export const config: PlasmoCSConfig = {
 
     container.appendChild(modal);
     currentModal = modal;
+    syncContentRootInteractivity();
 
     // Load similar image thumbnails via background script to avoid CORS
     if (data.similarImages?.length > 0) {
@@ -1442,8 +1450,10 @@ export const config: PlasmoCSConfig = {
         overlay.remove();
         // Show floating tab after modal is gone, if we have image or video analysis data
         if (showFloating && analysisHistory.length > 0) showFloatingTab();
+        syncContentRootInteractivity();
       }, 350);
       currentModal = null;
+      syncContentRootInteractivity();
     }
   }
 

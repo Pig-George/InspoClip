@@ -1,6 +1,11 @@
 import { describe, expect, test } from "vitest"
 
-import { CONTENT_RUNTIME_MARKER, claimContentRuntime, removeExistingContentRoot } from "./bootstrap"
+import {
+  CONTENT_RUNTIME_MARKER,
+  claimContentRuntime,
+  removeExistingContentRoot,
+  setContentRootInteractive
+} from "./bootstrap"
 
 describe("content bootstrap helpers", () => {
   test("claims the content runtime only once per extension context", () => {
@@ -29,5 +34,21 @@ describe("content bootstrap helpers", () => {
     const documentScope = { getElementById: () => null }
 
     expect(removeExistingContentRoot(documentScope, "inspoclip-root")).toBe(false)
+  })
+
+  test("expands the content root while interactive overlays are visible", () => {
+    const root = { style: { cssText: "" } }
+
+    setContentRootInteractive(root, true)
+
+    expect(root.style.cssText).toContain("width:100vw")
+    expect(root.style.cssText).toContain("height:100vh")
+    expect(root.style.cssText).toContain("pointer-events:none")
+
+    setContentRootInteractive(root, false)
+
+    expect(root.style.cssText).toContain("width:0")
+    expect(root.style.cssText).toContain("height:0")
+    expect(root.style.cssText).toContain("overflow:visible")
   })
 })
