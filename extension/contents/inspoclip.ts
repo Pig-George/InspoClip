@@ -9,6 +9,13 @@ import { createObjectUrlVideoSource, jumpVideoToTime, revokeObjectUrlVideoSource
 import { getPromptText as resolvePromptText } from "../src/content/prompt"
 import { matchShortcut } from "../src/content/shortcut"
 import { getContentStyles } from "../src/content/styles"
+import { syncToastElement } from "../src/content/toast"
+import {
+  clearVideoPromptInflight,
+  getVideoPromptInflight,
+  setVideoPromptInflight,
+  videoPromptRequestKey
+} from "../src/content/video-prompt-state"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -731,13 +738,19 @@ export const config: PlasmoCSConfig = {
   function showToast(message, type = 'loading') {
     // Clear any pending removal timer
     if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
-    removeToast();
+
+    if (currentToast) {
+      syncToastElement(currentToast, message, type);
+      currentToast.classList.add('inspoclip-toast-visible');
+      return;
+    }
+
     const toast = document.createElement('div');
-    toast.className = `inspoclip-toast inspoclip-toast-${type}`;
     toast.innerHTML = `
-      <div class="inspoclip-toast-icon">${type === 'loading' ? '<div class="inspoclip-spinner"></div>' : type === 'error' ? '✗' : '✓'}</div>
-      <span class="inspoclip-toast-text">${message}</span>
+      <div class="inspoclip-toast-icon"></div>
+      <span class="inspoclip-toast-text"></span>
     `;
+    syncToastElement(toast, message, type);
     container.appendChild(toast);
     currentToast = toast;
 
@@ -926,6 +939,34 @@ export const config: PlasmoCSConfig = {
     const targetInput = modal.querySelector('.inspoclip-video-prompt-target');
     const targetWrap = modal.querySelector('.inspoclip-video-prompt-target-wrap');
     const copyBtn = modal.querySelector('[data-video-prompt-copy]');
+    let activePromptKey = videoPromptRequestKey(videoId, videoPromptPurpose, videoPromptTarget);
+
+    const isActiveModal = () => currentModal === modal;
+    const setGenerating = (generating) => {
+      if (!generateBtn || !isActiveModal()) return;
+      generateBtn.disabled = generating;
+      generateBtn.textContent = generating
+        ? (locale === 'zh' ? '生成中...' : 'Generating...')
+        : (locale === 'zh' ? '生成' : 'Generate');
+    };
+    const currentPromptKey = () => videoPromptRequestKey(videoId, videoPromptPurpose, videoPromptTarget);
+    const isCurrentPrompt = (key) => isActiveModal() && activePromptKey === key;
+
+    const watchPromptPromise = async (key, promise) => {
+      activePromptKey = key;
+      setGenerating(true);
+      renderVideoPromptOutput(modal, null, locale === 'zh' ? '正在生成复刻提示词...' : 'Generating replication prompt...');
+      try {
+        const output = await promise;
+        if (isCurrentPrompt(key)) renderVideoPromptOutput(modal, output);
+      } catch (err) {
+        if (isCurrentPrompt(key)) {
+          renderVideoPromptOutput(modal, null, locale === 'zh' ? `生成失败: ${err.message}` : `Generation failed: ${err.message}`);
+        }
+      } finally {
+        if (isCurrentPrompt(key)) setGenerating(false);
+      }
+    };
 
     const refreshTargetVisibility = () => {
       if (!targetWrap) return;
@@ -933,34 +974,47 @@ export const config: PlasmoCSConfig = {
     };
 
     const loadExisting = async () => {
+      const key = currentPromptKey();
+      activePromptKey = key;
+      const inflight = getVideoPromptInflight(key);
+      if (inflight) {
+        watchPromptPromise(key, inflight);
+        return;
+      }
+      setGenerating(false);
       const params = new URLSearchParams({ purpose: videoPromptPurpose });
       if (videoPromptTarget.trim()) params.set('target', videoPromptTarget.trim());
       const res = await fetch(`${serverUrl}/api/videos/${videoId}/prompts?${params.toString()}`);
       if (res.ok) {
-        renderVideoPromptOutput(modal, await res.json());
+        const output = await res.json();
+        if (isCurrentPrompt(key)) renderVideoPromptOutput(modal, output);
       } else if (res.status === 404) {
-        renderVideoPromptOutput(modal, null);
+        if (isCurrentPrompt(key)) renderVideoPromptOutput(modal, null);
       }
     };
 
     const generate = async () => {
-      generateBtn.disabled = true;
-      generateBtn.textContent = locale === 'zh' ? '生成中...' : 'Generating...';
-      renderVideoPromptOutput(modal, null, locale === 'zh' ? '正在生成复刻提示词...' : 'Generating replication prompt...');
-      try {
-        const body = { purpose: videoPromptPurpose, target: videoPromptTarget.trim() };
-        const res = await fetch(`${serverUrl}/api/videos/${videoId}/prompts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
+      const key = currentPromptKey();
+      const existing = getVideoPromptInflight(key);
+      if (existing) {
+        watchPromptPromise(key, existing);
+        return;
+      }
+      const body = { purpose: videoPromptPurpose, target: videoPromptTarget.trim() };
+      const promise = fetch(`${serverUrl}/api/videos/${videoId}/prompts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then(async (res) => {
         if (!res.ok) throw new Error(await readableError(res, 'Prompt generation failed'));
-        renderVideoPromptOutput(modal, await res.json());
-      } catch (err) {
-        renderVideoPromptOutput(modal, null, locale === 'zh' ? `生成失败: ${err.message}` : `Generation failed: ${err.message}`);
+        return res.json();
+      });
+
+      setVideoPromptInflight(key, promise);
+      try {
+        await watchPromptPromise(key, promise);
       } finally {
-        generateBtn.disabled = false;
-        generateBtn.textContent = locale === 'zh' ? '生成' : 'Generate';
+        clearVideoPromptInflight(key, promise);
       }
     };
 
@@ -1169,6 +1223,7 @@ export const config: PlasmoCSConfig = {
     if (saveBtn) {
       saveBtn.addEventListener('click', async () => {
         saveBtn.disabled = true;
+        saveBtn.classList.add('inspoclip-btn-saving');
         saveBtn.textContent = locale === 'zh' ? '保存中...' : 'Saving...';
         try {
           const res = await fetch(`${serverUrl}/api/videos/${video.id}/save`, { method: 'POST' });
@@ -1182,21 +1237,15 @@ export const config: PlasmoCSConfig = {
             entry.saved = true;
           }
           saveBtn.textContent = locale === 'zh' ? '✓ 已保存' : '✓ Saved';
-          saveBtn.style.background = '#4caf50';
-          saveBtn.style.borderColor = '#4caf50';
+          saveBtn.classList.remove('inspoclip-btn-saving');
+          saveBtn.classList.add('inspoclip-btn-success');
           setTimeout(() => {
-            saveBtn.style.transition = 'width 0.35s ease, opacity 0.25s ease, padding 0.35s ease, margin 0.35s ease';
-            saveBtn.style.width = saveBtn.offsetWidth + 'px';
-            requestAnimationFrame(() => {
-              saveBtn.style.width = '0';
-              saveBtn.style.opacity = '0';
-              saveBtn.style.padding = '0';
-              saveBtn.style.margin = '0';
-              saveBtn.style.borderWidth = '0';
-            });
+            saveBtn.style.setProperty('--inspoclip-save-width', `${saveBtn.offsetWidth}px`);
+            saveBtn.classList.add('inspoclip-btn-collapse');
             setTimeout(() => saveBtn.remove(), 400);
-          }, 1000);
+          }, 850);
         } catch (err) {
+          saveBtn.classList.remove('inspoclip-btn-saving');
           saveBtn.textContent = locale === 'zh' ? '保存失败' : 'Save failed';
           saveBtn.style.background = '#f44336';
           setTimeout(() => {

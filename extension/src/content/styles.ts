@@ -475,6 +475,65 @@
     .inspoclip-btn-primary { background: #c0784a; color: white; }
     .inspoclip-btn-secondary { background: #e8d5b0; color: #4a3028; }
 
+    .inspoclip-btn-saving {
+      position: relative;
+      overflow: hidden;
+      opacity: 1 !important;
+    }
+
+    .inspoclip-btn-saving::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.28) 45%, transparent 75%);
+      transform: translateX(-120%);
+      animation: inspoclip-save-sheen 1.05s ease-in-out infinite;
+    }
+
+    .inspoclip-btn-success {
+      background: #4caf50 !important;
+      border-color: #4caf50 !important;
+      color: #fff !important;
+      opacity: 1 !important;
+      animation: inspoclip-save-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .inspoclip-btn-collapse {
+      flex: 0 0 var(--inspoclip-save-width, auto);
+      min-width: 0;
+      overflow: hidden;
+      pointer-events: none;
+      animation: inspoclip-save-collapse 0.42s ease forwards;
+    }
+
+    @keyframes inspoclip-save-sheen {
+      to { transform: translateX(120%); }
+    }
+
+    @keyframes inspoclip-save-pop {
+      0% { transform: scale(0.96); }
+      55% { transform: scale(1.04); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes inspoclip-save-collapse {
+      from {
+        flex-basis: var(--inspoclip-save-width, auto);
+        width: var(--inspoclip-save-width, auto);
+        opacity: 1;
+      }
+      to {
+        flex-basis: 0;
+        width: 0;
+        min-width: 0;
+        opacity: 0;
+        padding-left: 0;
+        padding-right: 0;
+        margin-left: 0;
+        margin-right: 0;
+      }
+    }
+
     /* Confirm Dialog */
     .inspoclip-confirm-overlay {
       position: fixed;
