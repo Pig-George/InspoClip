@@ -55,3 +55,8 @@ export function getPreferredRecordingMimeType(
 
   return candidates.find((type) => mediaRecorder?.isTypeSupported?.(type)) || ""
 }
+
+export function getRecordingUploadMimeType(recordingMimeType: string): string {
+  const baseMimeType = recordingMimeType.split(";")[0]?.trim().toLowerCase()
+  return baseMimeType || "video/webm"
+}

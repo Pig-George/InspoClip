@@ -4,7 +4,8 @@ import type { PlasmoCSConfig } from "plasmo"
 import {
   formatRecordingDuration,
   getAreaCaptureToolbarPosition,
-  getPreferredRecordingMimeType
+  getPreferredRecordingMimeType,
+  getRecordingUploadMimeType
 } from "../src/content/area-recording"
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
@@ -510,7 +511,7 @@ export const config: PlasmoCSConfig = {
         removeAreaOverlay();
         if (!shouldAnalyze) return;
         try {
-          const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+          const blob = new Blob(chunks, { type: getRecordingUploadMimeType(mimeType) });
           if (!blob.size) throw new Error('No recording data');
           await analyzeRecordedAreaVideo(blob);
         } catch (err) {

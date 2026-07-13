@@ -9,14 +9,22 @@ const extensionByMime: Record<string, string> = {
   'video/webm': '.webm',
 };
 
+export function getSupportedVideoMimeType(mimeType: string): string | null {
+  const baseMimeType = mimeType.split(';')[0]?.trim().toLowerCase();
+  return extensionByMime[baseMimeType] ? baseMimeType : null;
+}
+
 export function createVideoUpload(uploadDir = process.env.VIDEO_UPLOAD_DIR || './videos') {
   return multer({
     storage: multer.diskStorage({
       destination: uploadDir,
-      filename: (_req, file, cb) => cb(null, `${uuid()}${extensionByMime[file.mimetype] ?? path.extname(file.originalname).toLowerCase()}`),
+      filename: (_req, file, cb) => {
+        const supportedMimeType = getSupportedVideoMimeType(file.mimetype);
+        cb(null, `${uuid()}${supportedMimeType ? extensionByMime[supportedMimeType] : path.extname(file.originalname).toLowerCase()}`);
+      },
     }),
     fileFilter: (_req, file, cb) => {
-      if (extensionByMime[file.mimetype]) cb(null, true);
+      if (getSupportedVideoMimeType(file.mimetype)) cb(null, true);
       else cb(new Error('Unsupported video format'));
     },
     limits: { fileSize: MAX_VIDEO_BYTES, files: 1 },

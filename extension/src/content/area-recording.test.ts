@@ -3,7 +3,8 @@ import { describe, expect, test } from "vitest"
 import {
   formatRecordingDuration,
   getAreaCaptureToolbarPosition,
-  getPreferredRecordingMimeType
+  getPreferredRecordingMimeType,
+  getRecordingUploadMimeType
 } from "./area-recording"
 
 describe("area recording helpers", () => {
@@ -51,5 +52,11 @@ describe("area recording helpers", () => {
     }
 
     expect(getPreferredRecordingMimeType(mediaRecorder)).toBe("video/webm;codecs=vp9")
+  })
+
+  test("normalizes recording mime type before uploading", () => {
+    expect(getRecordingUploadMimeType("video/webm;codecs=vp9")).toBe("video/webm")
+    expect(getRecordingUploadMimeType(" video/webm; codecs=vp8 ")).toBe("video/webm")
+    expect(getRecordingUploadMimeType("")).toBe("video/webm")
   })
 })
