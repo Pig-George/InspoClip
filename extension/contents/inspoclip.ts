@@ -806,9 +806,22 @@ export const config: PlasmoCSConfig = {
       .replace(/'/g, '&#039;');
   }
 
-  function formatMs(ms) {
-    const seconds = Math.max(0, Math.round((ms || 0) / 100) / 10);
+  function formatSeconds(value) {
+    const numeric = Number(value);
+    const seconds = Number.isFinite(numeric) ? Math.max(0, numeric) : 0;
     return `${seconds.toFixed(seconds % 1 === 0 ? 0 : 1)}s`;
+  }
+
+  function formatActionLine(action) {
+    if (!action || typeof action !== 'object') return localizedText(action) || String(action ?? '');
+    const subject = localizedText(action.subject) || '';
+    const actionText = localizedText(action.action) || '';
+    const details = [subject, actionText].filter(Boolean);
+    const timing = [
+      Number.isFinite(Number(action.durationMs)) ? `${Number(action.durationMs)}ms` : '',
+      action.easing ? String(action.easing) : '',
+    ].filter(Boolean);
+    return [...details, ...timing].join(' · ') || JSON.stringify(action);
   }
 
   function newHistoryId() {
@@ -1042,7 +1055,7 @@ export const config: PlasmoCSConfig = {
                 <div class="inspoclip-video-stage">
                   <div class="inspoclip-video-stage-head">
                     <span>${index + 1}. ${escapeHtml(localizedText(stage.title) || stage.title || (locale === 'zh' ? '阶段' : 'Stage'))}</span>
-                    <em>${formatMs(stage.startTime)} – ${formatMs(stage.endTime)}</em>
+                    <em>${formatSeconds(stage.startTime)} – ${formatSeconds(stage.endTime)}</em>
                   </div>
                   <div class="inspoclip-video-stage-grid">
                     <div><b>${locale === 'zh' ? '初始' : 'Initial'}</b><span>${escapeHtml(localizedText(stage.initialState) || stage.initialState || '-')}</span></div>
@@ -1051,7 +1064,7 @@ export const config: PlasmoCSConfig = {
                   </div>
                   ${(stage.actions || []).length ? `<ul class="inspoclip-video-actions">
                     ${(stage.actions || []).map((action) => `
-                      <li>${escapeHtml([action.subject, action.action].filter(Boolean).join(' · ') || JSON.stringify(action))}</li>
+                      <li>${escapeHtml(formatActionLine(action))}</li>
                     `).join('')}
                   </ul>` : ''}
                 </div>
