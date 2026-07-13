@@ -1,6 +1,11 @@
 ﻿// @ts-nocheck
 import type { PlasmoCSConfig } from "plasmo"
 
+import {
+  formatRecordingDuration,
+  getAreaCaptureToolbarPosition,
+  getPreferredRecordingMimeType
+} from "../src/content/area-recording"
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
@@ -137,6 +142,7 @@ export const config: PlasmoCSConfig = {
   // ---- Area Capture Flow ----
 
   let areaOverlay = null;
+  let activeAreaRecording = null;
 
   function startAreaCapture(mode) {
     // Remove any existing overlay
@@ -167,6 +173,7 @@ export const config: PlasmoCSConfig = {
 
     let startX = 0, startY = 0;
     let isDrawing = false;
+    let isSelectionLocked = false;
     let hoveredRect = null;
     const DRAG_THRESHOLD = 5;
 
@@ -191,6 +198,7 @@ export const config: PlasmoCSConfig = {
 
     // Hover: show highlight on element under cursor
     overlay.addEventListener('mousemove', (e) => {
+      if (isSelectionLocked) return;
       if (isDrawing) {
         // Manual drawing mode — show selection rectangle
         selection.style.display = 'block';
@@ -223,6 +231,7 @@ export const config: PlasmoCSConfig = {
     });
 
     overlay.addEventListener('mousedown', (e) => {
+      if (isSelectionLocked) return;
       if (e.button !== 0) return;
       isDrawing = true;
       startX = e.clientX;
@@ -239,6 +248,7 @@ export const config: PlasmoCSConfig = {
     overlay.addEventListener('mouseup', async (e) => {
       if (!isDrawing) return;
       isDrawing = false;
+      isSelectionLocked = true;
 
       const dx = Math.abs(e.clientX - startX);
       const dy = Math.abs(e.clientY - startY);
@@ -267,66 +277,7 @@ export const config: PlasmoCSConfig = {
         return;
       }
 
-      try {
-        // Hide overlay before capturing to avoid capturing the UI
-        overlay.style.display = 'none';
-
-        // Small delay to ensure overlay is hidden before capture
-        await new Promise((r) => setTimeout(r, 50));
-
-        // Capture the visible tab
-        const dataUrl = await new Promise((resolve, reject) => {
-          chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' }, (response) => {
-            if (response?.dataUrl) resolve(response.dataUrl);
-            else reject(new Error('Capture failed'));
-          });
-        });
-
-        // Crop the image to the selected area
-        const croppedBlob = await cropImage(dataUrl, rect);
-
-        removeAreaOverlay();
-
-        // Process based on mode
-        if (mode === 'analyze') {
-          // Run analysis on the cropped image
-          showToast(locale === 'zh' ? '正在分析选区...' : 'Analyzing selection...', 'loading');
-
-          const ext = croppedBlob.type === 'image/png' ? '.png' : '.jpg';
-          const formData = new FormData();
-          formData.append('image', croppedBlob, 'area' + ext);
-
-          const res = await fetch(`${serverUrl}/api/images/analyze`, { method: 'POST', body: formData });
-          if (!res.ok) throw new Error('Analysis failed');
-          const data = await res.json();
-
-          // Check similarity
-          try {
-            const simForm = new FormData();
-            simForm.append('image', croppedBlob, 'check' + ext);
-            const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, { method: 'POST', body: simForm });
-            if (simRes.ok) {
-              const simData = await simRes.json();
-              data.similarImages = simData.similar || [];
-            }
-          } catch { data.similarImages = []; }
-
-          capturedBlob = croppedBlob;
-          lastPreviewUrl = URL.createObjectURL(croppedBlob);
-          analyzedData = data;
-          pushImageHistory(data, lastPreviewUrl, croppedBlob);
-
-          transitionToModal(data, lastPreviewUrl);
-        } else {
-          // Save mode — check similarity then upload
-          capturedBlob = croppedBlob;
-          await doUpload(croppedBlob);
-        }
-      } catch (err) {
-        removeAreaOverlay();
-        showToast(locale === 'zh' ? `截图失败: ${err.message}` : `Capture failed: ${err.message}`, 'error');
-        setTimeout(removeToast, 3000);
-      }
+      showAreaCaptureControls(overlay, selection, hoverHighlight, instructions, rect, mode);
     });
 
     // ESC to cancel
@@ -339,7 +290,327 @@ export const config: PlasmoCSConfig = {
     document.addEventListener('keydown', escHandler);
   }
 
+  function applyAreaRectToElement(element, rect) {
+    element.style.display = 'block';
+    element.style.left = rect.x + 'px';
+    element.style.top = rect.y + 'px';
+    element.style.width = rect.width + 'px';
+    element.style.height = rect.height + 'px';
+  }
+
+  function showAreaCaptureControls(overlay, selection, hoverHighlight, instructions, rect, mode) {
+    hoverHighlight.style.display = 'none';
+    instructions.style.display = 'none';
+    applyAreaRectToElement(selection, rect);
+    overlay.classList.add('inspoclip-area-overlay-selected');
+
+    const existing = overlay.querySelector('.inspoclip-area-toolbar');
+    if (existing) existing.remove();
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'inspoclip-area-toolbar';
+    toolbar.innerHTML = `
+      <div class="inspoclip-area-toolbar-main">
+        <button class="inspoclip-area-action" data-action="screenshot">${locale === 'zh' ? '截图' : 'Screenshot'}</button>
+        <button class="inspoclip-area-action inspoclip-area-action-primary" data-action="record">${locale === 'zh' ? '录屏' : 'Record'}</button>
+        <button class="inspoclip-area-action-icon" data-action="cancel" title="${locale === 'zh' ? '取消' : 'Cancel'}">×</button>
+      </div>
+    `;
+    positionAreaToolbar(toolbar, rect);
+    toolbar.addEventListener('mousedown', (event) => event.stopPropagation());
+    toolbar.addEventListener('mouseup', (event) => event.stopPropagation());
+    toolbar.addEventListener('click', (event) => event.stopPropagation());
+
+    toolbar.querySelector('[data-action="screenshot"]')?.addEventListener('click', () => {
+      processAreaScreenshot(mode, rect, overlay);
+    });
+    toolbar.querySelector('[data-action="record"]')?.addEventListener('click', () => {
+      startAreaRecording(rect, overlay, toolbar);
+    });
+    toolbar.querySelector('[data-action="cancel"]')?.addEventListener('click', () => {
+      removeAreaOverlay();
+    });
+    overlay.appendChild(toolbar);
+  }
+
+  function positionAreaToolbar(toolbar, rect) {
+    const position = getAreaCaptureToolbarPosition(
+      rect,
+      { width: window.innerWidth, height: window.innerHeight },
+      { width: 278, height: 44 }
+    );
+    toolbar.style.left = position.left + 'px';
+    toolbar.style.top = position.top + 'px';
+    toolbar.dataset.placement = position.placement;
+  }
+
+  async function processAreaScreenshot(mode, rect, overlay) {
+    try {
+      // Hide overlay before capturing to avoid capturing the UI
+      overlay.style.display = 'none';
+
+      // Small delay to ensure overlay is hidden before capture
+      await new Promise((r) => setTimeout(r, 50));
+
+      // Capture the visible tab
+      const dataUrl = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' }, (response) => {
+          if (response?.dataUrl) resolve(response.dataUrl);
+          else reject(new Error('Capture failed'));
+        });
+      });
+
+      // Crop the image to the selected area
+      const croppedBlob = await cropImage(dataUrl, rect);
+
+      removeAreaOverlay();
+
+      // Process based on mode
+      if (mode === 'analyze') {
+        // Run analysis on the cropped image
+        showToast(locale === 'zh' ? '正在分析选区...' : 'Analyzing selection...', 'loading');
+
+        const ext = croppedBlob.type === 'image/png' ? '.png' : '.jpg';
+        const formData = new FormData();
+        formData.append('image', croppedBlob, 'area' + ext);
+
+        const res = await fetch(`${serverUrl}/api/images/analyze`, { method: 'POST', body: formData });
+        if (!res.ok) throw new Error('Analysis failed');
+        const data = await res.json();
+
+        // Check similarity
+        try {
+          const simForm = new FormData();
+          simForm.append('image', croppedBlob, 'check' + ext);
+          const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, { method: 'POST', body: simForm });
+          if (simRes.ok) {
+            const simData = await simRes.json();
+            data.similarImages = simData.similar || [];
+          }
+        } catch { data.similarImages = []; }
+
+        capturedBlob = croppedBlob;
+        lastPreviewUrl = URL.createObjectURL(croppedBlob);
+        analyzedData = data;
+        pushImageHistory(data, lastPreviewUrl, croppedBlob);
+
+        transitionToModal(data, lastPreviewUrl);
+      } else {
+        // Save mode — check similarity then upload
+        capturedBlob = croppedBlob;
+        await doUpload(croppedBlob);
+      }
+    } catch (err) {
+      removeAreaOverlay();
+      showToast(locale === 'zh' ? `截图失败: ${err.message}` : `Capture failed: ${err.message}`, 'error');
+      setTimeout(removeToast, 3000);
+    }
+  }
+
+  async function startAreaRecording(rect, overlay, toolbar) {
+    if (!navigator.mediaDevices?.getDisplayMedia || typeof MediaRecorder === 'undefined') {
+      showToast(locale === 'zh' ? '当前浏览器不支持录屏' : 'Screen recording is not supported in this browser', 'error');
+      setTimeout(removeToast, 3000);
+      return;
+    }
+
+    const recordBtn = toolbar.querySelector('[data-action="record"]');
+    if (recordBtn) {
+      recordBtn.disabled = true;
+      recordBtn.textContent = locale === 'zh' ? '准备中...' : 'Preparing...';
+    }
+
+    try {
+      const sourceStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30 },
+        audio: false,
+      });
+      overlay.classList.add('inspoclip-area-overlay-recording');
+      toolbar.classList.add('inspoclip-area-toolbar-recording');
+      toolbar.innerHTML = `
+        <span class="inspoclip-area-record-dot"></span>
+        <span class="inspoclip-area-record-time">00:00</span>
+        <button class="inspoclip-area-action" data-action="pause">${locale === 'zh' ? '暂停' : 'Pause'}</button>
+        <button class="inspoclip-area-action inspoclip-area-action-primary" data-action="finish">${locale === 'zh' ? '完成' : 'Done'}</button>
+      `;
+      positionAreaToolbar(toolbar, rect);
+      toolbar.addEventListener('mousedown', (event) => event.stopPropagation());
+      toolbar.addEventListener('mouseup', (event) => event.stopPropagation());
+      toolbar.addEventListener('click', (event) => event.stopPropagation());
+
+      const sourceVideo = document.createElement('video');
+      sourceVideo.muted = true;
+      sourceVideo.playsInline = true;
+      sourceVideo.srcObject = sourceStream;
+      await new Promise((resolve, reject) => {
+        sourceVideo.onloadedmetadata = resolve;
+        sourceVideo.onerror = () => reject(new Error('Failed to prepare recording'));
+      });
+      await sourceVideo.play();
+
+      const scaleX = sourceVideo.videoWidth / window.innerWidth;
+      const scaleY = sourceVideo.videoHeight / window.innerHeight;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(rect.width * scaleX));
+      canvas.height = Math.max(1, Math.round(rect.height * scaleY));
+      const ctx = canvas.getContext('2d');
+      const canvasStream = canvas.captureStream(30);
+      const mimeType = getPreferredRecordingMimeType(MediaRecorder);
+      const recorder = new MediaRecorder(canvasStream, mimeType ? { mimeType } : undefined);
+      const chunks = [];
+      let animationId = 0;
+      let timerId = 0;
+      let startedAt = Date.now();
+      let pausedAt = 0;
+      let pausedTotal = 0;
+
+      const recording = {
+        recorder,
+        sourceStream,
+        canvasStream,
+        sourceVideo,
+        animationId: 0,
+        timerId: 0,
+        shouldAnalyze: true,
+      };
+      activeAreaRecording = recording;
+
+      const drawFrame = () => {
+        if (recorder.state !== 'inactive') {
+          ctx.drawImage(
+            sourceVideo,
+            rect.x * scaleX,
+            rect.y * scaleY,
+            rect.width * scaleX,
+            rect.height * scaleY,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+          animationId = requestAnimationFrame(drawFrame);
+          recording.animationId = animationId;
+        }
+      };
+
+      const timeEl = toolbar.querySelector('.inspoclip-area-record-time');
+      const updateTimer = () => {
+        const elapsed = (pausedAt || Date.now()) - startedAt - pausedTotal;
+        if (timeEl) timeEl.textContent = formatRecordingDuration(elapsed);
+      };
+      timerId = window.setInterval(updateTimer, 500);
+      recording.timerId = timerId;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) chunks.push(event.data);
+      };
+      recorder.onstop = async () => {
+        cleanupAreaRecording(recording);
+        const shouldAnalyze = recording.shouldAnalyze;
+        removeAreaOverlay();
+        if (!shouldAnalyze) return;
+        try {
+          const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+          if (!blob.size) throw new Error('No recording data');
+          await analyzeRecordedAreaVideo(blob);
+        } catch (err) {
+          showToast(locale === 'zh' ? `录屏分析失败: ${err.message}` : `Recording analysis failed: ${err.message}`, 'error');
+          setTimeout(removeToast, 5000);
+        }
+      };
+
+      sourceStream.getVideoTracks().forEach((track) => {
+        track.addEventListener('ended', () => {
+          if (activeAreaRecording === recording && recorder.state !== 'inactive') {
+            recording.shouldAnalyze = true;
+            recorder.stop();
+          }
+        });
+      });
+
+      toolbar.querySelector('[data-action="pause"]')?.addEventListener('click', () => {
+        const pauseBtn = toolbar.querySelector('[data-action="pause"]');
+        if (recorder.state === 'recording') {
+          recorder.pause();
+          pausedAt = Date.now();
+          overlay.classList.add('inspoclip-area-overlay-paused');
+          if (pauseBtn) pauseBtn.textContent = locale === 'zh' ? '继续' : 'Resume';
+        } else if (recorder.state === 'paused') {
+          recorder.resume();
+          pausedTotal += Date.now() - pausedAt;
+          pausedAt = 0;
+          overlay.classList.remove('inspoclip-area-overlay-paused');
+          if (pauseBtn) pauseBtn.textContent = locale === 'zh' ? '暂停' : 'Pause';
+        }
+        updateTimer();
+      });
+      toolbar.querySelector('[data-action="finish"]')?.addEventListener('click', () => {
+        recording.shouldAnalyze = true;
+        if (recorder.state !== 'inactive') recorder.stop();
+      });
+
+      recorder.start(1000);
+      drawFrame();
+      updateTimer();
+    } catch (err) {
+      cancelActiveAreaRecording();
+      overlay.classList.remove('inspoclip-area-overlay-recording');
+      if (recordBtn) {
+        recordBtn.disabled = false;
+        recordBtn.textContent = locale === 'zh' ? '录屏' : 'Record';
+      }
+      showToast(locale === 'zh' ? `录屏启动失败: ${err.message}` : `Failed to start recording: ${err.message}`, 'error');
+      setTimeout(removeToast, 5000);
+    }
+  }
+
+  function cleanupAreaRecording(recording) {
+    if (!recording) return;
+    if (recording.animationId) cancelAnimationFrame(recording.animationId);
+    if (recording.timerId) clearInterval(recording.timerId);
+    recording.sourceStream?.getTracks?.().forEach((track) => track.stop());
+    recording.canvasStream?.getTracks?.().forEach((track) => track.stop());
+    if (recording.sourceVideo) recording.sourceVideo.srcObject = null;
+    if (activeAreaRecording === recording) activeAreaRecording = null;
+  }
+
+  function cancelActiveAreaRecording() {
+    const recording = activeAreaRecording;
+    if (!recording) return;
+    recording.shouldAnalyze = false;
+    if (recording.recorder && recording.recorder.state !== 'inactive') {
+      recording.recorder.stop();
+    } else {
+      cleanupAreaRecording(recording);
+    }
+  }
+
+  async function analyzeRecordedAreaVideo(videoBlob) {
+    showToast(locale === 'zh' ? '正在上传录屏...' : 'Uploading recording...', 'loading');
+    const formData = new FormData();
+    formData.append('video', videoBlob, 'area-recording.webm');
+    formData.append('source', 'extension');
+    formData.append('draft', 'true');
+    const uploadRes = await fetch(`${serverUrl}/api/videos`, { method: 'POST', body: formData });
+    if (!uploadRes.ok) throw new Error(await readableError(uploadRes, 'Video upload failed'));
+    const uploadResult = await uploadRes.json();
+
+    showToast(locale === 'zh' ? '正在理解录屏... 0%' : 'Understanding recording... 0%', 'loading');
+    const job = await pollVideoJob(uploadResult.jobId, (value) => {
+      const progress = value.progress || 0;
+      showToast(locale === 'zh' ? `正在理解录屏... ${progress}%` : `Understanding recording... ${progress}%`, 'loading');
+    });
+    if (job.status === 'failed') throw new Error(job.errorMessage || 'Video analysis failed');
+
+    const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
+    if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
+    const detail = await detailRes.json();
+    pushVideoHistory(detail);
+    transitionToVideoModal(detail, window.innerWidth - 20, 20);
+  }
+
   function removeAreaOverlay() {
+    cancelActiveAreaRecording();
     if (areaOverlay) {
       areaOverlay.remove();
       areaOverlay = null;
