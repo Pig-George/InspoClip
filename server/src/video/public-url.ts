@@ -4,6 +4,17 @@ export interface ModelVideoUrlEnv {
   PUBLIC_BASE_URL?: string;
 }
 
+export interface ModelVideoTunnelProvider {
+  getPublicBaseUrl(): Promise<string>;
+  refreshPublicBaseUrl(): Promise<string>;
+}
+
+export interface ModelVideoUrlProvider {
+  getPublicBaseUrl(): Promise<string>;
+  refreshPublicBaseUrl(): Promise<string | null>;
+  toVerifyUrl(publicUrl: string): string;
+}
+
 function trimBaseUrl(value: string): string {
   return value.replace(/\/+$/, '');
 }
@@ -24,4 +35,39 @@ export function getModelVideoBaseUrls(env: ModelVideoUrlEnv, port: number): { pu
 export function modelVideoAccessPath(publicUrl: string): string {
   const url = new URL(publicUrl);
   return `${url.pathname}${url.search}`;
+}
+
+export function createModelVideoUrlProvider(
+  env: ModelVideoUrlEnv,
+  port: number,
+  tunnelProvider?: ModelVideoTunnelProvider | null,
+): ModelVideoUrlProvider {
+  const configured = getModelVideoBaseUrls(env, port);
+  const explicitVerifyBaseUrl = configuredBaseUrl(env.MODEL_VIDEO_VERIFY_BASE_URL);
+  let currentPublicBaseUrl = configured.publicBaseUrl;
+
+  const usePublicBaseUrl = (baseUrl: string): string => {
+    currentPublicBaseUrl = trimBaseUrl(baseUrl.trim());
+    return currentPublicBaseUrl;
+  };
+
+  return {
+    async getPublicBaseUrl() {
+      if (!tunnelProvider) return currentPublicBaseUrl;
+      try {
+        return usePublicBaseUrl(await tunnelProvider.getPublicBaseUrl());
+      } catch (error) {
+        console.warn(`Unable to load tunnel manager URL, using fallback video public URL: ${error instanceof Error ? error.message : String(error)}`);
+        return currentPublicBaseUrl;
+      }
+    },
+    async refreshPublicBaseUrl() {
+      if (!tunnelProvider) return null;
+      return usePublicBaseUrl(await tunnelProvider.refreshPublicBaseUrl());
+    },
+    toVerifyUrl(publicUrl: string) {
+      const verifyBaseUrl = explicitVerifyBaseUrl ?? new URL(publicUrl).origin;
+      return `${verifyBaseUrl}${modelVideoAccessPath(publicUrl)}`;
+    },
+  };
 }

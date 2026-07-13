@@ -34,6 +34,7 @@ services:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
       MODEL_VIDEO_PUBLIC_BASE_URL: ${MODEL_VIDEO_PUBLIC_BASE_URL:-http://localhost:8080}
       MODEL_VIDEO_VERIFY_BASE_URL: ${MODEL_VIDEO_VERIFY_BASE_URL:-}
+      TUNNEL_MANAGER_URL: ${TUNNEL_MANAGER_URL:-http://tunnel-manager:3002}
       MODEL_VIDEO_ACCESS_TTL_MS: ${MODEL_VIDEO_ACCESS_TTL_MS:-7200000}
       PORT: 3001
       UPLOAD_DIR: /app/uploads
@@ -60,6 +61,21 @@ services:
       - server
     ports:
       - '${PORT:-8080}:80'
+
+  tunnel-manager:
+    build:
+      context: .
+      dockerfile: tunnel-manager/Dockerfile
+    restart: unless-stopped
+    environment:
+      TUNNEL_TARGET_URL: ${TUNNEL_TARGET_URL:-http://client:80}
+      TUNNEL_MANAGER_PORT: 3002
+      TUNNEL_STARTUP_TIMEOUT_MS: ${TUNNEL_STARTUP_TIMEOUT_MS:-45000}
+      TUNNEL_RESTART_DELAY_MS: ${TUNNEL_RESTART_DELAY_MS:-3000}
+    depends_on:
+      - client
+    ports:
+      - '127.0.0.1:3002:3002'
 
   video-public-proxy:
     image: nginx:alpine

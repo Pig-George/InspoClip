@@ -21,7 +21,8 @@ import { DrizzleVideoRepository } from './video/repository.js';
 import { VideoWorker } from './video/worker.js';
 import { startDraftVideoCleanup } from './video/draft-cleanup.js';
 import { ModelVideoAccessTokens } from './video/public-access.js';
-import { getModelVideoBaseUrls, modelVideoAccessPath } from './video/public-url.js';
+import { createModelVideoUrlProvider, modelVideoAccessPath } from './video/public-url.js';
+import { createTunnelManagerClient } from './video/tunnel-manager.js';
 import { createVideoAiService } from './services/video-ai.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -201,7 +202,8 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`InspoClip server running on http://localhost:${PORT}`);
   });
-  const { publicBaseUrl: modelVideoPublicBaseUrl, verifyBaseUrl: modelVideoVerifyBaseUrl } = getModelVideoBaseUrls(process.env, PORT);
+  const tunnelManagerClient = createTunnelManagerClient(process.env);
+  const modelVideoUrlProvider = createModelVideoUrlProvider(process.env, PORT, tunnelManagerClient);
   const ensurePublicVideoUrlAvailable = async (url: string) => {
     let lastError = '';
     for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -219,12 +221,22 @@ async function start() {
   const worker = new VideoWorker(videoRepository, {
     analyzeVideo: async (input) => (await createVideoAiService()).analyzeVideo(input),
   }, {
-    videoUrlFor: (video) => {
+    videoUrlFor: async (video) => {
+      const modelVideoPublicBaseUrl = await modelVideoUrlProvider.getPublicBaseUrl();
       const issued = modelVideoAccessTokens.issue(video.id);
       return `${modelVideoPublicBaseUrl}/api/model-videos/${video.id}/content?token=${encodeURIComponent(issued.token)}`;
     },
     ensureVideoUrlAvailable: async (url) => {
-      await ensurePublicVideoUrlAvailable(`${modelVideoVerifyBaseUrl}${modelVideoAccessPath(url)}`);
+      try {
+        await ensurePublicVideoUrlAvailable(modelVideoUrlProvider.toVerifyUrl(url));
+        return undefined;
+      } catch (error) {
+        const refreshedBaseUrl = await modelVideoUrlProvider.refreshPublicBaseUrl();
+        if (!refreshedBaseUrl) throw error;
+        const refreshedUrl = `${refreshedBaseUrl}${modelVideoAccessPath(url)}`;
+        await ensurePublicVideoUrlAvailable(modelVideoUrlProvider.toVerifyUrl(refreshedUrl));
+        return refreshedUrl;
+      }
     },
     releaseVideoUrl: (url) => {
       const token = new URL(url).searchParams.get('token');

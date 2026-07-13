@@ -68,6 +68,27 @@ describe('VideoWorker', () => {
     expect(await repo.getJob(job.id)).toMatchObject({ status: 'pending', attemptCount: 1 });
   });
 
+  it('uses the refreshed public URL returned by preflight before calling the model', async () => {
+    const provider = new FakeProvider([JSON.stringify(validAnalysis)]);
+    const repo = new InMemoryVideoRepository();
+    const video = await repo.createVideo({ filePath: 'demo.mp4', originalName: 'demo.mp4', mimeType: 'video/mp4', sizeBytes: 1, durationMs: 10_000, width: 100, height: 100, source: 'client' });
+    const job = await repo.createJob(video.id, 'qwen3.7-plus', 4);
+    const releasedUrls: string[] = [];
+    const worker = new VideoWorker(repo, new AiService(provider), {
+      videoUrlFor: () => 'https://expired.trycloudflare.com/api/model-videos/demo/content?token=abc',
+      ensureVideoUrlAvailable: async () => 'https://fresh.trycloudflare.com/api/model-videos/demo/content?token=abc',
+      releaseVideoUrl: (url) => { releasedUrls.push(url); },
+      maxAttempts: 3,
+      wait: async () => undefined,
+    });
+
+    await worker.runOnce();
+
+    expect(await repo.getJob(job.id)).toMatchObject({ status: 'completed' });
+    expect(provider.videoCalls[0]?.videoUrl).toBe('https://fresh.trycloudflare.com/api/model-videos/demo/content?token=abc');
+    expect(releasedUrls).toEqual(['https://fresh.trycloudflare.com/api/model-videos/demo/content?token=abc']);
+  });
+
   it('repairs malformed JSON exactly once', async () => {
     const repaired = JSON.stringify(validAnalysis);
     const ctx = await setup(new FakeProvider(['not-json'], repaired));

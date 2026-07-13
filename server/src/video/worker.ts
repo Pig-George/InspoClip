@@ -4,7 +4,7 @@ import type { VideoRecord, VideoRepository } from './repository.js';
 
 export interface VideoWorkerOptions {
   videoUrlFor(video: VideoRecord): string | Promise<string>;
-  ensureVideoUrlAvailable?(url: string): Promise<void>;
+  ensureVideoUrlAvailable?(url: string): Promise<void | string>;
   releaseVideoUrl?(url: string, video: VideoRecord): Promise<void> | void;
   maxAttempts?: number;
   pollIntervalMs?: number;
@@ -54,7 +54,8 @@ export class VideoWorker {
       video = await this.repository.getVideo(job.videoId);
       if (!video) throw new Error('Video not found');
       videoUrl = await this.options.videoUrlFor(video);
-      await this.options.ensureVideoUrlAvailable?.(videoUrl);
+      const availableUrl = await this.options.ensureVideoUrlAvailable?.(videoUrl);
+      if (availableUrl) videoUrl = availableUrl;
       const result = await this.aiService.analyzeVideo({
         videoUrl, fps: job.fps,
       });

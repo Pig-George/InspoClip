@@ -141,6 +141,8 @@ docker compose up -d --build
 | `AI_MODEL` | 模型名称 | `gpt-5.4` |
 | `MODEL_VIDEO_PUBLIC_BASE_URL` | 云端视频模型实际访问的视频公网地址；用于 `/api/model-videos/:id/content` 临时授权链接 | `PUBLIC_BASE_URL` |
 | `MODEL_VIDEO_VERIFY_BASE_URL` | 可选：视频公网地址预检覆盖值；默认留空并跟随 `MODEL_VIDEO_PUBLIC_BASE_URL`，避免只验证内网代理 | 空 |
+| `TUNNEL_MANAGER_URL` | Docker 内部 tunnel-manager 地址；视频分析预检失败时会调用它刷新 trycloudflare 公网地址 | `http://tunnel-manager:3002` |
+| `TUNNEL_TARGET_URL` | cloudflared 暴露到公网的容器内目标地址 | `http://client:80` |
 | `PORT` | 前端端口 | `8080` |
 
 ## 项目结构
