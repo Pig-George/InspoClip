@@ -6,7 +6,16 @@ type RuntimeManifest = {
   content_scripts?: ManifestContentScript[]
 }
 
+export type TabAccessMessages = {
+  inaccessiblePage: string
+  inaccessibleFilePage: string
+}
+
 const INJECTABLE_PROTOCOLS = new Set(["http:", "https:"])
+const DEFAULT_TAB_ACCESS_MESSAGES: TabAccessMessages = {
+  inaccessiblePage: "Cannot access this page. Please open a normal http/https webpage and try again.",
+  inaccessibleFilePage: "Cannot access local file pages. Please open a normal http/https webpage, or enable file access for this extension in Chrome."
+}
 
 export function getManifestContentScriptFiles(manifest: RuntimeManifest): string[] {
   return (manifest.content_scripts || []).flatMap((script) => script.js || [])
@@ -21,24 +30,24 @@ export function isInjectableTabUrl(url?: string): boolean {
   }
 }
 
-export function getTabAccessErrorMessage(url?: string): string {
-  if (!url) return "Cannot access this page. Please open a normal http/https webpage and try again."
+export function getTabAccessErrorMessage(url?: string, messages: TabAccessMessages = DEFAULT_TAB_ACCESS_MESSAGES): string {
+  if (!url) return messages.inaccessiblePage
   let protocol = ""
   try {
     protocol = new URL(url).protocol
   } catch {
-    return "Cannot access this page. Please open a normal http/https webpage and try again."
+    return messages.inaccessiblePage
   }
   if (protocol === "file:") {
-    return "Cannot access local file pages. Please open a normal http/https webpage, or enable file access for this extension in Chrome."
+    return messages.inaccessibleFilePage
   }
-  return "Cannot access this page. Browser-managed pages such as chrome://, extension pages, and blank tabs cannot show the InspoClip analysis panel."
+  return messages.inaccessiblePage
 }
 
-export async function sendCurrentTabMessage(message: unknown): Promise<void> {
+export async function sendCurrentTabMessage(message: unknown, accessMessages?: TabAccessMessages): Promise<void> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   if (!tab?.id) throw new Error("No active tab")
-  if (!isInjectableTabUrl(tab.url)) throw new Error(getTabAccessErrorMessage(tab.url))
+  if (!isInjectableTabUrl(tab.url)) throw new Error(getTabAccessErrorMessage(tab.url, accessMessages))
   await sendTabMessageWithContentScriptFallback(tab.id, message)
 }
 

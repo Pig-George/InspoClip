@@ -44,7 +44,9 @@ export const I18N: Record<Locale, I18nMessages> = {
     fetchingVideo: "Fetching video…",
     waitingAnalysis: "Waiting for analysis…",
     analysisCompleted: "Analysis completed",
-    starting: "Starting..."
+    starting: "Starting...",
+    inaccessiblePage: "Cannot access this page. Please open a normal http/https webpage and try again.",
+    inaccessibleFilePage: "Cannot access local file pages. Please open a normal http/https webpage, or enable file access for this extension in Chrome."
   },
   zh: {
     subtitle: "设计灵感剪贴簿",
@@ -78,7 +80,9 @@ export const I18N: Record<Locale, I18nMessages> = {
     fetchingVideo: "获取视频…",
     waitingAnalysis: "等待分析…",
     analysisCompleted: "分析完成",
-    starting: "启动中..."
+    starting: "启动中...",
+    inaccessiblePage: "无法访问当前页面。请打开普通的 http/https 网页后再试。",
+    inaccessibleFilePage: "无法访问本地文件页面。请打开普通的 http/https 网页，或在 Chrome 扩展管理页为此扩展开启本地文件访问权限。"
   }
 }
 

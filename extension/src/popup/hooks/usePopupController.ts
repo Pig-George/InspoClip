@@ -85,7 +85,7 @@ export function usePopupController() {
     setAnalyzing(true)
     const msg = captureMode === "area" ? { type: "START_AREA_CAPTURE", mode: "analyze" } : { type: "ANALYZE_PAGE" }
     try {
-      await sendCurrentTabMessage(msg)
+      await sendCurrentTabMessage(msg, t)
       setTimeout(() => window.close(), 200)
     } catch (err) {
       showStatus(err instanceof Error ? err.message : "Failed to start analysis", "error")
@@ -100,7 +100,7 @@ export function usePopupController() {
         ? { type: "START_AREA_CAPTURE", mode: "save" }
         : { type: "SAVE_IMAGE", imageUrl: null, isImage: false }
     try {
-      await sendCurrentTabMessage(msg)
+      await sendCurrentTabMessage(msg, t)
       setTimeout(() => window.close(), 200)
     } catch (err) {
       showStatus(err instanceof Error ? err.message : "Failed to start save", "error")
@@ -127,7 +127,7 @@ export function usePopupController() {
       await sendCurrentTabMessage({
         ...(await buildAssetAnalysisMessage(file)),
         serverUrl
-      })
+      }, t)
       setTimeout(() => window.close(), 150)
     } catch (err) {
       showStatus(err instanceof Error ? err.message : "Upload failed", "error")
@@ -142,7 +142,7 @@ export function usePopupController() {
         videoUrl: assetUrl,
         fileName: assetUrl.split("/").pop() || "web-video.mp4",
         serverUrl
-      })
+      }, t)
       setTimeout(() => window.close(), 150)
     } catch (err) {
       showStatus(err instanceof Error ? err.message : "Upload failed", "error")

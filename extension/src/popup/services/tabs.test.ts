@@ -30,4 +30,14 @@ describe("popup tab messaging helpers", () => {
   test("explains why the current page cannot receive analysis UI", () => {
     expect(getTabAccessErrorMessage("chrome://extensions/")).toContain("Cannot access this page")
   })
+
+  test("uses localized tab access warnings when provided", () => {
+    const messages = {
+      inaccessiblePage: "无法访问当前页面。请打开普通的 http/https 网页后再试。",
+      inaccessibleFilePage: "无法访问本地文件页面。"
+    }
+
+    expect(getTabAccessErrorMessage("chrome://extensions/", messages)).toBe(messages.inaccessiblePage)
+    expect(getTabAccessErrorMessage("file:///Users/demo/video.html", messages)).toBe(messages.inaccessibleFilePage)
+  })
 })

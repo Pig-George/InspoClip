@@ -56,4 +56,6 @@ export type I18nMessages = {
   waitingAnalysis: string
   analysisCompleted: string
   starting: string
+  inaccessiblePage: string
+  inaccessibleFilePage: string
 }
