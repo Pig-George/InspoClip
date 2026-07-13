@@ -3,6 +3,7 @@ import { db } from '../db/index.js';
 import { weeks, images, terms as termsTable, notes, tags as tagsTable, imageTags, imageColors as imageColorsTable, videos, videoAnalysisJobs, videoAnalyses, videoTags } from '../db/schema.js';
 import { eq, inArray, and, gte, lt, desc } from 'drizzle-orm';
 import { cardSummaryFromAnalysis } from '../video/summary.js';
+import { visibleSavedVideos } from '../video/visibility.js';
 
 const router: ExpressRouter = Router();
 
@@ -48,8 +49,8 @@ async function loadWeekPayload(week: typeof weeks.$inferSelect) {
     .where(eq(images.weekId, weekId))
     .orderBy(images.sortOrder, images.createdAt);
 
-  const weekVideos = await db.select().from(videos)
-    .where(eq(videos.weekId, weekId)).orderBy(videos.sortOrder, videos.createdAt);
+  const weekVideos = visibleSavedVideos(await db.select().from(videos)
+    .where(and(eq(videos.weekId, weekId), eq(videos.isSaved, true))).orderBy(videos.sortOrder, videos.createdAt));
   const videoIds = weekVideos.map((video) => video.id);
   const videoJobs = videoIds.length > 0
     ? await db.select().from(videoAnalysisJobs).where(inArray(videoAnalysisJobs.videoId, videoIds)).orderBy(desc(videoAnalysisJobs.createdAt))
@@ -170,7 +171,8 @@ router.get('/content-days', async (req: Request, res: Response) => {
     const videoCandidates = await db
       .select({ weekStart: weeks.weekStart, dayOfWeek: videos.dayOfWeek })
       .from(videos)
-      .innerJoin(weeks, eq(videos.weekId, weeks.id));
+      .innerJoin(weeks, eq(videos.weekId, weeks.id))
+      .where(eq(videos.isSaved, true));
 
     const weekStarts = getContentWeekStarts(
       [...imageCandidates, ...videoCandidates],
@@ -237,8 +239,8 @@ router.get('/:date', async (req: Request, res: Response) => {
       .where(eq(images.weekId, weekId))
       .orderBy(images.sortOrder, images.createdAt);
 
-    const weekVideos = await db.select().from(videos)
-      .where(eq(videos.weekId, weekId)).orderBy(videos.sortOrder, videos.createdAt);
+    const weekVideos = visibleSavedVideos(await db.select().from(videos)
+      .where(and(eq(videos.weekId, weekId), eq(videos.isSaved, true))).orderBy(videos.sortOrder, videos.createdAt));
     const videoIds = weekVideos.map((video) => video.id);
     const videoJobs = videoIds.length > 0
       ? await db.select().from(videoAnalysisJobs).where(inArray(videoAnalysisJobs.videoId, videoIds)).orderBy(desc(videoAnalysisJobs.createdAt))

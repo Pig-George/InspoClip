@@ -10,12 +10,13 @@ import {
   videoTags,
   tags as tagsTable,
 } from '../db/schema.js';
-import { eq, inArray, desc } from 'drizzle-orm';
+import { and, eq, inArray, desc } from 'drizzle-orm';
 import fs from 'fs/promises';
 import path from 'path';
 import { createRequire } from 'module';
 import type { LocalizedString, VideoAnalysis } from '../ai/types.js';
 import { cardSummaryFromAnalysis } from '../video/summary.js';
+import { visibleSavedVideos } from '../video/visibility.js';
 
 const require = createRequire(import.meta.url);
 const { ZipArchive } = require('archiver');
@@ -30,6 +31,7 @@ type ExportImage = {
 
 type ExportVideo = {
   id: string;
+  isSaved?: boolean;
   dayOfWeek: number | null;
   filePath: string;
   thumbnailPath: string | null;
@@ -260,7 +262,9 @@ async function getWeekData(dateStr: string) {
     termsByImage[imgId].push(term.keyword);
   }
 
-  const weekVideos = await db.select().from(videos).where(eq(videos.weekId, week.id)).orderBy(videos.dayOfWeek, videos.createdAt);
+  const weekVideos = visibleSavedVideos(await db.select().from(videos)
+    .where(and(eq(videos.weekId, week.id), eq(videos.isSaved, true)))
+    .orderBy(videos.dayOfWeek, videos.createdAt));
   const videoIds = weekVideos.map((video) => video.id);
   const allVideoAnalyses = videoIds.length > 0
     ? await db.select().from(videoAnalyses).where(inArray(videoAnalyses.videoId, videoIds))

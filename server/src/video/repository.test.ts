@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryVideoRepository } from './repository.js';
 import type { VideoAnalysis } from '../ai/types.js';
+import { visibleSavedVideos } from './visibility.js';
 
 const analysis: VideoAnalysis = {
   summary: 'Dashboard interaction',
@@ -124,5 +125,18 @@ describe('InMemoryVideoRepository', () => {
     const same = await repo.savePromptOutput(video.id, 'general', '', 'replacement-en', 'replacement-zh');
     expect(same.id).toBe(saved.id);
     expect((await repo.getPromptOutput(video.id, 'general', ''))?.contentEn).toBe('replacement-en');
+  });
+});
+
+describe('video visibility helpers', () => {
+  it('excludes draft videos from client-facing collections', () => {
+    expect(visibleSavedVideos([
+      { id: 'draft-video', isSaved: false },
+      { id: 'saved-video', isSaved: true },
+      { id: 'legacy-video' },
+    ])).toEqual([
+      { id: 'saved-video', isSaved: true },
+      { id: 'legacy-video' },
+    ]);
   });
 });
