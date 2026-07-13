@@ -31,6 +31,18 @@ describe("video helpers", () => {
     expect((calls[0][1].body as FormData).get("source")).toBe("extension")
   })
 
+  test("can upload a video blob as an unsaved draft for analysis", async () => {
+    const calls: Array<[string, RequestInit]> = []
+    const fetchFn = (async (url: string, options: RequestInit) => {
+      calls.push([url, options])
+      return { ok: true, json: async () => ({ videoId: "v", jobId: "j", status: "pending" }) }
+    }) as typeof fetch
+
+    await uploadVideoBlob(fetchFn, "http://localhost:3001/", new Blob(["x"], { type: "video/mp4" }), "demo.mp4", { draft: true })
+
+    expect((calls[0][1].body as FormData).get("draft")).toBe("true")
+  })
+
   test("polling stops on completed status", async () => {
     let calls = 0
     const fetchFn = (async () => ({

@@ -20,6 +20,7 @@ export interface CreateVideoInput {
   width: number;
   height: number;
   source: VideoSource;
+  isSaved?: boolean;
 }
 
 export interface VideoRecord extends Omit<CreateVideoInput, 'weekId' | 'dayOfWeek' | 'sortOrder'> {
@@ -28,6 +29,7 @@ export interface VideoRecord extends Omit<CreateVideoInput, 'weekId' | 'dayOfWee
   dayOfWeek: number | null;
   sortOrder: number;
   thumbnailPath: string | null;
+  isSaved: boolean;
   createdAt: Date;
 }
 
@@ -87,6 +89,7 @@ export interface VideoRepository {
   getAnalysis(videoId: string): Promise<VideoAnalysisRecord | null>;
   savePromptOutput(videoId: string, purpose: string, target: string, contentEn: string, contentZh: string): Promise<VideoPromptOutputRecord>;
   getPromptOutput(videoId: string, purpose: string, target: string): Promise<VideoPromptOutputRecord | null>;
+  saveVideo(id: string): Promise<VideoRecord | null>;
   deleteVideo(id: string): Promise<VideoRecord | null>;
 }
 
@@ -99,7 +102,8 @@ export class InMemoryVideoRepository implements VideoRepository {
   async createVideo(input: CreateVideoInput): Promise<VideoRecord> {
     const record: VideoRecord = {
       ...input, id: randomUUID(), weekId: input.weekId ?? null, dayOfWeek: input.dayOfWeek ?? null,
-      sortOrder: input.sortOrder ?? 0, thumbnailPath: input.thumbnailPath ?? null, createdAt: new Date(),
+      sortOrder: input.sortOrder ?? 0, thumbnailPath: input.thumbnailPath ?? null,
+      isSaved: input.isSaved ?? true, createdAt: new Date(),
     };
     this.videos.set(record.id, record);
     return record;
@@ -108,7 +112,7 @@ export class InMemoryVideoRepository implements VideoRepository {
   async getVideo(id: string): Promise<VideoRecord | null> { return this.videos.get(id) ?? null; }
   async listVideosForWeek(weekId: string): Promise<VideoWithJob[]> {
     return Promise.all([...this.videos.values()]
-      .filter((video) => video.weekId === weekId)
+      .filter((video) => video.weekId === weekId && video.isSaved)
       .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime())
       .map(async (video) => ({ ...video, job: await this.getLatestJobForVideo(video.id) })));
   }
@@ -199,6 +203,13 @@ export class InMemoryVideoRepository implements VideoRepository {
     return this.outputs.get(this.outputKey(analysis.id, purpose, target)) ?? null;
   }
 
+  async saveVideo(id: string): Promise<VideoRecord | null> {
+    const video = this.videos.get(id) ?? null;
+    if (!video) return null;
+    video.isSaved = true;
+    return { ...video };
+  }
+
   async deleteVideo(id: string): Promise<VideoRecord | null> {
     const video = this.videos.get(id) ?? null;
     if (!video) return null;
@@ -213,7 +224,7 @@ export class DrizzleVideoRepository implements VideoRepository {
   constructor(private readonly database: typeof db = db) {}
 
   async createVideo(input: CreateVideoInput): Promise<VideoRecord> {
-    const [record] = await this.database.insert(videos).values(input).returning();
+    const [record] = await this.database.insert(videos).values({ ...input, isSaved: input.isSaved ?? true }).returning();
     return record as VideoRecord;
   }
 
@@ -224,7 +235,7 @@ export class DrizzleVideoRepository implements VideoRepository {
 
   async listVideosForWeek(weekId: string): Promise<VideoWithJob[]> {
     const records = await this.database.select().from(videos)
-      .where(eq(videos.weekId, weekId)).orderBy(asc(videos.sortOrder), asc(videos.createdAt));
+      .where(and(eq(videos.weekId, weekId), eq(videos.isSaved, true))).orderBy(asc(videos.sortOrder), asc(videos.createdAt));
     return Promise.all(records.map(async (record) => ({
       ...(record as VideoRecord), job: await this.getLatestJobForVideo(record.id),
     })));
@@ -323,6 +334,11 @@ export class DrizzleVideoRepository implements VideoRepository {
       eq(videoPromptOutputs.target, target),
     )).limit(1);
     return (record as VideoPromptOutputRecord | undefined) ?? null;
+  }
+
+  async saveVideo(id: string): Promise<VideoRecord | null> {
+    const [record] = await this.database.update(videos).set({ isSaved: true }).where(eq(videos.id, id)).returning();
+    return (record as VideoRecord | undefined) ?? null;
   }
 
   async deleteVideo(id: string): Promise<VideoRecord | null> {

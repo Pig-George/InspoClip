@@ -30,15 +30,22 @@ export async function uploadVideoBlob<T = unknown>(
   fetchFn: typeof fetch,
   serverUrl: string,
   blob: Blob,
-  filename?: string
+  filename?: string,
+  options?: { draft?: boolean }
 ): Promise<T> {
   const form = new FormData()
   form.append("video", blob, filename || "video.mp4")
   form.append("source", "extension")
+  if (options?.draft) form.append("draft", "true")
   return responseJson<T>(await fetchFn(`${trimBase(serverUrl)}/api/videos`, { method: "POST", body: form }))
 }
 
-export async function uploadVideoUrl<T = unknown>(fetchFn: typeof fetch, serverUrl: string, videoUrl: string): Promise<T> {
+export async function uploadVideoUrl<T = unknown>(
+  fetchFn: typeof fetch,
+  serverUrl: string,
+  videoUrl: string,
+  options?: { draft?: boolean }
+): Promise<T> {
   if (!isSupportedVideoUrl(videoUrl)) {
     throw new Error("Blob or protected video URLs must be downloaded and uploaded as a local file")
   }
@@ -50,7 +57,7 @@ export async function uploadVideoUrl<T = unknown>(fetchFn: typeof fetch, serverU
 
   const blob = await response.blob()
   const name = new URL(videoUrl).pathname.split("/").pop() || "web-video.mp4"
-  return uploadVideoBlob<T>(fetchFn, serverUrl, blob, name)
+  return uploadVideoBlob<T>(fetchFn, serverUrl, blob, name, options)
 }
 
 export async function pollVideoJob<T extends { status: string }>(

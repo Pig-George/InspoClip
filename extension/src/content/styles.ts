@@ -717,6 +717,98 @@
       font-weight: 600;
     }
 
+    .inspoclip-video-prompt-section {
+      background: linear-gradient(135deg, #fffaf2, #f7ead6);
+      border: 1px solid #ead8ba;
+      border-radius: 14px;
+      padding: 10px;
+    }
+
+    .inspoclip-video-purpose-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .inspoclip-video-purpose-btn {
+      border: 1px solid #e2c9a8;
+      background: #fff8ef;
+      color: #6b4a3a;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: all 0.2s ease;
+    }
+
+    .inspoclip-video-purpose-btn:hover,
+    .inspoclip-video-purpose-btn.active {
+      background: #c0784a;
+      border-color: #c0784a;
+      color: #fff;
+    }
+
+    .inspoclip-video-prompt-target-wrap {
+      margin-bottom: 8px;
+    }
+
+    .inspoclip-video-prompt-target {
+      box-sizing: border-box;
+      width: 100%;
+      border: 1px solid #e2c9a8;
+      border-radius: 10px;
+      background: #fffdf8;
+      color: #4a3028;
+      font-size: 11px;
+      padding: 7px 9px;
+      outline: none;
+      pointer-events: auto;
+    }
+
+    .inspoclip-video-prompt-target:focus {
+      border-color: #c0784a;
+      box-shadow: 0 0 0 2px rgba(192, 120, 74, 0.12);
+    }
+
+    .inspoclip-video-prompt-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .inspoclip-video-prompt-generate {
+      min-height: 26px;
+      padding: 6px 10px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .inspoclip-video-prompt-output {
+      max-height: 220px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      border-radius: 12px;
+      border: 1px dashed #ddc39d;
+      background: rgba(255, 253, 248, 0.92);
+      color: #4a3028;
+      font-size: 11px;
+      line-height: 1.6;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .inspoclip-video-prompt-placeholder {
+      color: #9a8070;
+      font-family: inherit;
+    }
+
     .inspoclip-empty {
       color: #9a8070;
       font-size: 11px;

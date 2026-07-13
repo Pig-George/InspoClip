@@ -1,10 +1,10 @@
 import { buildClientVideoUrl, uploadVideoUrl } from "../video"
 import { getAppUrl, getServerUrl } from "./settings"
 
-export async function saveVideoFromUrl(url?: string, explicitServerUrl?: string) {
+export async function saveVideoFromUrl(url?: string, explicitServerUrl?: string, options?: { draft?: boolean }) {
   if (!url) throw new Error("No video URL found")
   const serverUrl = explicitServerUrl || (await getServerUrl())
-  return uploadVideoUrl<{ videoId: string; jobId: string; status: string }>(fetch, serverUrl, url)
+  return uploadVideoUrl<{ videoId: string; jobId: string; status: string }>(fetch, serverUrl, url, options)
 }
 
 export async function openVideoInApp(videoId: string): Promise<void> {

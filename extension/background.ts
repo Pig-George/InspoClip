@@ -95,7 +95,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "UPLOAD_VIDEO_URL") {
-    saveVideoFromUrl(message.url, message.serverUrl)
+    saveVideoFromUrl(message.url, message.serverUrl, { draft: message.draft === true })
       .then((result) => sendResponse({ success: true, ...result }))
       .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Upload failed" }))
     return true

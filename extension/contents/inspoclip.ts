@@ -49,6 +49,7 @@ export const config: PlasmoCSConfig = {
   let analyzedData = null;
   let capturedBlob = null;
   let lastPreviewUrl = null;
+  let currentAssetResult = null;
 
   // Analysis history
   let analysisHistory = []; // [{data, previewUrl, timestamp}]
@@ -57,6 +58,9 @@ export const config: PlasmoCSConfig = {
   let serverUrl = 'http://localhost:3001';
   let locale = (navigator.language || 'en').startsWith('zh') ? 'zh' : 'en';
   let promptLangMode = 'auto';
+  let videoPromptLangMode = 'auto';
+  let videoPromptPurpose = 'general';
+  let videoPromptTarget = '';
 
   // Load server URL
   chrome.storage.sync.get(['serverUrl', 'lang'], (result) => {
@@ -536,6 +540,7 @@ export const config: PlasmoCSConfig = {
     removeFloatingTab();
     analyzedData = null;
     capturedBlob = null;
+    currentAssetResult = null;
 
     // Phase 1: Show toast
     showToast(locale === 'zh' ? '正在分析...' : 'Analyzing...');
@@ -598,6 +603,7 @@ export const config: PlasmoCSConfig = {
     removeFloatingTab();
     analyzedData = null;
     capturedBlob = null;
+    currentAssetResult = null;
 
     if (asset.serverUrl) serverUrl = asset.serverUrl;
 
@@ -658,6 +664,7 @@ export const config: PlasmoCSConfig = {
       const formData = new FormData();
       formData.append('video', videoBlob, asset.fileName || 'asset-video.mp4');
       formData.append('source', 'extension');
+      formData.append('draft', 'true');
       const res = await fetch(`${serverUrl}/api/videos`, { method: 'POST', body: formData });
       if (!res.ok) throw new Error(await readableError(res, 'Video upload failed'));
       uploadResult = await res.json();
@@ -673,11 +680,12 @@ export const config: PlasmoCSConfig = {
     const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
     if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
     const detail = await detailRes.json();
+    currentAssetResult = { kind: 'video', detail };
     transitionToVideoModal(detail, window.innerWidth - 20, 20);
   }
 
   async function uploadVideoUrlFromBackground(videoUrl) {
-    const response = await chrome.runtime.sendMessage({ type: 'UPLOAD_VIDEO_URL', url: videoUrl, serverUrl });
+    const response = await chrome.runtime.sendMessage({ type: 'UPLOAD_VIDEO_URL', url: videoUrl, serverUrl, draft: true });
     if (!response?.success) throw new Error(response?.error || 'Video upload failed');
     return response;
   }
@@ -808,8 +816,130 @@ export const config: PlasmoCSConfig = {
     return `${seconds.toFixed(seconds % 1 === 0 ? 0 : 1)}s`;
   }
 
+  const videoPurposeOptions = [
+    { value: 'general', zh: '通用', en: 'General' },
+    { value: 'video-generation', zh: '视频生成', en: 'Video' },
+    { value: 'frontend', zh: '前端实现', en: 'Frontend' },
+    { value: 'motion-design', zh: '动效设计', en: 'Motion' },
+    { value: 'storyboard', zh: '分镜', en: 'Storyboard' },
+    { value: 'json', zh: 'JSON', en: 'JSON' },
+  ];
+
+  function videoPurposeLabel(value) {
+    const item = videoPurposeOptions.find((option) => option.value === value);
+    return item ? (locale === 'zh' ? item.zh : item.en) : value;
+  }
+
+  function getVideoPromptOutputText(output) {
+    if (!output) return '';
+    if (videoPromptLangMode === 'en') return output.contentEn || '';
+    if (videoPromptLangMode === 'zh') return output.contentZh || output.contentEn || '';
+    if (videoPromptLangMode === 'both') {
+      return `EN\n${output.contentEn || ''}\n\n中文\n${output.contentZh || output.contentEn || ''}`.trim();
+    }
+    return locale === 'zh' ? (output.contentZh || output.contentEn || '') : (output.contentEn || output.contentZh || '');
+  }
+
+  async function renderVideoPromptOutput(modal, output, statusText = '') {
+    const outputEl = modal.querySelector('#inspoclip-video-prompt-output');
+    const copyBtn = modal.querySelector('[data-video-prompt-copy]');
+    if (!outputEl) return;
+    const text = getVideoPromptOutputText(output);
+    outputEl.textContent = statusText || text || (locale === 'zh' ? '选择用途后点击生成，得到可复刻此视频效果的提示词。' : 'Choose a purpose and generate a prompt to recreate this video effect.');
+    outputEl.classList.toggle('inspoclip-video-prompt-placeholder', !text && !!statusText);
+    if (copyBtn) copyBtn.disabled = !text;
+  }
+
+  function bindVideoPromptPanel(modal, videoId) {
+    if (!videoId) return;
+    const generateBtn = modal.querySelector('.inspoclip-video-prompt-generate');
+    const targetInput = modal.querySelector('.inspoclip-video-prompt-target');
+    const targetWrap = modal.querySelector('.inspoclip-video-prompt-target-wrap');
+    const copyBtn = modal.querySelector('[data-video-prompt-copy]');
+
+    const refreshTargetVisibility = () => {
+      if (!targetWrap) return;
+      targetWrap.style.display = ['general', 'json'].includes(videoPromptPurpose) ? 'none' : 'block';
+    };
+
+    const loadExisting = async () => {
+      const params = new URLSearchParams({ purpose: videoPromptPurpose });
+      if (videoPromptTarget.trim()) params.set('target', videoPromptTarget.trim());
+      const res = await fetch(`${serverUrl}/api/videos/${videoId}/prompts?${params.toString()}`);
+      if (res.ok) {
+        renderVideoPromptOutput(modal, await res.json());
+      } else if (res.status === 404) {
+        renderVideoPromptOutput(modal, null);
+      }
+    };
+
+    const generate = async () => {
+      generateBtn.disabled = true;
+      generateBtn.textContent = locale === 'zh' ? '生成中...' : 'Generating...';
+      renderVideoPromptOutput(modal, null, locale === 'zh' ? '正在生成复刻提示词...' : 'Generating replication prompt...');
+      try {
+        const body = { purpose: videoPromptPurpose, target: videoPromptTarget.trim() };
+        const res = await fetch(`${serverUrl}/api/videos/${videoId}/prompts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(await readableError(res, 'Prompt generation failed'));
+        renderVideoPromptOutput(modal, await res.json());
+      } catch (err) {
+        renderVideoPromptOutput(modal, null, locale === 'zh' ? `生成失败: ${err.message}` : `Generation failed: ${err.message}`);
+      } finally {
+        generateBtn.disabled = false;
+        generateBtn.textContent = locale === 'zh' ? '生成' : 'Generate';
+      }
+    };
+
+    modal.querySelectorAll('.inspoclip-video-purpose-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        videoPromptPurpose = btn.dataset.purpose;
+        modal.querySelectorAll('.inspoclip-video-purpose-btn').forEach((item) => item.classList.remove('active'));
+        btn.classList.add('active');
+        refreshTargetVisibility();
+        loadExisting().catch(() => renderVideoPromptOutput(modal, null));
+      });
+    });
+
+    modal.querySelectorAll('.inspoclip-video-lang-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        videoPromptLangMode = btn.dataset.lang;
+        modal.querySelectorAll('.inspoclip-video-lang-btn').forEach((item) => item.classList.remove('active'));
+        btn.classList.add('active');
+        loadExisting().catch(() => renderVideoPromptOutput(modal, null));
+      });
+    });
+
+    if (targetInput) {
+      targetInput.value = videoPromptTarget;
+      targetInput.addEventListener('input', () => { videoPromptTarget = targetInput.value; });
+      targetInput.addEventListener('change', () => loadExisting().catch(() => renderVideoPromptOutput(modal, null)));
+    }
+    if (generateBtn) generateBtn.addEventListener('click', generate);
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        const text = modal.querySelector('#inspoclip-video-prompt-output')?.textContent || '';
+        if (!text) return;
+        await navigator.clipboard.writeText(text).catch(() => undefined);
+        copyBtn.innerHTML = getCopyButtonIcon('copied');
+        copyBtn.classList.add('inspoclip-copy-all-copied');
+        setTimeout(() => {
+          copyBtn.innerHTML = getCopyButtonIcon();
+          copyBtn.classList.remove('inspoclip-copy-all-copied');
+        }, 1500);
+      });
+    }
+
+    refreshTargetVisibility();
+    loadExisting().catch(() => renderVideoPromptOutput(modal, null));
+  }
+
   function showVideoModal(detail, originX, originY) {
     removeModal();
+    currentAssetResult = { kind: 'video', detail };
 
     const video = detail.video || {};
     const analysis = detail.analysis || {};
@@ -890,6 +1020,33 @@ export const config: PlasmoCSConfig = {
             </div>
           </div>
 
+          <div class="inspoclip-section inspoclip-video-prompt-section">
+            <div class="inspoclip-section-header">
+              <span class="inspoclip-section-title">${locale === 'zh' ? '复刻输出' : 'Replication Output'}</span>
+              <button class="inspoclip-copy-all" data-video-prompt-copy title="${getCopyButtonTitle(locale)}" aria-label="${getCopyButtonTitle(locale)}" disabled>${getCopyButtonIcon()}</button>
+            </div>
+            <div class="inspoclip-video-purpose-group">
+              ${videoPurposeOptions.map((item) => `
+                <button class="inspoclip-video-purpose-btn ${item.value === videoPromptPurpose ? 'active' : ''}" data-purpose="${item.value}">
+                  ${escapeHtml(locale === 'zh' ? item.zh : item.en)}
+                </button>
+              `).join('')}
+            </div>
+            <div class="inspoclip-video-prompt-target-wrap">
+              <input class="inspoclip-video-prompt-target" placeholder="${locale === 'zh' ? '目标场景，例如 React + Tailwind 组件' : 'Target, e.g. React + Tailwind component'}" />
+            </div>
+            <div class="inspoclip-video-prompt-toolbar">
+              <div class="inspoclip-lang-group">
+                <button class="inspoclip-lang-btn inspoclip-video-lang-btn ${videoPromptLangMode === 'auto' ? 'active' : ''}" data-lang="auto">Auto</button>
+                <button class="inspoclip-lang-btn inspoclip-video-lang-btn ${videoPromptLangMode === 'en' ? 'active' : ''}" data-lang="en">EN</button>
+                <button class="inspoclip-lang-btn inspoclip-video-lang-btn ${videoPromptLangMode === 'zh' ? 'active' : ''}" data-lang="zh">中</button>
+                <button class="inspoclip-lang-btn inspoclip-video-lang-btn ${videoPromptLangMode === 'both' ? 'active' : ''}" data-lang="both">EN/中</button>
+              </div>
+              <button class="inspoclip-btn inspoclip-btn-secondary inspoclip-video-prompt-generate">${locale === 'zh' ? '生成' : 'Generate'}</button>
+            </div>
+            <pre class="inspoclip-video-prompt-output inspoclip-video-prompt-placeholder" id="inspoclip-video-prompt-output">${locale === 'zh' ? '选择用途后点击生成，得到可复刻此视频效果的提示词。' : 'Choose a purpose and generate a prompt to recreate this video effect.'}</pre>
+          </div>
+
           ${assets.length || uncertainties.length ? `
             <div class="inspoclip-section">
               <div class="inspoclip-section-header">
@@ -903,6 +1060,11 @@ export const config: PlasmoCSConfig = {
 
         <div class="inspoclip-modal-footer">
           <button class="inspoclip-btn inspoclip-btn-secondary inspoclip-close-btn">${locale === 'zh' ? '关闭' : 'Close'}</button>
+          ${video.isSaved ? '' : `
+            <button class="inspoclip-btn inspoclip-btn-primary inspoclip-video-save-btn">
+              ${locale === 'zh' ? '保存到 InspoClip' : 'Save to InspoClip'}
+            </button>
+          `}
         </div>
       </div>
     `;
@@ -915,6 +1077,44 @@ export const config: PlasmoCSConfig = {
     modal.querySelector('.inspoclip-modal-close').addEventListener('click', removeModal);
     modal.querySelector('.inspoclip-close-btn').addEventListener('click', removeModal);
     modal.addEventListener('click', (e) => { if (e.target === modal) removeModal(); });
+    bindVideoPromptPanel(modal, video.id);
+    const saveBtn = modal.querySelector('.inspoclip-video-save-btn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        saveBtn.disabled = true;
+        saveBtn.textContent = locale === 'zh' ? '保存中...' : 'Saving...';
+        try {
+          const res = await fetch(`${serverUrl}/api/videos/${video.id}/save`, { method: 'POST' });
+          if (!res.ok) throw new Error(await readableError(res, 'Save failed'));
+          const saved = await res.json();
+          detail.video = saved.video || { ...video, isSaved: true };
+          currentAssetResult = { kind: 'video', detail };
+          saveBtn.textContent = locale === 'zh' ? '✓ 已保存' : '✓ Saved';
+          saveBtn.style.background = '#4caf50';
+          saveBtn.style.borderColor = '#4caf50';
+          setTimeout(() => {
+            saveBtn.style.transition = 'width 0.35s ease, opacity 0.25s ease, padding 0.35s ease, margin 0.35s ease';
+            saveBtn.style.width = saveBtn.offsetWidth + 'px';
+            requestAnimationFrame(() => {
+              saveBtn.style.width = '0';
+              saveBtn.style.opacity = '0';
+              saveBtn.style.padding = '0';
+              saveBtn.style.margin = '0';
+              saveBtn.style.borderWidth = '0';
+            });
+            setTimeout(() => saveBtn.remove(), 400);
+          }, 1000);
+        } catch (err) {
+          saveBtn.textContent = locale === 'zh' ? '保存失败' : 'Save failed';
+          saveBtn.style.background = '#f44336';
+          setTimeout(() => {
+            saveBtn.disabled = false;
+            saveBtn.textContent = locale === 'zh' ? '保存到 InspoClip' : 'Save to InspoClip';
+            saveBtn.style.background = '';
+          }, 2000);
+        }
+      });
+    }
   }
 
   // ---- Modal ----
@@ -1185,8 +1385,8 @@ export const config: PlasmoCSConfig = {
       if (modal) modal.classList.remove('inspoclip-modal-visible');
       setTimeout(() => {
         overlay.remove();
-        // Show floating tab after modal is gone, if we have data
-        if (analyzedData) showFloatingTab();
+        // Show floating tab after modal is gone, if we have image or video analysis data
+        if (analyzedData || currentAssetResult) showFloatingTab();
       }, 350);
       currentModal = null;
     }
@@ -1284,7 +1484,10 @@ export const config: PlasmoCSConfig = {
 
     const tab = document.createElement('div');
     tab.className = 'inspoclip-tab';
-    tab.innerHTML = `<span class="inspoclip-tab-arrow">◂</span><span class="inspoclip-tab-label">InspoClip</span>`;
+    const tabLabel = currentAssetResult?.kind === 'video'
+      ? (locale === 'zh' ? '视频分析' : 'Video')
+      : 'InspoClip';
+    tab.innerHTML = `<span class="inspoclip-tab-arrow">◂</span><span class="inspoclip-tab-label">${tabLabel}</span>`;
 
     // Restore last position
     const savedTop = localStorage.getItem('inspoclip-tab-top');
@@ -1311,7 +1514,11 @@ export const config: PlasmoCSConfig = {
       currentTab = null;
       setTimeout(() => {
         tab.remove();
-        showModal(analyzedData, lastPreviewUrl, tabX, tabY);
+        if (currentAssetResult?.kind === 'video') {
+          showVideoModal(currentAssetResult.detail, tabX, tabY);
+        } else {
+          showModal(analyzedData, lastPreviewUrl, tabX, tabY);
+        }
       }, 280);
     });
 
@@ -1378,17 +1585,22 @@ export const config: PlasmoCSConfig = {
 
     const items = [
       { icon: '👁', label: locale === 'zh' ? '查看分析结果' : 'View results', action: () => {
-        if (!analyzedData) { removeFloatingTab(); return; }
+        if (!analyzedData && !currentAssetResult) { removeFloatingTab(); return; }
         const tabEl = currentTab;
         const rect = tabEl ? tabEl.getBoundingClientRect() : { left: window.innerWidth - 20, top: 20, height: 40 };
         const tabX = rect.left;
         const tabY = rect.top + rect.height / 2;
         removeFloatingTab();
-        showModal(analyzedData, lastPreviewUrl, tabX, tabY);
+        if (currentAssetResult?.kind === 'video') {
+          showVideoModal(currentAssetResult.detail, tabX, tabY);
+        } else {
+          showModal(analyzedData, lastPreviewUrl, tabX, tabY);
+        }
       }},
       { icon: '🙈', label: locale === 'zh' ? '隐藏标签' : 'Hide tab', action: () => {
         removeFloatingTab();
         analyzedData = null; capturedBlob = null; lastPreviewUrl = null;
+        currentAssetResult = null;
         analysisHistory = []; historyIndex = -1;
       }},
     ];

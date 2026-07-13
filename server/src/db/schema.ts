@@ -1,4 +1,4 @@
-import { pgTable, uuid, date, integer, jsonb, smallint, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, boolean, date, integer, jsonb, smallint, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const weeks = pgTable('weeks', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -92,6 +92,7 @@ export const videos = pgTable('videos', {
   width: integer('width').notNull(),
   height: integer('height').notNull(),
   source: text('source').notNull(),
+  isSaved: boolean('is_saved').notNull().default(true),
   createdAt: timestamp('created_at').defaultNow(),
 });
 

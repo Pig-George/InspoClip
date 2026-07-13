@@ -49,6 +49,31 @@ describe('InMemoryVideoRepository', () => {
     ]);
   });
 
+  it('hides draft videos from weekly lists until they are saved', async () => {
+    const repo = new InMemoryVideoRepository();
+    const draft = await repo.createVideo({
+      filePath: 'draft.mp4', originalName: 'draft.mp4', mimeType: 'video/mp4',
+      sizeBytes: 100, durationMs: 8_000, width: 1280, height: 720, source: 'extension',
+      weekId: 'week-a', dayOfWeek: 3, sortOrder: 0, isSaved: false,
+    });
+    await repo.createVideo({
+      filePath: 'saved.mp4', originalName: 'saved.mp4', mimeType: 'video/mp4',
+      sizeBytes: 100, durationMs: 8_000, width: 1280, height: 720, source: 'client',
+      weekId: 'week-a', dayOfWeek: 4, sortOrder: 0,
+    });
+
+    await expect(repo.listVideosForWeek('week-a')).resolves.toMatchObject([
+      { originalName: 'saved.mp4' },
+    ]);
+
+    await repo.saveVideo(draft.id);
+
+    await expect(repo.listVideosForWeek('week-a')).resolves.toMatchObject([
+      { id: draft.id, isSaved: true },
+      { originalName: 'saved.mp4', isSaved: true },
+    ]);
+  });
+
   it('claims each pending job only once', async () => {
     const repo = new InMemoryVideoRepository();
     const video = await repo.createVideo({ filePath: 'v.mp4', originalName: 'v.mp4', mimeType: 'video/mp4', sizeBytes: 1, durationMs: 10_000, width: 1, height: 1, source: 'client' });

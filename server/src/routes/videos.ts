@@ -91,6 +91,7 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
       const thumbnailPath = `${file.filename}.thumb.jpg`;
       const generatedThumbnail = await deps.thumbnail(file.path, safeStoredPath(videoRoot, thumbnailPath)).catch(() => null);
       const source: VideoSource = req.body?.source === 'extension' ? 'extension' : 'client';
+      const isDraft = req.body?.draft === true || req.body?.draft === 'true';
       const requestedDay = Number(req.body?.dayOfWeek);
       const placement = typeof req.body?.weekId === 'string' && req.body.weekId && Number.isInteger(requestedDay) && requestedDay >= 0 && requestedDay <= 6
         ? { weekId: req.body.weekId, dayOfWeek: requestedDay }
@@ -100,6 +101,7 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
         filePath: file.filename, thumbnailPath: generatedThumbnail ? thumbnailPath : null,
         originalName: file.originalname, mimeType: file.mimetype, sizeBytes: file.size,
         durationMs: metadata.durationMs, width: metadata.width, height: metadata.height, source,
+        isSaved: !isDraft,
       });
       const settings = await deps.getModelSettings();
       const job = await deps.repository.createJob(video.id, settings.model, settings.fps);
@@ -108,6 +110,12 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
       await deps.removeFile(file.path).catch(() => undefined);
       res.status(400).json({ error: error instanceof Error ? error.message : 'Video upload failed' });
     }
+  });
+
+  router.post('/:id/save', async (req, res) => {
+    const video = await deps.repository.saveVideo(String(req.params.id));
+    if (!video) { res.status(404).json({ error: 'Video not found' }); return; }
+    res.json({ video });
   });
 
   router.get('/:id/content', async (req, res) => {

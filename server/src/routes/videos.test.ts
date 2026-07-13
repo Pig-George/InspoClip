@@ -53,6 +53,21 @@ describe('video routes', () => {
     expect(await repo.getJob(response.body.jobId)).toMatchObject({ model: 'qwen3.7-plus', fps: 3 });
   });
 
+  it('keeps draft uploads out of weekly lists until explicitly saved', async () => {
+    const { app, repo } = setup();
+    const uploaded = await request(app).post('/api/videos').send({ source: 'extension', draft: 'true' });
+    expect(uploaded.status).toBe(202);
+    expect(await repo.getVideo(uploaded.body.videoId)).toMatchObject({ source: 'extension', isSaved: false });
+    await expect(repo.listVideosForWeek('week-today')).resolves.toEqual([]);
+
+    const saved = await request(app).post(`/api/videos/${uploaded.body.videoId}/save`).send({});
+    expect(saved.status).toBe(200);
+    expect(saved.body.video).toMatchObject({ id: uploaded.body.videoId, isSaved: true });
+    await expect(repo.listVideosForWeek('week-today')).resolves.toMatchObject([
+      { id: uploaded.body.videoId, isSaved: true },
+    ]);
+  });
+
   it('returns job status and completed analysis', async () => {
     const { app, repo } = setup();
     const uploaded = await request(app).post('/api/videos').send({});
