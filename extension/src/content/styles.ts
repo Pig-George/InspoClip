@@ -626,6 +626,14 @@
       pointer-events: auto;
     }
 
+    .inspoclip-video-preview-status {
+      margin-top: 6px;
+      color: #8a7060;
+      font-size: 11px;
+      line-height: 1.4;
+      text-align: center;
+    }
+
     .inspoclip-video-summary {
       color: #4a3028;
       font-size: 12px;

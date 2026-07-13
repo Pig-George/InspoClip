@@ -5,6 +5,7 @@ import { claimContentRuntime, removeExistingContentRoot, setContentRootInteracti
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
 import { dataUrlToBlob } from "../src/content/image"
+import { createObjectUrlVideoSource, revokeObjectUrlVideoSource } from "../src/content/media"
 import { getPromptText as resolvePromptText } from "../src/content/prompt"
 import { matchShortcut } from "../src/content/shortcut"
 import { getContentStyles } from "../src/content/styles"
@@ -46,6 +47,7 @@ export const config: PlasmoCSConfig = {
   let currentModal = null;
   let currentTab = null;
   let currentCtxMenu = null;
+  let currentVideoPreviewUrl = null;
   let analyzedData = null;
   let capturedBlob = null;
   let lastPreviewUrl = null;
@@ -1041,7 +1043,8 @@ export const config: PlasmoCSConfig = {
         </div>
 
         <div class="inspoclip-video-preview">
-          <video controls src="${escapeHtml(videoSrc)}"></video>
+          <video controls preload="metadata" data-video-src="${escapeHtml(videoSrc)}"></video>
+          <div class="inspoclip-video-preview-status">${locale === 'zh' ? '正在加载视频预览...' : 'Loading video preview...'}</div>
         </div>
 
         <div class="inspoclip-modal-body">
@@ -1127,6 +1130,28 @@ export const config: PlasmoCSConfig = {
     modal.querySelector('.inspoclip-modal-close').addEventListener('click', removeModal);
     modal.querySelector('.inspoclip-close-btn').addEventListener('click', removeModal);
     modal.addEventListener('click', (e) => { if (e.target === modal) removeModal(); });
+    const previewVideo = modal.querySelector('.inspoclip-video-preview video');
+    const previewStatus = modal.querySelector('.inspoclip-video-preview-status');
+    if (previewVideo) {
+      createObjectUrlVideoSource(videoSrc)
+        .then((objectUrl) => {
+          if (currentModal !== modal) {
+            revokeObjectUrlVideoSource(objectUrl);
+            return;
+          }
+          revokeObjectUrlVideoSource(currentVideoPreviewUrl);
+          currentVideoPreviewUrl = objectUrl;
+          previewVideo.src = objectUrl;
+          previewStatus?.remove();
+        })
+        .catch((err) => {
+          if (previewStatus) {
+            previewStatus.textContent = locale === 'zh'
+              ? `视频预览加载失败：${err.message}`
+              : `Video preview failed: ${err.message}`;
+          }
+        });
+    }
     const prevBtn = modal.querySelector('#inspoclip-prev');
     const nextBtn = modal.querySelector('#inspoclip-next');
     if (prevBtn) prevBtn.addEventListener('click', () => navigateHistory(-1));
@@ -1444,6 +1469,8 @@ export const config: PlasmoCSConfig = {
   function removeModal(showFloating = true) {
     if (currentModal) {
       const overlay = currentModal;
+      revokeObjectUrlVideoSource(currentVideoPreviewUrl);
+      currentVideoPreviewUrl = null;
       const modal = overlay.querySelector('.inspoclip-modal');
       if (modal) modal.classList.remove('inspoclip-modal-visible');
       setTimeout(() => {
