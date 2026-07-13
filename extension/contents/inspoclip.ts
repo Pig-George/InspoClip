@@ -5,7 +5,7 @@ import { claimContentRuntime, removeExistingContentRoot, setContentRootInteracti
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
 import { dataUrlToBlob } from "../src/content/image"
-import { createObjectUrlVideoSource, revokeObjectUrlVideoSource } from "../src/content/media"
+import { createObjectUrlVideoSource, jumpVideoToTime, revokeObjectUrlVideoSource } from "../src/content/media"
 import { getPromptText as resolvePromptText } from "../src/content/prompt"
 import { matchShortcut } from "../src/content/shortcut"
 import { getContentStyles } from "../src/content/styles"
@@ -1061,7 +1061,7 @@ export const config: PlasmoCSConfig = {
             </div>
             <div class="inspoclip-video-stages">
               ${stages.length ? stages.map((stage, index) => `
-                <div class="inspoclip-video-stage">
+                <button type="button" class="inspoclip-video-stage" data-start-time="${Number(stage.startTime) || 0}" title="${locale === 'zh' ? '跳转到此阶段' : 'Jump to this stage'}">
                   <div class="inspoclip-video-stage-head">
                     <span>${index + 1}. ${escapeHtml(localizedText(stage.title) || stage.title || (locale === 'zh' ? '阶段' : 'Stage'))}</span>
                     <em>${formatSeconds(stage.startTime)} – ${formatSeconds(stage.endTime)}</em>
@@ -1076,7 +1076,7 @@ export const config: PlasmoCSConfig = {
                       <li>${escapeHtml(formatActionLine(action))}</li>
                     `).join('')}
                   </ul>` : ''}
-                </div>
+                </button>
               `).join('') : `<p class="inspoclip-empty">${locale === 'zh' ? '暂无阶段分析' : 'No stage analysis yet'}</p>`}
             </div>
           </div>
@@ -1151,6 +1151,14 @@ export const config: PlasmoCSConfig = {
               : `Video preview failed: ${err.message}`;
           }
         });
+    }
+    if (previewVideo) {
+      modal.querySelectorAll('.inspoclip-video-stage[data-start-time]').forEach((stageEl) => {
+        stageEl.addEventListener('click', () => {
+          const startTime = Number(stageEl.dataset.startTime || 0);
+          void jumpVideoToTime(previewVideo, startTime);
+        });
+      });
     }
     const prevBtn = modal.querySelector('#inspoclip-prev');
     const nextBtn = modal.querySelector('#inspoclip-next');

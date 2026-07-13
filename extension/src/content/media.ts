@@ -20,3 +20,16 @@ export function revokeObjectUrlVideoSource(source: string | null | undefined, ru
   const revokeObjectURL = runtime.revokeObjectURL ?? URL.revokeObjectURL.bind(URL)
   revokeObjectURL(source)
 }
+
+export async function jumpVideoToTime(
+  video: Pick<HTMLVideoElement, "currentTime" | "play">,
+  startTime: number
+): Promise<void> {
+  const safeStartTime = Number.isFinite(startTime) ? Math.max(0, startTime) : 0
+  video.currentTime = safeStartTime
+  try {
+    await video.play()
+  } catch {
+    // Browser autoplay policy can reject play(); seeking is still the important action.
+  }
+}

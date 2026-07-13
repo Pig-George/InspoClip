@@ -648,10 +648,26 @@
     }
 
     .inspoclip-video-stage {
+      appearance: none;
+      display: block;
+      width: 100%;
       border: 1px solid #ead8ba;
       border-radius: 12px;
       padding: 10px;
       background: linear-gradient(135deg, #fffaf2, #f7ead6);
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      text-align: left;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .inspoclip-video-stage:hover,
+    .inspoclip-video-stage:focus-visible {
+      border-color: #c0784a;
+      box-shadow: 0 6px 18px rgba(192,120,74,0.14);
+      transform: translateY(-1px);
+      outline: none;
     }
 
     .inspoclip-video-stage-head {
