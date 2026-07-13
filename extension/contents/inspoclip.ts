@@ -5,6 +5,7 @@ import { claimContentRuntime, removeExistingContentRoot, setContentRootInteracti
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
 import { dataUrlToBlob } from "../src/content/image"
+import { renderSafeMarkdown } from "../src/content/markdown"
 import { createObjectUrlVideoSource, jumpVideoToTime, revokeObjectUrlVideoSource } from "../src/content/media"
 import { getPromptText as resolvePromptText } from "../src/content/prompt"
 import { matchShortcut } from "../src/content/shortcut"
@@ -928,7 +929,13 @@ export const config: PlasmoCSConfig = {
     const copyBtn = modal.querySelector('[data-video-prompt-copy]');
     if (!outputEl) return;
     const text = getVideoPromptOutputText(output);
-    outputEl.textContent = statusText || text || (locale === 'zh' ? '选择用途后点击生成，得到可复刻此视频效果的提示词。' : 'Choose a purpose and generate a prompt to recreate this video effect.');
+    const placeholder = locale === 'zh' ? '选择用途后点击生成，得到可复刻此视频效果的提示词。' : 'Choose a purpose and generate a prompt to recreate this video effect.';
+    outputEl.dataset.rawMarkdown = text || '';
+    if (text && !statusText) {
+      outputEl.innerHTML = renderSafeMarkdown(text);
+    } else {
+      outputEl.textContent = statusText || placeholder;
+    }
     outputEl.classList.toggle('inspoclip-video-prompt-placeholder', !text && !!statusText);
     if (copyBtn) copyBtn.disabled = !text;
   }
@@ -1045,7 +1052,8 @@ export const config: PlasmoCSConfig = {
     if (generateBtn) generateBtn.addEventListener('click', generate);
     if (copyBtn) {
       copyBtn.addEventListener('click', async () => {
-        const text = modal.querySelector('#inspoclip-video-prompt-output')?.textContent || '';
+        const outputEl = modal.querySelector('#inspoclip-video-prompt-output');
+        const text = outputEl?.dataset.rawMarkdown || outputEl?.textContent || '';
         if (!text) return;
         await navigator.clipboard.writeText(text).catch(() => undefined);
         copyBtn.innerHTML = getCopyButtonIcon('copied');
@@ -1159,7 +1167,7 @@ export const config: PlasmoCSConfig = {
               </div>
               <button class="inspoclip-btn inspoclip-btn-secondary inspoclip-video-prompt-generate">${locale === 'zh' ? '生成' : 'Generate'}</button>
             </div>
-            <pre class="inspoclip-video-prompt-output inspoclip-video-prompt-placeholder" id="inspoclip-video-prompt-output">${locale === 'zh' ? '选择用途后点击生成，得到可复刻此视频效果的提示词。' : 'Choose a purpose and generate a prompt to recreate this video effect.'}</pre>
+            <div class="inspoclip-video-prompt-output inspoclip-video-prompt-placeholder" id="inspoclip-video-prompt-output">${locale === 'zh' ? '选择用途后点击生成，得到可复刻此视频效果的提示词。' : 'Choose a purpose and generate a prompt to recreate this video effect.'}</div>
           </div>
 
         </div>

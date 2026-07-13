@@ -794,7 +794,6 @@
     .inspoclip-video-prompt-output {
       max-height: 220px;
       overflow: auto;
-      white-space: pre-wrap;
       word-break: break-word;
       margin: 0;
       border-radius: 12px;
@@ -804,7 +803,56 @@
       font-size: 11px;
       line-height: 1.6;
       padding: 10px;
+      font-family: inherit;
+    }
+
+    .inspoclip-video-prompt-output h1,
+    .inspoclip-video-prompt-output h2,
+    .inspoclip-video-prompt-output h3 {
+      margin: 8px 0 6px;
+      color: #3d2a22;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+
+    .inspoclip-video-prompt-output h1 { font-size: 14px; }
+    .inspoclip-video-prompt-output h2 { font-size: 13px; }
+    .inspoclip-video-prompt-output h3 { font-size: 12px; }
+
+    .inspoclip-video-prompt-output p {
+      margin: 0 0 8px;
+    }
+
+    .inspoclip-video-prompt-output ul {
+      margin: 4px 0 8px;
+      padding-left: 18px;
+    }
+
+    .inspoclip-video-prompt-output li {
+      margin: 2px 0;
+    }
+
+    .inspoclip-video-prompt-output code {
+      border-radius: 5px;
+      background: rgba(192, 120, 74, 0.12);
+      padding: 1px 4px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 10.5px;
+    }
+
+    .inspoclip-video-prompt-output pre {
+      margin: 6px 0 10px;
+      border-radius: 10px;
+      background: rgba(74, 48, 40, 0.06);
+      padding: 8px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    .inspoclip-video-prompt-output pre code {
+      display: block;
+      background: transparent;
+      padding: 0;
     }
 
     .inspoclip-video-prompt-placeholder {
