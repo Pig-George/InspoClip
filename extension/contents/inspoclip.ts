@@ -1223,7 +1223,6 @@ export const config: PlasmoCSConfig = {
     if (saveBtn) {
       saveBtn.addEventListener('click', async () => {
         saveBtn.disabled = true;
-        saveBtn.classList.add('inspoclip-btn-saving');
         saveBtn.textContent = locale === 'zh' ? '保存中...' : 'Saving...';
         try {
           const res = await fetch(`${serverUrl}/api/videos/${video.id}/save`, { method: 'POST' });
@@ -1237,15 +1236,23 @@ export const config: PlasmoCSConfig = {
             entry.saved = true;
           }
           saveBtn.textContent = locale === 'zh' ? '✓ 已保存' : '✓ Saved';
-          saveBtn.classList.remove('inspoclip-btn-saving');
-          saveBtn.classList.add('inspoclip-btn-success');
+          saveBtn.style.background = '#4caf50';
+          saveBtn.style.borderColor = '#4caf50';
+          saveBtn.style.flex = 'none';
+          saveBtn.style.whiteSpace = 'nowrap';
           setTimeout(() => {
-            saveBtn.style.setProperty('--inspoclip-save-width', `${saveBtn.offsetWidth}px`);
-            saveBtn.classList.add('inspoclip-btn-collapse');
+            saveBtn.style.transition = 'width 0.35s ease, opacity 0.25s ease, padding 0.35s ease, margin 0.35s ease';
+            saveBtn.style.width = saveBtn.offsetWidth + 'px';
+            requestAnimationFrame(() => {
+              saveBtn.style.width = '0';
+              saveBtn.style.opacity = '0';
+              saveBtn.style.padding = '0';
+              saveBtn.style.margin = '0';
+              saveBtn.style.borderWidth = '0';
+            });
             setTimeout(() => saveBtn.remove(), 400);
-          }, 850);
+          }, 1000);
         } catch (err) {
-          saveBtn.classList.remove('inspoclip-btn-saving');
           saveBtn.textContent = locale === 'zh' ? '保存失败' : 'Save failed';
           saveBtn.style.background = '#f44336';
           setTimeout(() => {
