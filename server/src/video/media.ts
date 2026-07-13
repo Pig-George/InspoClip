@@ -23,6 +23,36 @@ function normalizeContainer(formatName: string): string {
   return names[0] ?? '';
 }
 
+function durationMsFromSeconds(value: unknown): number {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 0;
+}
+
+function durationMsFromPackets(stdout: string): number {
+  const parsed = JSON.parse(stdout) as {
+    packets?: Array<{ pts_time?: string; dts_time?: string; duration_time?: string }>;
+  };
+  const endTimes = (parsed.packets ?? [])
+    .map((packet) => {
+      const timestamp = Number(packet.pts_time ?? packet.dts_time);
+      const duration = Number(packet.duration_time ?? 0);
+      if (!Number.isFinite(timestamp) || timestamp < 0) return 0;
+      return timestamp + (Number.isFinite(duration) && duration > 0 ? duration : 0);
+    })
+    .filter((value) => Number.isFinite(value) && value > 0);
+  if (endTimes.length === 0) return 0;
+  return Math.round(Math.max(...endTimes) * 1000);
+}
+
+async function inspectPacketDuration(filePath: string, run: CommandRunner): Promise<number> {
+  const { stdout } = await run('ffprobe', [
+    '-v', 'error', '-select_streams', 'v:0',
+    '-show_entries', 'packet=pts_time,dts_time,duration_time',
+    '-of', 'json', filePath,
+  ]);
+  return durationMsFromPackets(stdout);
+}
+
 export function validateVideoMetadata(metadata: VideoMetadata): VideoMetadata {
   if (!Number.isFinite(metadata.durationMs) || metadata.durationMs <= 0) throw new Error('Video must have a valid duration');
   if (metadata.durationMs > 120_000) throw new Error('Video must be at most 120 seconds');
@@ -44,8 +74,9 @@ export async function inspectVideo(filePath: string, run: CommandRunner = defaul
   };
   const stream = parsed.streams?.find((item) => item.codec_type === 'video');
   if (!stream) throw new Error('Media has no video stream');
+  const formatDurationMs = durationMsFromSeconds(parsed.format?.duration);
   const metadata: VideoMetadata = {
-    durationMs: Math.round(Number(parsed.format?.duration) * 1000),
+    durationMs: formatDurationMs || await inspectPacketDuration(filePath, run),
     width: stream.width ?? 0,
     height: stream.height ?? 0,
     container: normalizeContainer(parsed.format?.format_name ?? ''),

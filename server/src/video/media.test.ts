@@ -11,6 +11,29 @@ describe('video media validation', () => {
     expect(run).toHaveBeenCalledWith('ffprobe', expect.arrayContaining(['demo.mp4']));
   });
 
+  it('falls back to packet timestamps when a browser-recorded webm has no container duration', async () => {
+    const run = vi.fn()
+      .mockResolvedValueOnce({ stdout: JSON.stringify({
+        format: { duration: 'N/A', format_name: 'matroska,webm' },
+        streams: [{ codec_type: 'video', width: 640, height: 360 }],
+      }) })
+      .mockResolvedValueOnce({ stdout: JSON.stringify({
+        packets: [
+          { pts_time: '0.000000', duration_time: '0.033000' },
+          { pts_time: '2.467000', duration_time: '0.033000' },
+        ],
+      }) });
+
+    await expect(inspectVideo('recording.webm', run)).resolves.toEqual({
+      durationMs: 2500,
+      width: 640,
+      height: 360,
+      container: 'webm',
+    });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(run).toHaveBeenLastCalledWith('ffprobe', expect.arrayContaining(['packet=pts_time,dts_time,duration_time']));
+  });
+
   it.each([
     [{ durationMs: 0, width: 1, height: 1, container: 'mp4' }, 'valid duration'],
     [{ durationMs: Number.NaN, width: 1, height: 1, container: 'mp4' }, 'valid duration'],
