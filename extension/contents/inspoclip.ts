@@ -944,9 +944,6 @@ export const config: PlasmoCSConfig = {
     const video = detail.video || {};
     const analysis = detail.analysis || {};
     const stages = Array.isArray(analysis.stages) ? analysis.stages : [];
-    const visualStyle = analysis.visualStyle || {};
-    const assets = Array.isArray(analysis.assets) ? analysis.assets : [];
-    const uncertainties = Array.isArray(analysis.uncertainties) ? analysis.uncertainties : [];
     const title = localizedText(detail.summary) || localizedText(analysis.summary) || video.originalName || (locale === 'zh' ? '视频分析结果' : 'Video Analysis Result');
     const videoSrc = `${serverUrl}/api/videos/${video.id}/content`;
     const vw = window.innerWidth;
@@ -1008,18 +1005,6 @@ export const config: PlasmoCSConfig = {
             </div>
           </div>
 
-          <div class="inspoclip-section">
-            <div class="inspoclip-section-header">
-              <span class="inspoclip-section-title">${locale === 'zh' ? '视觉风格' : 'Visual Style'}</span>
-            </div>
-            <div class="inspoclip-video-meta">
-              <span>${locale === 'zh' ? '布局' : 'Layout'}：${escapeHtml(localizedText(visualStyle.layout) || visualStyle.layout || '-')}</span>
-              <span>${locale === 'zh' ? '字体' : 'Typography'}：${escapeHtml(localizedText(visualStyle.typography) || visualStyle.typography || '-')}</span>
-              ${Array.isArray(visualStyle.colors) && visualStyle.colors.length ? `<span>${locale === 'zh' ? '色彩' : 'Colors'}：${visualStyle.colors.map(escapeHtml).join(', ')}</span>` : ''}
-              ${Array.isArray(visualStyle.effects) && visualStyle.effects.length ? `<span>${locale === 'zh' ? '效果' : 'Effects'}：${visualStyle.effects.map((item) => escapeHtml(localizedText(item) || item)).join(', ')}</span>` : ''}
-            </div>
-          </div>
-
           <div class="inspoclip-section inspoclip-video-prompt-section">
             <div class="inspoclip-section-header">
               <span class="inspoclip-section-title">${locale === 'zh' ? '复刻输出' : 'Replication Output'}</span>
@@ -1047,15 +1032,6 @@ export const config: PlasmoCSConfig = {
             <pre class="inspoclip-video-prompt-output inspoclip-video-prompt-placeholder" id="inspoclip-video-prompt-output">${locale === 'zh' ? '选择用途后点击生成，得到可复刻此视频效果的提示词。' : 'Choose a purpose and generate a prompt to recreate this video effect.'}</pre>
           </div>
 
-          ${assets.length || uncertainties.length ? `
-            <div class="inspoclip-section">
-              <div class="inspoclip-section-header">
-                <span class="inspoclip-section-title">${locale === 'zh' ? '素材与不确定项' : 'Assets & Uncertainties'}</span>
-              </div>
-              ${assets.length ? `<div class="inspoclip-video-chips">${assets.map((item) => `<span>${escapeHtml(localizedText(item) || item)}</span>`).join('')}</div>` : ''}
-              ${uncertainties.length ? `<ul class="inspoclip-video-uncertainties">${uncertainties.map((item) => `<li>${escapeHtml(localizedText(item) || item)}</li>`).join('')}</ul>` : ''}
-            </div>
-          ` : ''}
         </div>
 
         <div class="inspoclip-modal-footer">

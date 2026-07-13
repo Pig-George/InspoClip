@@ -683,38 +683,12 @@
       color: #5c463c;
     }
 
-    .inspoclip-video-actions,
-    .inspoclip-video-uncertainties {
+    .inspoclip-video-actions {
       margin: 0;
       padding-left: 18px;
       color: #6b5448;
       font-size: 11px;
       line-height: 1.55;
-    }
-
-    .inspoclip-video-meta {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      color: #5c463c;
-      font-size: 11px;
-      line-height: 1.5;
-    }
-
-    .inspoclip-video-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 8px;
-    }
-
-    .inspoclip-video-chips span {
-      padding: 4px 8px;
-      border-radius: 999px;
-      background: #f0e2ca;
-      color: #8a5b3f;
-      font-size: 10px;
-      font-weight: 600;
     }
 
     .inspoclip-video-prompt-section {
