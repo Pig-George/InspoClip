@@ -87,8 +87,8 @@ export function usePopupController() {
     try {
       await sendCurrentTabMessage(msg)
       setTimeout(() => window.close(), 200)
-    } catch {
-      showStatus("Failed to start analysis", "error")
+    } catch (err) {
+      showStatus(err instanceof Error ? err.message : "Failed to start analysis", "error")
       setAnalyzing(false)
     }
   }
@@ -102,8 +102,8 @@ export function usePopupController() {
     try {
       await sendCurrentTabMessage(msg)
       setTimeout(() => window.close(), 200)
-    } catch {
-      showStatus("Failed to start save", "error")
+    } catch (err) {
+      showStatus(err instanceof Error ? err.message : "Failed to start save", "error")
       setSaving(false)
     }
   }
