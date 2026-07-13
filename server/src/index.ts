@@ -19,6 +19,7 @@ import { createModelVideosRouter } from './routes/model-videos.js';
 import { createVideoJobsRouter } from './routes/video-jobs.js';
 import { DrizzleVideoRepository } from './video/repository.js';
 import { VideoWorker } from './video/worker.js';
+import { startDraftVideoCleanup } from './video/draft-cleanup.js';
 import { ModelVideoAccessTokens } from './video/public-access.js';
 import { getModelVideoBaseUrls, modelVideoAccessPath } from './video/public-url.js';
 import { createVideoAiService } from './services/video-ai.js';
@@ -231,6 +232,16 @@ async function start() {
     },
   });
   void worker.start().catch((error) => console.error('Video worker stopped:', error));
+  startDraftVideoCleanup({
+    repository: videoRepository,
+    videoRoot: process.env.VIDEO_UPLOAD_DIR || './videos',
+    onResult: (result) => {
+      if (result.deleted > 0 || result.fileErrors > 0) {
+        console.log(`Draft video cleanup: deleted=${result.deleted}, fileErrors=${result.fileErrors}`);
+      }
+    },
+    onError: (error) => console.error('Draft video cleanup failed:', error),
+  });
 }
 
 start();

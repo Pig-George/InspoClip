@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { LocalizedString, VideoAnalysis } from '../ai/types.js';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, lte } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { videoAnalyses, videoAnalysisJobs, videoPromptOutputs, videos } from '../db/schema.js';
 
@@ -90,6 +90,7 @@ export interface VideoRepository {
   savePromptOutput(videoId: string, purpose: string, target: string, contentEn: string, contentZh: string): Promise<VideoPromptOutputRecord>;
   getPromptOutput(videoId: string, purpose: string, target: string): Promise<VideoPromptOutputRecord | null>;
   saveVideo(id: string): Promise<VideoRecord | null>;
+  listDraftVideosCreatedBefore(cutoff: Date): Promise<VideoRecord[]>;
   deleteVideo(id: string): Promise<VideoRecord | null>;
 }
 
@@ -210,13 +211,29 @@ export class InMemoryVideoRepository implements VideoRepository {
     return { ...video };
   }
 
+  async listDraftVideosCreatedBefore(cutoff: Date): Promise<VideoRecord[]> {
+    return [...this.videos.values()]
+      .filter((video) => !video.isSaved && video.createdAt.getTime() <= cutoff.getTime())
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .map((video) => ({ ...video }));
+  }
+
+  async setVideoCreatedAtForTest(id: string, createdAt: Date): Promise<void> {
+    const video = this.videos.get(id);
+    if (video) video.createdAt = createdAt;
+  }
+
   async deleteVideo(id: string): Promise<VideoRecord | null> {
     const video = this.videos.get(id) ?? null;
     if (!video) return null;
     this.videos.delete(id);
-    this.analyses.delete(id);
+    const analysis = this.analyses.get(id) ?? null;
+    if (analysis) {
+      for (const [key, output] of this.outputs) if (output.analysisId === analysis.id) this.outputs.delete(key);
+      this.analyses.delete(id);
+    }
     for (const [jobId, job] of this.jobs) if (job.videoId === id) this.jobs.delete(jobId);
-    return video;
+    return { ...video };
   }
 }
 
@@ -339,6 +356,13 @@ export class DrizzleVideoRepository implements VideoRepository {
   async saveVideo(id: string): Promise<VideoRecord | null> {
     const [record] = await this.database.update(videos).set({ isSaved: true }).where(eq(videos.id, id)).returning();
     return (record as VideoRecord | undefined) ?? null;
+  }
+
+  async listDraftVideosCreatedBefore(cutoff: Date): Promise<VideoRecord[]> {
+    const records = await this.database.select().from(videos)
+      .where(and(eq(videos.isSaved, false), lte(videos.createdAt, cutoff)))
+      .orderBy(asc(videos.createdAt));
+    return records as VideoRecord[];
   }
 
   async deleteVideo(id: string): Promise<VideoRecord | null> {
