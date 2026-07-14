@@ -431,6 +431,8 @@ export const config: PlasmoCSConfig = {
       visualScale: visualViewport?.scale || 1,
       captureInsetLeft: horizontalViewportGap / 2,
       captureInsetTop: verticalViewportGap / 2,
+      captureWidthPadding: horizontalViewportGap,
+      captureHeightPadding: verticalViewportGap,
     };
 
     try {
