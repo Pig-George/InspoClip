@@ -20,6 +20,62 @@ export type SourceSize = {
   height: number
 }
 
+export const AREA_RESIZE_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const
+
+export type AreaResizeHandle = typeof AREA_RESIZE_HANDLES[number]
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+export function moveAreaRect(
+  rect: AreaRect,
+  deltaX: number,
+  deltaY: number,
+  viewport: ViewportSize
+): AreaRect {
+  return {
+    ...rect,
+    x: clamp(rect.x + deltaX, 0, Math.max(0, viewport.width - rect.width)),
+    y: clamp(rect.y + deltaY, 0, Math.max(0, viewport.height - rect.height))
+  }
+}
+
+export function resizeAreaRect(
+  rect: AreaRect,
+  handle: AreaResizeHandle,
+  deltaX: number,
+  deltaY: number,
+  viewport: ViewportSize,
+  minSize = 20
+): AreaRect {
+  const minimumWidth = Math.min(Math.max(1, minSize), Math.max(1, viewport.width))
+  const minimumHeight = Math.min(Math.max(1, minSize), Math.max(1, viewport.height))
+  let left = rect.x
+  let top = rect.y
+  let right = rect.x + rect.width
+  let bottom = rect.y + rect.height
+
+  if (handle.includes("w")) {
+    left = clamp(rect.x + deltaX, 0, right - minimumWidth)
+  } else if (handle.includes("e")) {
+    right = clamp(right + deltaX, left + minimumWidth, viewport.width)
+  }
+
+  if (handle.includes("n")) {
+    top = clamp(rect.y + deltaY, 0, bottom - minimumHeight)
+  } else if (handle.includes("s")) {
+    bottom = clamp(bottom + deltaY, top + minimumHeight, viewport.height)
+  }
+
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top
+  }
+}
+
 export function getAreaCaptureToolbarPosition(
   rect: AreaRect,
   viewport: ViewportSize,
