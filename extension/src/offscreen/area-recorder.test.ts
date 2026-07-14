@@ -28,7 +28,7 @@ describe("offscreen area recorder helpers", () => {
       { x: 100, y: 20, width: 200, height: 100 },
       { width: 1600, height: 1200 },
       { width: 817, height: 600, clientWidth: 800, clientHeight: 600 }
-    )).toEqual({ x: 196, y: 40, width: 392, height: 200 })
+    )).toEqual({ x: 196, y: 52, width: 392, height: 196 })
   })
 
   test("uses explicit capture bounds as the single source of coordinate truth", () => {
@@ -42,7 +42,31 @@ describe("offscreen area recorder helpers", () => {
         clientHeight: 600,
         captureBounds: { x: 0, y: 0, width: 817, height: 600 }
       }
-    )).toEqual({ x: 196, y: 40, width: 392, height: 200 })
+    )).toEqual({ x: 196, y: 52, width: 392, height: 196 })
+  })
+
+  test("maps through centered vertical letterboxing without stretching the y axis", () => {
+    expect(getAreaRecordingSourceRect(
+      { x: 100, y: 50, width: 200, height: 100 },
+      { width: 1600, height: 1200 },
+      {
+        width: 800,
+        height: 500,
+        captureBounds: { x: 0, y: 0, width: 800, height: 500 }
+      }
+    )).toEqual({ x: 200, y: 200, width: 400, height: 200 })
+  })
+
+  test("maps through centered horizontal letterboxing without stretching the x axis", () => {
+    expect(getAreaRecordingSourceRect(
+      { x: 50, y: 100, width: 100, height: 200 },
+      { width: 1200, height: 1600 },
+      {
+        width: 500,
+        height: 800,
+        captureBounds: { x: 0, y: 0, width: 500, height: 800 }
+      }
+    )).toEqual({ x: 200, y: 200, width: 200, height: 400 })
   })
 
   test("applies visual viewport offsets before mapping to native tab stream pixels", () => {

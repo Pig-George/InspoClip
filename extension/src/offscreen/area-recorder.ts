@@ -137,12 +137,26 @@ export function getAreaRecordingSourceRect(
   viewport: ViewportSize
 ): AreaRect {
   const coordinateSpace = getCaptureCoordinateSpace(viewport)
-  const scaleX = source.width / coordinateSpace.width
-  const scaleY = source.height / coordinateSpace.height
-  const sourceX = clamp(Math.round((rect.x - coordinateSpace.x) * scaleX), 0, Math.max(0, source.width - 1))
-  const sourceY = clamp(Math.round((rect.y - coordinateSpace.y) * scaleY), 0, Math.max(0, source.height - 1))
-  const sourceWidth = Math.max(1, Math.round(rect.width * scaleX))
-  const sourceHeight = Math.max(1, Math.round(rect.height * scaleY))
+  const scale = Math.min(
+    source.width / coordinateSpace.width,
+    source.height / coordinateSpace.height
+  )
+  const capturedWidth = coordinateSpace.width * scale
+  const capturedHeight = coordinateSpace.height * scale
+  const capturedX = (source.width - capturedWidth) / 2
+  const capturedY = (source.height - capturedHeight) / 2
+  const sourceX = clamp(
+    Math.round(capturedX + (rect.x - coordinateSpace.x) * scale),
+    0,
+    Math.max(0, source.width - 1)
+  )
+  const sourceY = clamp(
+    Math.round(capturedY + (rect.y - coordinateSpace.y) * scale),
+    0,
+    Math.max(0, source.height - 1)
+  )
+  const sourceWidth = Math.max(1, Math.round(rect.width * scale))
+  const sourceHeight = Math.max(1, Math.round(rect.height * scale))
 
   return {
     x: sourceX,
