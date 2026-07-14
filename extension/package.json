@@ -35,8 +35,7 @@
       "activeTab",
       "storage",
       "notifications",
-      "scripting",
-      "tabCapture"
+      "scripting"
     ],
     "host_permissions": [
       "http://localhost:3001/*",

@@ -20,16 +20,6 @@ export type SourceSize = {
   height: number
 }
 
-export type TabCaptureMediaConstraints = {
-  audio: false
-  video: {
-    mandatory: {
-      chromeMediaSource: "tab"
-      chromeMediaSourceId: string
-    }
-  }
-}
-
 export function getAreaCaptureToolbarPosition(
   rect: AreaRect,
   viewport: ViewportSize,
@@ -91,14 +81,7 @@ export function getAreaRecordingSourceRect(
   }
 }
 
-export function getTabCaptureMediaConstraints(streamId: string): TabCaptureMediaConstraints {
-  return {
-    audio: false,
-    video: {
-      mandatory: {
-        chromeMediaSource: "tab",
-        chromeMediaSourceId: streamId
-      }
-    }
-  }
+export function getRecordingFrameIntervalMs(fps: number): number {
+  const safeFps = Number.isFinite(fps) ? Math.min(2, Math.max(1, Math.floor(fps))) : 2
+  return Math.round(1000 / safeFps)
 }

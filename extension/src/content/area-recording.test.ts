@@ -4,8 +4,8 @@ import {
   formatRecordingDuration,
   getAreaRecordingSourceRect,
   getAreaCaptureToolbarPosition,
+  getRecordingFrameIntervalMs,
   getPreferredRecordingMimeType,
-  getTabCaptureMediaConstraints,
   getRecordingUploadMimeType
 } from "./area-recording"
 
@@ -70,15 +70,9 @@ describe("area recording helpers", () => {
     )).toEqual({ x: 100, y: 160, width: 400, height: 240 })
   })
 
-  test("creates current tab capture constraints from a stream id", () => {
-    expect(getTabCaptureMediaConstraints("stream-1")).toEqual({
-      audio: false,
-      video: {
-        mandatory: {
-          chromeMediaSource: "tab",
-          chromeMediaSourceId: "stream-1"
-        }
-      }
-    })
+  test("uses a captureVisibleTab-safe frame interval", () => {
+    expect(getRecordingFrameIntervalMs(2)).toBe(500)
+    expect(getRecordingFrameIntervalMs(10)).toBe(500)
+    expect(getRecordingFrameIntervalMs(1)).toBe(1000)
   })
 })

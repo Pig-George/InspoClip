@@ -4,10 +4,9 @@ import type { PlasmoCSConfig } from "plasmo"
 import {
   formatRecordingDuration,
   getAreaCaptureToolbarPosition,
-  getAreaRecordingSourceRect,
   getPreferredRecordingMimeType,
+  getRecordingFrameIntervalMs,
   getRecordingUploadMimeType,
-  getTabCaptureMediaConstraints
 } from "../src/content/area-recording"
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
@@ -411,7 +410,7 @@ export const config: PlasmoCSConfig = {
   }
 
   async function startAreaRecording(rect, overlay, toolbar) {
-    if ((!navigator.mediaDevices?.getUserMedia && !navigator.mediaDevices?.getDisplayMedia) || typeof MediaRecorder === 'undefined') {
+    if (typeof MediaRecorder === 'undefined') {
       showToast(locale === 'zh' ? '当前浏览器不支持录屏' : 'Screen recording is not supported in this browser', 'error');
       setTimeout(removeToast, 3000);
       return;
@@ -424,21 +423,6 @@ export const config: PlasmoCSConfig = {
     }
 
     try {
-      let sourceStream;
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) throw new Error('Current tab capture is not supported');
-        const streamResponse = await chrome.runtime.sendMessage({ type: 'GET_TAB_CAPTURE_STREAM_ID' });
-        if (!streamResponse?.success || !streamResponse.streamId) {
-          throw new Error(streamResponse?.error || 'Failed to capture current tab');
-        }
-        sourceStream = await navigator.mediaDevices.getUserMedia(getTabCaptureMediaConstraints(streamResponse.streamId));
-      } catch (tabCaptureError) {
-        if (!navigator.mediaDevices?.getDisplayMedia) throw tabCaptureError;
-        sourceStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: 30 },
-          audio: false,
-        });
-      }
       overlay.classList.add('inspoclip-area-overlay-recording');
       toolbar.classList.add('inspoclip-area-toolbar-recording');
       toolbar.innerHTML = `
@@ -452,30 +436,21 @@ export const config: PlasmoCSConfig = {
       toolbar.addEventListener('mouseup', (event) => event.stopPropagation());
       toolbar.addEventListener('click', (event) => event.stopPropagation());
 
-      const sourceVideo = document.createElement('video');
-      sourceVideo.muted = true;
-      sourceVideo.playsInline = true;
-      sourceVideo.srcObject = sourceStream;
-      await new Promise((resolve, reject) => {
-        sourceVideo.onloadedmetadata = resolve;
-        sourceVideo.onerror = () => reject(new Error('Failed to prepare recording'));
-      });
-      await sourceVideo.play();
-
-      const sourceRect = getAreaRecordingSourceRect(
-        rect,
-        { width: sourceVideo.videoWidth, height: sourceVideo.videoHeight },
-        { width: window.innerWidth, height: window.innerHeight }
-      );
+      const firstFrame = await captureAreaRecordingFrame(overlay);
+      const firstImage = await loadImage(firstFrame);
+      const scaleX = firstImage.naturalWidth / window.innerWidth;
+      const scaleY = firstImage.naturalHeight / window.innerHeight;
       const canvas = document.createElement('canvas');
-      canvas.width = sourceRect.width;
-      canvas.height = sourceRect.height;
+      canvas.width = Math.max(1, Math.round(rect.width * scaleX));
+      canvas.height = Math.max(1, Math.round(rect.height * scaleY));
       const ctx = canvas.getContext('2d');
-      const canvasStream = canvas.captureStream(30);
+      drawAreaRecordingFrame(ctx, firstImage, rect, scaleX, scaleY, canvas);
+      const frameIntervalMs = getRecordingFrameIntervalMs(2);
+      const canvasStream = canvas.captureStream(1000 / frameIntervalMs);
       const mimeType = getPreferredRecordingMimeType(MediaRecorder);
       const recorder = new MediaRecorder(canvasStream, mimeType ? { mimeType } : undefined);
       const chunks = [];
-      let animationId = 0;
+      let frameTimerId = 0;
       let timerId = 0;
       let startedAt = Date.now();
       let pausedAt = 0;
@@ -483,30 +458,27 @@ export const config: PlasmoCSConfig = {
 
       const recording = {
         recorder,
-        sourceStream,
         canvasStream,
-        sourceVideo,
-        animationId: 0,
+        frameTimerId: 0,
         timerId: 0,
         shouldAnalyze: true,
       };
       activeAreaRecording = recording;
 
-      const drawFrame = () => {
+      const drawFrame = async () => {
+        if (activeAreaRecording !== recording || recorder.state === 'inactive') return;
         if (recorder.state !== 'inactive') {
-          ctx.drawImage(
-            sourceVideo,
-            sourceRect.x,
-            sourceRect.y,
-            sourceRect.width,
-            sourceRect.height,
-            0,
-            0,
-            canvas.width,
-            canvas.height
-          );
-          animationId = requestAnimationFrame(drawFrame);
-          recording.animationId = animationId;
+          if (recorder.state === 'recording') {
+            try {
+              const frame = await captureAreaRecordingFrame(overlay);
+              const image = await loadImage(frame);
+              drawAreaRecordingFrame(ctx, image, rect, scaleX, scaleY, canvas);
+            } catch {
+              // Keep the previous frame if a single captureVisibleTab call is throttled or interrupted.
+            }
+          }
+          frameTimerId = window.setTimeout(drawFrame, frameIntervalMs);
+          recording.frameTimerId = frameTimerId;
         }
       };
 
@@ -535,15 +507,6 @@ export const config: PlasmoCSConfig = {
           setTimeout(removeToast, 5000);
         }
       };
-
-      sourceStream.getVideoTracks().forEach((track) => {
-        track.addEventListener('ended', () => {
-          if (activeAreaRecording === recording && recorder.state !== 'inactive') {
-            recording.shouldAnalyze = true;
-            recorder.stop();
-          }
-        });
-      });
 
       toolbar.querySelector('[data-action="pause"]')?.addEventListener('click', () => {
         const pauseBtn = toolbar.querySelector('[data-action="pause"]');
@@ -583,11 +546,9 @@ export const config: PlasmoCSConfig = {
 
   function cleanupAreaRecording(recording) {
     if (!recording) return;
-    if (recording.animationId) cancelAnimationFrame(recording.animationId);
+    if (recording.frameTimerId) clearTimeout(recording.frameTimerId);
     if (recording.timerId) clearInterval(recording.timerId);
-    recording.sourceStream?.getTracks?.().forEach((track) => track.stop());
     recording.canvasStream?.getTracks?.().forEach((track) => track.stop());
-    if (recording.sourceVideo) recording.sourceVideo.srcObject = null;
     if (activeAreaRecording === recording) activeAreaRecording = null;
   }
 
@@ -624,6 +585,41 @@ export const config: PlasmoCSConfig = {
     const detail = await detailRes.json();
     pushVideoHistory(detail);
     transitionToVideoModal(detail, window.innerWidth - 20, 20);
+  }
+
+  async function captureAreaRecordingFrame(overlay) {
+    const previousVisibility = overlay.style.visibility;
+    overlay.style.visibility = 'hidden';
+    try {
+      await new Promise((r) => setTimeout(r, 40));
+      return await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' }, (response) => {
+          if (response?.dataUrl) resolve(response.dataUrl);
+          else reject(new Error(response?.error || 'Capture failed'));
+        });
+      });
+    } finally {
+      overlay.style.visibility = previousVisibility;
+    }
+  }
+
+  function loadImage(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Failed to load recording frame'));
+      img.src = dataUrl;
+    });
+  }
+
+  function drawAreaRecordingFrame(ctx, image, rect, scaleX, scaleY, canvas) {
+    ctx.drawImage(
+      image,
+      rect.x * scaleX, rect.y * scaleY,
+      rect.width * scaleX, rect.height * scaleY,
+      0, 0,
+      canvas.width, canvas.height
+    );
   }
 
   function removeAreaOverlay() {
