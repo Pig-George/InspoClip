@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest"
 import {
   AREA_RESIZE_HANDLES,
   formatRecordingDuration,
+  getAreaResizeHandlesMarkup,
   getAreaRecordingInnerRect,
   getAreaRecordingSourceRect,
   getAreaCaptureToolbarPosition,
@@ -93,6 +94,15 @@ describe("area recording helpers", () => {
 
   test("defines all eight area resize handles", () => {
     expect(AREA_RESIZE_HANDLES).toEqual(["nw", "n", "ne", "e", "se", "s", "sw", "w"])
+  })
+
+  test("renders one adjustment handle for every resize direction", () => {
+    const markup = getAreaResizeHandlesMarkup()
+
+    expect(markup.match(/data-handle=/g)).toHaveLength(8)
+    AREA_RESIZE_HANDLES.forEach((handle) => {
+      expect(markup).toContain(`data-handle="${handle}"`)
+    })
   })
 
   test("moves the selected area while keeping it inside the viewport", () => {

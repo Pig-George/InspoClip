@@ -565,6 +565,17 @@
       cursor: default;
     }
 
+    .inspoclip-area-overlay-selected .inspoclip-area-selection {
+      cursor: move;
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    .inspoclip-area-overlay-adjusting,
+    .inspoclip-area-overlay-adjusting .inspoclip-area-selection {
+      user-select: none;
+    }
+
     .inspoclip-area-overlay-recording {
       pointer-events: none;
       background: transparent;
@@ -604,6 +615,51 @@
       box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
       pointer-events: none;
       z-index: 2;
+    }
+
+    .inspoclip-area-handle {
+      position: absolute;
+      display: block;
+      width: 20px;
+      height: 20px;
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+      touch-action: none;
+      z-index: 3;
+    }
+
+    .inspoclip-area-handle::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      border: 2px solid #fffaf2;
+      border-radius: 999px;
+      background: #c0784a;
+      box-shadow: 0 1px 4px rgba(74, 48, 40, 0.32);
+      transform: translate(-50%, -50%);
+      transition: width 0.12s ease, height 0.12s ease, background 0.12s ease;
+    }
+
+    .inspoclip-area-handle:hover::after {
+      width: 10px;
+      height: 10px;
+      background: #a95f38;
+    }
+
+    .inspoclip-area-handle[data-handle="nw"] { left: 0; top: 0; cursor: nwse-resize; }
+    .inspoclip-area-handle[data-handle="n"] { left: 50%; top: 0; cursor: ns-resize; }
+    .inspoclip-area-handle[data-handle="ne"] { left: 100%; top: 0; cursor: nesw-resize; }
+    .inspoclip-area-handle[data-handle="e"] { left: 100%; top: 50%; cursor: ew-resize; }
+    .inspoclip-area-handle[data-handle="se"] { left: 100%; top: 100%; cursor: nwse-resize; }
+    .inspoclip-area-handle[data-handle="s"] { left: 50%; top: 100%; cursor: ns-resize; }
+    .inspoclip-area-handle[data-handle="sw"] { left: 0; top: 100%; cursor: nesw-resize; }
+    .inspoclip-area-handle[data-handle="w"] { left: 0; top: 50%; cursor: ew-resize; }
+
+    .inspoclip-area-overlay-recording .inspoclip-area-handle {
+      display: none;
     }
 
     .inspoclip-area-hover {

@@ -24,6 +24,12 @@ export const AREA_RESIZE_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] 
 
 export type AreaResizeHandle = typeof AREA_RESIZE_HANDLES[number]
 
+export function getAreaResizeHandlesMarkup(): string {
+  return AREA_RESIZE_HANDLES
+    .map((handle) => `<span class="inspoclip-area-handle" data-handle="${handle}" aria-hidden="true"></span>`)
+    .join("")
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }

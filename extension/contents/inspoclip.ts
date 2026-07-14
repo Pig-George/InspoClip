@@ -5,6 +5,9 @@ import {
   formatRecordingDuration,
   getAreaCaptureToolbarPosition,
   getAreaRecordingInnerRect,
+  getAreaResizeHandlesMarkup,
+  moveAreaRect,
+  resizeAreaRect,
 } from "../src/content/area-recording"
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
@@ -311,7 +314,9 @@ export const config: PlasmoCSConfig = {
   function showAreaCaptureControls(overlay, selection, hoverHighlight, instructions, rect, mode) {
     hoverHighlight.style.display = 'none';
     instructions.style.display = 'none';
-    applyAreaRectToElement(selection, rect);
+    let currentRect = { ...rect };
+    applyAreaRectToElement(selection, currentRect);
+    selection.innerHTML = getAreaResizeHandlesMarkup();
     overlay.classList.add('inspoclip-area-overlay-selected');
 
     const existing = overlay.querySelector('.inspoclip-area-toolbar');
@@ -326,16 +331,75 @@ export const config: PlasmoCSConfig = {
         <button class="inspoclip-area-action-icon" data-action="cancel" title="${locale === 'zh' ? '取消' : 'Cancel'}">×</button>
       </div>
     `;
-    positionAreaToolbar(toolbar, rect);
+    positionAreaToolbar(toolbar, currentRect);
+    let adjustment = null;
+
+    const syncAdjustedArea = () => {
+      applyAreaRectToElement(selection, currentRect);
+      positionAreaToolbar(toolbar, currentRect);
+    };
+
+    selection.addEventListener('pointerdown', (event) => {
+      if (overlay.classList.contains('inspoclip-area-overlay-recording')) return;
+      if (event.button !== 0) return;
+
+      const handleElement = event.target.closest?.('.inspoclip-area-handle');
+      adjustment = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originRect: { ...currentRect },
+        handle: handleElement?.dataset.handle || null,
+      };
+      selection.setPointerCapture?.(event.pointerId);
+      overlay.classList.add('inspoclip-area-overlay-adjusting');
+      event.preventDefault();
+      event.stopPropagation();
+    });
+
+    selection.addEventListener('pointermove', (event) => {
+      if (!adjustment || event.pointerId !== adjustment.pointerId) return;
+      const deltaX = event.clientX - adjustment.startX;
+      const deltaY = event.clientY - adjustment.startY;
+      const viewport = { width: window.innerWidth, height: window.innerHeight };
+
+      currentRect = adjustment.handle
+        ? resizeAreaRect(adjustment.originRect, adjustment.handle, deltaX, deltaY, viewport)
+        : moveAreaRect(adjustment.originRect, deltaX, deltaY, viewport);
+      syncAdjustedArea();
+      event.preventDefault();
+      event.stopPropagation();
+    });
+
+    const finishAdjustment = (event) => {
+      if (!adjustment || event.pointerId !== adjustment.pointerId) return;
+      if (selection.hasPointerCapture?.(event.pointerId)) {
+        selection.releasePointerCapture(event.pointerId);
+      }
+      adjustment = null;
+      overlay.classList.remove('inspoclip-area-overlay-adjusting');
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    selection.addEventListener('pointerup', finishAdjustment);
+    selection.addEventListener('pointercancel', finishAdjustment);
+    selection.addEventListener('lostpointercapture', (event) => {
+      if (!adjustment || event.pointerId !== adjustment.pointerId) return;
+      adjustment = null;
+      overlay.classList.remove('inspoclip-area-overlay-adjusting');
+    });
+
+    toolbar.addEventListener('pointerdown', (event) => event.stopPropagation());
     toolbar.addEventListener('mousedown', (event) => event.stopPropagation());
     toolbar.addEventListener('mouseup', (event) => event.stopPropagation());
     toolbar.addEventListener('click', (event) => event.stopPropagation());
 
     toolbar.querySelector('[data-action="screenshot"]')?.addEventListener('click', () => {
-      processAreaScreenshot(mode, rect, overlay);
+      processAreaScreenshot(mode, currentRect, overlay);
     });
     toolbar.querySelector('[data-action="record"]')?.addEventListener('click', () => {
-      startAreaRecording(rect, overlay, toolbar);
+      startAreaRecording(currentRect, overlay, toolbar);
     });
     toolbar.querySelector('[data-action="cancel"]')?.addEventListener('click', () => {
       removeAreaOverlay();
