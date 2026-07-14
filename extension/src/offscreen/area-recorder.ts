@@ -24,6 +24,7 @@ export type RecordingCommand =
   | { type: "START_OFFSCREEN_AREA_RECORDING"; recordingId: string; sourceId?: string; streamId?: string; rect: AreaRect; viewport: ViewportSize; includeTabAudio: boolean }
   | { type: "PAUSE_OFFSCREEN_AREA_RECORDING"; recordingId: string }
   | { type: "RESUME_OFFSCREEN_AREA_RECORDING"; recordingId: string }
+  | { type: "RETAKE_OFFSCREEN_AREA_RECORDING"; recordingId: string }
   | { type: "STOP_OFFSCREEN_AREA_RECORDING"; recordingId: string }
   | { type: "CANCEL_OFFSCREEN_AREA_RECORDING"; recordingId: string }
 
@@ -244,6 +245,41 @@ function stopMediaRecorder(recorder: MediaRecorder): Promise<void> {
   })
 }
 
+type AreaRecordingMediaRecorderState = {
+  recorder: MediaRecorder
+  outputStream: MediaStream
+  mimeType: string
+  chunks: Blob[]
+}
+
+type MediaRecorderFactory = (stream: MediaStream, options?: MediaRecorderOptions) => MediaRecorder
+
+function createAreaRecordingMediaRecorder(
+  outputStream: MediaStream,
+  mimeType: string,
+  createRecorder: MediaRecorderFactory = (stream, options) => new MediaRecorder(stream, options)
+): AreaRecordingMediaRecorderState {
+  const recorder = createRecorder(outputStream, mimeType ? { mimeType } : undefined)
+  const chunks: Blob[] = []
+  recorder.addEventListener("dataavailable", (event) => {
+    if (event.data?.size) chunks.push(event.data)
+  })
+  recorder.start(1000)
+  return { recorder, outputStream, mimeType, chunks }
+}
+
+export async function restartAreaRecordingMediaRecorder(
+  recording: AreaRecordingMediaRecorderState,
+  createRecorder?: MediaRecorderFactory
+): Promise<AreaRecordingMediaRecorderState> {
+  await stopMediaRecorder(recording.recorder)
+  return createAreaRecordingMediaRecorder(
+    recording.outputStream,
+    recording.mimeType,
+    createRecorder
+  )
+}
+
 function normalizeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error || "Recording failed")
 }
@@ -328,19 +364,15 @@ export class OffscreenAreaRecorder {
     const outputStream = new MediaStream(getAreaRecordingOutputTracks(canvasStream, sourceStream, Boolean(command.includeTabAudio)))
     const canvasTrack = canvasStream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined
     const mimeType = getPreferredRecordingMimeType(MediaRecorder)
-    const recorder = new MediaRecorder(outputStream, mimeType ? { mimeType } : undefined)
-    const chunks: Blob[] = []
-    recorder.addEventListener("dataavailable", (event) => {
-      if (event.data?.size) chunks.push(event.data)
-    })
+    const recorderState = createAreaRecordingMediaRecorder(outputStream, mimeType)
 
     const recording: ActiveRecording = {
       recordingId: command.recordingId,
       sourceStream,
       outputStream,
       video,
-      recorder,
-      chunks,
+      recorder: recorderState.recorder,
+      chunks: recorderState.chunks,
       frameTimerId: 0,
       mimeType,
       audioContext: preparedSource?.audioContext || createTabAudioMonitor(sourceStream)
@@ -349,7 +381,7 @@ export class OffscreenAreaRecorder {
 
     const drawFrame = () => {
       if (!this.recordings.has(command.recordingId)) return
-      if (recorder.state === "recording") {
+      if (recording.recorder.state === "recording") {
         context.drawImage(
           video,
           sourceRect.x,
@@ -365,7 +397,6 @@ export class OffscreenAreaRecorder {
       }
     }
 
-    recorder.start(1000)
     drawFrame()
     recording.frameTimerId = window.setInterval(drawFrame, getOffscreenRecordingFrameIntervalMs(30))
 
@@ -385,6 +416,13 @@ export class OffscreenAreaRecorder {
   resume(recordingId: string): void {
     const recording = this.requireRecording(recordingId)
     if (recording.recorder.state === "paused") recording.recorder.resume()
+  }
+
+  async retake(recordingId: string): Promise<void> {
+    const recording = this.requireRecording(recordingId)
+    const restarted = await restartAreaRecordingMediaRecorder(recording)
+    recording.recorder = restarted.recorder
+    recording.chunks = restarted.chunks
   }
 
   async stop(recordingId: string): Promise<RecordingResult> {
@@ -417,6 +455,10 @@ export class OffscreenAreaRecorder {
     }
     if (command.type === "RESUME_OFFSCREEN_AREA_RECORDING") {
       this.resume(command.recordingId)
+      return { recordingId: command.recordingId }
+    }
+    if (command.type === "RETAKE_OFFSCREEN_AREA_RECORDING") {
+      await this.retake(command.recordingId)
       return { recordingId: command.recordingId }
     }
     if (command.type === "STOP_OFFSCREEN_AREA_RECORDING") return this.stop(command.recordingId)

@@ -4,7 +4,8 @@ import {
   getAreaRecordingOutputTracks,
   getAreaRecordingSourceRect,
   getOffscreenRecordingFrameIntervalMs,
-  getTabCaptureMediaConstraints
+  getTabCaptureMediaConstraints,
+  restartAreaRecordingMediaRecorder
 } from "./area-recorder"
 
 describe("offscreen area recorder helpers", () => {
@@ -37,6 +38,44 @@ describe("offscreen area recorder helpers", () => {
 
     expect(getAreaRecordingOutputTracks(canvasStream, sourceStream, false)).toEqual([videoTrack])
     expect(getAreaRecordingOutputTracks(canvasStream, sourceStream, true)).toEqual([videoTrack, audioTrack])
+  })
+
+  test("restarts the media recorder on the existing output stream and discards old chunks", async () => {
+    const calls: string[] = []
+    const oldRecorder = {
+      state: "recording",
+      requestData: () => calls.push("old:requestData"),
+      addEventListener: (type: string, listener: () => void) => {
+        if (type === "stop") (oldRecorder as { onStop?: () => void }).onStop = listener
+      },
+      stop: () => {
+        calls.push("old:stop")
+        ;(oldRecorder as { onStop?: () => void }).onStop?.()
+      }
+    } as unknown as MediaRecorder
+    const newRecorder = {
+      state: "inactive",
+      addEventListener: (type: string) => calls.push(`new:listen:${type}`),
+      start: (timeslice: number) => calls.push(`new:start:${timeslice}`)
+    } as unknown as MediaRecorder
+    const outputStream = { id: "existing-output" } as unknown as MediaStream
+    const oldChunks = [new Blob(["old take"])]
+
+    const restarted = await restartAreaRecordingMediaRecorder(
+      { recorder: oldRecorder, outputStream, mimeType: "video/webm", chunks: oldChunks },
+      () => newRecorder
+    )
+
+    expect(calls).toEqual([
+      "old:requestData",
+      "old:stop",
+      "new:listen:dataavailable",
+      "new:start:1000"
+    ])
+    expect(restarted.recorder).toBe(newRecorder)
+    expect(restarted.outputStream).toBe(outputStream)
+    expect(restarted.chunks).toEqual([])
+    expect(oldChunks).toHaveLength(1)
   })
 
   test("maps viewport coordinates to native tab stream pixels", () => {

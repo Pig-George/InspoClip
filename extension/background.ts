@@ -118,7 +118,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sourceId: message.sourceId,
         streamId,
         rect: message.rect,
-        viewport: message.viewport
+        viewport: message.viewport,
+        includeTabAudio: Boolean(message.includeTabAudio)
       })
     })()
       .then((response) => sendResponse(response))
@@ -155,10 +156,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true
   }
 
-  if (message.type === "PAUSE_AREA_RECORDING" || message.type === "RESUME_AREA_RECORDING" || message.type === "STOP_AREA_RECORDING" || message.type === "CANCEL_AREA_RECORDING") {
+  if (message.type === "PAUSE_AREA_RECORDING" || message.type === "RESUME_AREA_RECORDING" || message.type === "RETAKE_AREA_RECORDING" || message.type === "STOP_AREA_RECORDING" || message.type === "CANCEL_AREA_RECORDING") {
     const offscreenType = {
       PAUSE_AREA_RECORDING: "PAUSE_OFFSCREEN_AREA_RECORDING",
       RESUME_AREA_RECORDING: "RESUME_OFFSCREEN_AREA_RECORDING",
+      RETAKE_AREA_RECORDING: "RETAKE_OFFSCREEN_AREA_RECORDING",
       STOP_AREA_RECORDING: "STOP_OFFSCREEN_AREA_RECORDING",
       CANCEL_AREA_RECORDING: "CANCEL_OFFSCREEN_AREA_RECORDING"
     }[message.type]
