@@ -19,7 +19,9 @@ export type ViewportSize = {
 }
 
 export type RecordingCommand =
-  | { type: "START_OFFSCREEN_AREA_RECORDING"; recordingId: string; streamId: string; rect: AreaRect; viewport: ViewportSize }
+  | { type: "PREPARE_OFFSCREEN_AREA_RECORDING_SOURCE"; sourceId: string; streamId: string }
+  | { type: "RELEASE_OFFSCREEN_AREA_RECORDING_SOURCE"; sourceId: string }
+  | { type: "START_OFFSCREEN_AREA_RECORDING"; recordingId: string; sourceId?: string; streamId?: string; rect: AreaRect; viewport: ViewportSize }
   | { type: "PAUSE_OFFSCREEN_AREA_RECORDING"; recordingId: string }
   | { type: "RESUME_OFFSCREEN_AREA_RECORDING"; recordingId: string }
   | { type: "STOP_OFFSCREEN_AREA_RECORDING"; recordingId: string }
@@ -74,6 +76,12 @@ type ActiveRecording = {
   chunks: Blob[]
   frameTimerId: number
   mimeType: string
+}
+
+type PreparedSource = {
+  sourceId: string
+  sourceStream: MediaStream
+  video: HTMLVideoElement
 }
 
 export function getPreferredRecordingMimeType(
@@ -171,6 +179,12 @@ function cleanupRecording(recording: ActiveRecording): void {
   recording.video.srcObject = null
 }
 
+function cleanupPreparedSource(source: PreparedSource): void {
+  source.sourceStream.getTracks().forEach((track) => track.stop())
+  source.video.pause()
+  source.video.srcObject = null
+}
+
 function stopMediaRecorder(recorder: MediaRecorder): Promise<void> {
   return new Promise((resolve) => {
     if (recorder.state === "inactive") {
@@ -189,11 +203,11 @@ function normalizeError(error: unknown): string {
 
 export class OffscreenAreaRecorder {
   private recordings = new Map<string, ActiveRecording>()
+  private preparedSources = new Map<string, PreparedSource>()
 
-  async start(command: Extract<RecordingCommand, { type: "START_OFFSCREEN_AREA_RECORDING" }>): Promise<{ recordingId: string; width: number; height: number; mimeType: string }> {
-    if (this.recordings.has(command.recordingId)) {
-      throw new Error("Recording already exists")
-    }
+  async prepare(command: Extract<RecordingCommand, { type: "PREPARE_OFFSCREEN_AREA_RECORDING_SOURCE" }>): Promise<{ sourceId: string }> {
+    const existing = this.preparedSources.get(command.sourceId)
+    if (existing) cleanupPreparedSource(existing)
 
     const sourceStream = await navigator.mediaDevices.getUserMedia(
       getTabCaptureMediaConstraints(command.streamId) as unknown as MediaStreamConstraints
@@ -204,6 +218,48 @@ export class OffscreenAreaRecorder {
     video.srcObject = sourceStream
     await waitForVideoReady(video)
     await video.play()
+
+    this.preparedSources.set(command.sourceId, {
+      sourceId: command.sourceId,
+      sourceStream,
+      video
+    })
+
+    return { sourceId: command.sourceId }
+  }
+
+  release(sourceId: string): void {
+    const source = this.preparedSources.get(sourceId)
+    if (!source) return
+    this.preparedSources.delete(sourceId)
+    cleanupPreparedSource(source)
+  }
+
+  async start(command: Extract<RecordingCommand, { type: "START_OFFSCREEN_AREA_RECORDING" }>): Promise<{ recordingId: string; width: number; height: number; mimeType: string }> {
+    if (this.recordings.has(command.recordingId)) {
+      throw new Error("Recording already exists")
+    }
+
+    const preparedSource = command.sourceId ? this.preparedSources.get(command.sourceId) : undefined
+    if (command.sourceId && !preparedSource) {
+      throw new Error("Prepared recording source expired. Please start area capture again.")
+    }
+    if (!preparedSource && !command.streamId) {
+      throw new Error("Missing tab capture stream for recording")
+    }
+    const sourceStream = preparedSource?.sourceStream || await navigator.mediaDevices.getUserMedia(
+      getTabCaptureMediaConstraints(command.streamId) as unknown as MediaStreamConstraints
+    )
+    const video = preparedSource?.video || document.createElement("video")
+    if (!preparedSource) {
+      video.muted = true
+      video.playsInline = true
+      video.srcObject = sourceStream
+      await waitForVideoReady(video)
+      await video.play()
+    } else {
+      this.preparedSources.delete(preparedSource.sourceId)
+    }
 
     const sourceRect = getAreaRecordingSourceRect(
       command.rect,
@@ -298,6 +354,11 @@ export class OffscreenAreaRecorder {
   }
 
   async handle(command: RecordingCommand): Promise<unknown> {
+    if (command.type === "PREPARE_OFFSCREEN_AREA_RECORDING_SOURCE") return this.prepare(command)
+    if (command.type === "RELEASE_OFFSCREEN_AREA_RECORDING_SOURCE") {
+      this.release(command.sourceId)
+      return { sourceId: command.sourceId }
+    }
     if (command.type === "START_OFFSCREEN_AREA_RECORDING") return this.start(command)
     if (command.type === "PAUSE_OFFSCREEN_AREA_RECORDING") {
       this.pause(command.recordingId)

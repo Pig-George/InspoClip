@@ -19,3 +19,11 @@ export function getExtensionRelativeUrl(url: string): string {
     return url.replace(/^\/+/, "")
   }
 }
+
+export function normalizeTabCaptureErrorMessage(message: string | undefined): string {
+  if (message?.includes("Extension has not been invoked")) {
+    return "Recording permission expired. Please start area recording from the InspoClip extension button or shortcut again."
+  }
+
+  return message || "Failed to start tab capture"
+}

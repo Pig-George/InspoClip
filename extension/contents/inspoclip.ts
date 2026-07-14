@@ -143,6 +143,7 @@ export const config: PlasmoCSConfig = {
 
   let areaOverlay = null;
   let activeAreaRecording = null;
+  let preparedAreaRecordingSource = null;
 
   function startAreaCapture(mode) {
     // Remove any existing overlay
@@ -169,6 +170,15 @@ export const config: PlasmoCSConfig = {
     overlay.appendChild(selection);
     container.appendChild(overlay);
     areaOverlay = overlay;
+    const sourceId = crypto.randomUUID?.() || `area-source-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    preparedAreaRecordingSource = {
+      sourceId,
+      promise: sendRuntimeMessage({ type: 'PREPARE_AREA_RECORDING', sourceId })
+        .then((response) => {
+          if (!response?.success) throw new Error(response?.error || 'Failed to prepare recording');
+          return response;
+        })
+    };
     syncContentRootInteractivity();
 
     let startX = 0, startY = 0;
@@ -416,6 +426,7 @@ export const config: PlasmoCSConfig = {
 
     const recordingId = crypto.randomUUID?.() || `area-recording-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const recordingRect = getAreaRecordingInnerRect(rect);
+    const preparedSource = preparedAreaRecordingSource;
     const visualViewport = window.visualViewport;
     const viewport = {
       width: window.innerWidth,
@@ -436,10 +447,14 @@ export const config: PlasmoCSConfig = {
     };
 
     try {
+      if (!preparedSource) throw new Error(locale === 'zh' ? '录屏权限未准备好，请重新从 InspoClip 启动框选' : 'Recording permission is not ready. Please start area capture from InspoClip again.');
       overlay.classList.add('inspoclip-area-overlay-recording');
+      await preparedSource.promise;
+      preparedAreaRecordingSource = null;
       const startResponse = await sendRuntimeMessage({
         type: 'START_AREA_RECORDING',
         recordingId,
+        sourceId: preparedSource.sourceId,
         rect: recordingRect,
         viewport,
       });
@@ -601,6 +616,13 @@ export const config: PlasmoCSConfig = {
 
   function removeAreaOverlay() {
     cancelActiveAreaRecording();
+    const preparedSource = preparedAreaRecordingSource;
+    preparedAreaRecordingSource = null;
+    if (preparedSource) {
+      preparedSource.promise
+        .then(() => sendRuntimeMessage({ type: 'RELEASE_AREA_RECORDING_SOURCE', sourceId: preparedSource.sourceId }))
+        .catch(() => {});
+    }
     if (areaOverlay) {
       areaOverlay.remove();
       areaOverlay = null;

@@ -2,7 +2,7 @@ import { CONTEXT_MENUS } from "./src/background/constants"
 import { captureAndUpload } from "./src/background/capture"
 import { fetchImageAsDataUrl, sendContentMessage } from "./src/background/messages"
 import offscreenDocumentUrl from "url:./offscreen.html"
-import { getExtensionRelativeUrl, getOffscreenDocumentOptions, getTabCaptureStreamOptions } from "./src/background/offscreen-recording"
+import { getExtensionRelativeUrl, getOffscreenDocumentOptions, getTabCaptureStreamOptions, normalizeTabCaptureErrorMessage } from "./src/background/offscreen-recording"
 import { openVideoInApp, saveVideoFromUrl } from "./src/background/video"
 
 const OFFSCREEN_DOCUMENT_PATH = getExtensionRelativeUrl(offscreenDocumentUrl)
@@ -78,7 +78,7 @@ function getMediaStreamId(options: chrome.tabCapture.GetMediaStreamOptions): Pro
     chrome.tabCapture.getMediaStreamId(options, (streamId) => {
       const error = chrome.runtime.lastError
       if (error || !streamId) {
-        reject(new Error(error?.message || "Failed to start tab capture"))
+        reject(new Error(normalizeTabCaptureErrorMessage(error?.message)))
         return
       }
       resolve(streamId)
@@ -111,10 +111,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     ;(async () => {
       await ensureOffscreenDocument()
-      const streamId = await getMediaStreamId(getTabCaptureStreamOptions(tabId))
+      const streamId = message.sourceId ? undefined : await getMediaStreamId(getTabCaptureStreamOptions(tabId))
       return sendOffscreenMessage({
         type: "START_OFFSCREEN_AREA_RECORDING",
         recordingId: message.recordingId,
+        sourceId: message.sourceId,
         streamId,
         rect: message.rect,
         viewport: message.viewport
@@ -122,6 +123,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })()
       .then((response) => sendResponse(response))
       .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to start recording" }))
+    return true
+  }
+
+  if (message.type === "PREPARE_AREA_RECORDING") {
+    const tabId = sender.tab?.id
+    if (!tabId) {
+      sendResponse({ success: false, error: "Cannot access the current tab for recording" })
+      return
+    }
+
+    ;(async () => {
+      await ensureOffscreenDocument()
+      const streamId = await getMediaStreamId(getTabCaptureStreamOptions(tabId))
+      return sendOffscreenMessage({
+        type: "PREPARE_OFFSCREEN_AREA_RECORDING_SOURCE",
+        sourceId: message.sourceId,
+        streamId
+      })
+    })()
+      .then((response) => sendResponse(response))
+      .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to prepare recording" }))
+    return true
+  }
+
+  if (message.type === "RELEASE_AREA_RECORDING_SOURCE") {
+    sendOffscreenMessage({
+      type: "RELEASE_OFFSCREEN_AREA_RECORDING_SOURCE",
+      sourceId: message.sourceId
+    })
+      .then((response) => sendResponse(response))
+      .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to release recording source" }))
     return true
   }
 
