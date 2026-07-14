@@ -114,11 +114,15 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function getCaptureCoordinateSpace(viewport: ViewportSize): CaptureCoordinateSpace {
+  const captureInsetLeft = getFiniteNumber(viewport.captureInsetLeft) ?? 0
+  const captureInsetTop = getFiniteNumber(viewport.captureInsetTop) ?? 0
+  const layoutWidth = getPositiveNumber(viewport.clientWidth) ?? getPositiveNumber(viewport.width) ?? 1
+  const layoutHeight = getPositiveNumber(viewport.clientHeight) ?? getPositiveNumber(viewport.height) ?? 1
   return {
-    width: getPositiveNumber(viewport.clientWidth) ?? getPositiveNumber(viewport.width) ?? 1,
-    height: getPositiveNumber(viewport.clientHeight) ?? getPositiveNumber(viewport.height) ?? 1,
-    offsetLeft: (getFiniteNumber(viewport.visualOffsetLeft) ?? 0) + (getFiniteNumber(viewport.captureInsetLeft) ?? 0),
-    offsetTop: (getFiniteNumber(viewport.visualOffsetTop) ?? 0) + (getFiniteNumber(viewport.captureInsetTop) ?? 0)
+    width: Math.max(1, layoutWidth + Math.max(0, captureInsetLeft) * 2),
+    height: Math.max(1, layoutHeight + Math.max(0, captureInsetTop) * 2),
+    offsetLeft: (getFiniteNumber(viewport.visualOffsetLeft) ?? 0) + captureInsetLeft,
+    offsetTop: (getFiniteNumber(viewport.visualOffsetTop) ?? 0) + captureInsetTop
   }
 }
 
