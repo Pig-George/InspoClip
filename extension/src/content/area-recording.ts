@@ -117,9 +117,9 @@ export function getAreaCaptureToolbarPosition(
   toolbar: ToolbarSize,
   margin = 12
 ): { left: number; top: number; placement: "top" | "bottom" } {
-  const centeredLeft = rect.x + rect.width / 2 - toolbar.width / 2
+  const rightAlignedLeft = rect.x + rect.width - toolbar.width
   const maxLeft = Math.max(margin, viewport.width - toolbar.width - margin)
-  const left = Math.min(Math.max(margin, centeredLeft), maxLeft)
+  const left = Math.min(Math.max(margin, rightAlignedLeft), maxLeft)
 
   const bottomTop = rect.y + rect.height + margin
   if (bottomTop + toolbar.height <= viewport.height - margin) {

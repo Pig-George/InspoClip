@@ -46,7 +46,7 @@ describe("area recording helpers", () => {
     })
   })
 
-  test("places the toolbar below the selected area when there is enough room", () => {
+  test("right-aligns the toolbar below the selected area when there is enough room", () => {
     const position = getAreaCaptureToolbarPosition(
       { x: 100, y: 120, width: 240, height: 120 },
       { width: 800, height: 600 },
@@ -55,7 +55,7 @@ describe("area recording helpers", () => {
 
     expect(position.placement).toBe("bottom")
     expect(position.top).toBe(252)
-    expect(position.left).toBe(90)
+    expect(position.left).toBe(80)
   })
 
   test("places the toolbar above the selected area when bottom space is not enough", () => {
@@ -77,6 +77,16 @@ describe("area recording helpers", () => {
     )
 
     expect(position.left).toBe(12)
+  })
+
+  test("keeps a right-aligned toolbar inside the viewport right edge", () => {
+    const position = getAreaCaptureToolbarPosition(
+      { x: 760, y: 80, width: 30, height: 40 },
+      { width: 800, height: 600 },
+      { width: 260, height: 44 }
+    )
+
+    expect(position.left).toBe(528)
   })
 
   test("formats recording duration as mm:ss", () => {
