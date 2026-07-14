@@ -411,7 +411,7 @@ export const config: PlasmoCSConfig = {
   }
 
   async function startAreaRecording(rect, overlay, toolbar) {
-    if (!navigator.mediaDevices?.getDisplayMedia || typeof MediaRecorder === 'undefined') {
+    if ((!navigator.mediaDevices?.getUserMedia && !navigator.mediaDevices?.getDisplayMedia) || typeof MediaRecorder === 'undefined') {
       showToast(locale === 'zh' ? '当前浏览器不支持录屏' : 'Screen recording is not supported in this browser', 'error');
       setTimeout(removeToast, 3000);
       return;
@@ -424,11 +424,21 @@ export const config: PlasmoCSConfig = {
     }
 
     try {
-      const streamResponse = await chrome.runtime.sendMessage({ type: 'GET_TAB_CAPTURE_STREAM_ID' });
-      if (!streamResponse?.success || !streamResponse.streamId) {
-        throw new Error(streamResponse?.error || 'Failed to capture current tab');
+      let sourceStream;
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('Current tab capture is not supported');
+        const streamResponse = await chrome.runtime.sendMessage({ type: 'GET_TAB_CAPTURE_STREAM_ID' });
+        if (!streamResponse?.success || !streamResponse.streamId) {
+          throw new Error(streamResponse?.error || 'Failed to capture current tab');
+        }
+        sourceStream = await navigator.mediaDevices.getUserMedia(getTabCaptureMediaConstraints(streamResponse.streamId));
+      } catch (tabCaptureError) {
+        if (!navigator.mediaDevices?.getDisplayMedia) throw tabCaptureError;
+        sourceStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: 30 },
+          audio: false,
+        });
       }
-      const sourceStream = await navigator.mediaDevices.getUserMedia(getTabCaptureMediaConstraints(streamResponse.streamId));
       overlay.classList.add('inspoclip-area-overlay-recording');
       toolbar.classList.add('inspoclip-area-toolbar-recording');
       toolbar.innerHTML = `

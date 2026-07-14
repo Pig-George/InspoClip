@@ -1,6 +1,7 @@
 import { CONTEXT_MENUS } from "./src/background/constants"
 import { captureAndUpload } from "./src/background/capture"
 import { fetchImageAsDataUrl, sendContentMessage } from "./src/background/messages"
+import { getTabCaptureStreamOptions } from "./src/background/tab-capture"
 import { openVideoInApp, saveVideoFromUrl } from "./src/background/video"
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -60,7 +61,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return
     }
 
-    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
+    chrome.tabCapture.getMediaStreamId(getTabCaptureStreamOptions(tabId), (streamId) => {
       const error = chrome.runtime.lastError
       if (error || !streamId) {
         sendResponse({ success: false, error: error?.message || "Failed to capture current tab" })
