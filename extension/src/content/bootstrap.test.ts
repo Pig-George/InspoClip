@@ -4,7 +4,8 @@ import {
   CONTENT_RUNTIME_MARKER,
   claimContentRuntime,
   removeExistingContentRoot,
-  setContentRootInteractive
+  setContentRootInteractive,
+  shouldExpandContentRoot
 } from "./bootstrap"
 
 describe("content bootstrap helpers", () => {
@@ -50,5 +51,25 @@ describe("content bootstrap helpers", () => {
     expect(root.style.cssText).toContain("width:0")
     expect(root.style.cssText).toContain("height:0")
     expect(root.style.cssText).toContain("overflow:visible")
+  })
+
+  test("collapses the content root while area recording lets the page stay interactive", () => {
+    expect(shouldExpandContentRoot({
+      hasModal: false,
+      hasAreaOverlay: true,
+      isAreaRecording: true
+    })).toBe(false)
+
+    expect(shouldExpandContentRoot({
+      hasModal: false,
+      hasAreaOverlay: true,
+      isAreaRecording: false
+    })).toBe(true)
+
+    expect(shouldExpandContentRoot({
+      hasModal: true,
+      hasAreaOverlay: true,
+      isAreaRecording: true
+    })).toBe(true)
   })
 })

@@ -577,6 +577,11 @@
     }
 
     .inspoclip-area-overlay-recording {
+      right: auto;
+      bottom: auto;
+      width: 0;
+      height: 0;
+      overflow: visible;
       pointer-events: none;
       background: transparent;
     }

@@ -9,7 +9,7 @@ import {
   moveAreaRect,
   resizeAreaRect,
 } from "../src/content/area-recording"
-import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive } from "../src/content/bootstrap"
+import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive, shouldExpandContentRoot } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
 import { dataUrlToBlob } from "../src/content/image"
@@ -81,7 +81,11 @@ export const config: PlasmoCSConfig = {
   let videoPromptTarget = '';
 
   function syncContentRootInteractivity() {
-    setContentRootInteractive(root, Boolean(currentModal || areaOverlay));
+    setContentRootInteractive(root, shouldExpandContentRoot({
+      hasModal: Boolean(currentModal),
+      hasAreaOverlay: Boolean(areaOverlay),
+      isAreaRecording: Boolean(areaOverlay?.classList.contains('inspoclip-area-overlay-recording')),
+    }));
   }
 
   // Load server URL
@@ -513,6 +517,7 @@ export const config: PlasmoCSConfig = {
     try {
       if (!preparedSource) throw new Error(locale === 'zh' ? '录屏权限未准备好，请重新从 InspoClip 启动框选' : 'Recording permission is not ready. Please start area capture from InspoClip again.');
       overlay.classList.add('inspoclip-area-overlay-recording');
+      syncContentRootInteractivity();
       await preparedSource.promise;
       preparedAreaRecordingSource = null;
       const startResponse = await sendRuntimeMessage({
@@ -613,6 +618,7 @@ export const config: PlasmoCSConfig = {
     } catch (err) {
       await sendRuntimeMessage({ type: 'CANCEL_AREA_RECORDING', recordingId }).catch(() => {});
       overlay.classList.remove('inspoclip-area-overlay-recording');
+      syncContentRootInteractivity();
       if (recordBtn) {
         recordBtn.disabled = false;
         recordBtn.textContent = locale === 'zh' ? '录屏' : 'Record';
