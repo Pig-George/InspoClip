@@ -687,30 +687,32 @@
     .inspoclip-area-toolbar {
       position: fixed;
       z-index: 4;
-      min-width: 278px;
+      width: max-content;
       max-width: calc(100vw - 24px);
       box-sizing: border-box;
       border: 1px solid rgba(224, 190, 148, 0.92);
-      border-radius: 14px;
+      border-radius: 13px;
       background: rgba(255, 250, 242, 0.96);
-      box-shadow: 0 10px 32px rgba(74, 48, 40, 0.22), 0 2px 8px rgba(74, 48, 40, 0.08);
+      box-shadow: 0 10px 28px rgba(74, 48, 40, 0.18), 0 2px 8px rgba(74, 48, 40, 0.07);
       color: #4a3028;
-      padding: 7px;
+      padding: 5px;
       pointer-events: auto;
       cursor: default;
       backdrop-filter: blur(8px);
+      transform-origin: calc(100% - 20px) 0;
+      animation: inspoclip-area-dock-arrive 0.36s cubic-bezier(0.2, 0.9, 0.25, 1.25) both;
     }
 
     .inspoclip-area-toolbar::before {
       content: "";
       position: absolute;
-      left: 50%;
+      right: 17px;
       width: 10px;
       height: 10px;
       background: rgba(255, 250, 242, 0.96);
       border-left: 1px solid rgba(224, 190, 148, 0.92);
       border-top: 1px solid rgba(224, 190, 148, 0.92);
-      transform: translateX(-50%) rotate(45deg);
+      transform: rotate(45deg);
     }
 
     .inspoclip-area-toolbar[data-placement="bottom"]::before {
@@ -719,154 +721,265 @@
 
     .inspoclip-area-toolbar[data-placement="top"]::before {
       bottom: -6px;
-      transform: translateX(-50%) rotate(225deg);
+      transform: rotate(225deg);
+    }
+
+    .inspoclip-area-toolbar[data-placement="top"] {
+      transform-origin: calc(100% - 20px) 100%;
     }
 
     .inspoclip-area-toolbar-main,
     .inspoclip-area-toolbar-recording {
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 5px;
     }
 
     .inspoclip-area-toolbar-main {
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
     }
 
-    .inspoclip-area-audio-toggle {
+    .inspoclip-area-icon-button,
+    .inspoclip-area-icon-status {
+      appearance: none;
       position: relative;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      color: #6b5448;
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      white-space: nowrap;
-      user-select: none;
-    }
-
-    .inspoclip-area-audio-toggle input {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .inspoclip-area-audio-switch {
-      position: relative;
-      width: 28px;
-      height: 16px;
-      border-radius: 999px;
-      background: #d9c7a9;
-      box-shadow: inset 0 0 0 1px rgba(74, 48, 40, 0.08);
-      transition: background 0.18s ease, box-shadow 0.18s ease;
-      flex-shrink: 0;
-    }
-
-    .inspoclip-area-audio-switch::after {
-      content: "";
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #fffaf2;
-      box-shadow: 0 1px 3px rgba(74, 48, 40, 0.28);
-      transition: transform 0.18s ease;
-    }
-
-    .inspoclip-area-audio-toggle input:checked + .inspoclip-area-audio-switch {
-      background: #c0784a;
-    }
-
-    .inspoclip-area-audio-toggle input:checked + .inspoclip-area-audio-switch::after {
-      transform: translateX(12px);
-    }
-
-    .inspoclip-area-audio-toggle input:focus-visible + .inspoclip-area-audio-switch {
-      box-shadow: 0 0 0 3px rgba(192, 120, 74, 0.2);
-    }
-
-    .inspoclip-area-action,
-    .inspoclip-area-action-icon {
+      display: inline-grid;
+      width: 32px;
+      height: 32px;
+      box-sizing: border-box;
+      place-items: center;
+      flex: 0 0 32px;
       border: none;
-      border-radius: 10px;
+      border-radius: 9px;
       background: #e8d5b0;
       color: #4a3028;
-      font-size: 12px;
-      font-weight: 700;
-      padding: 7px 12px;
+      padding: 0;
+      line-height: 1;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
+    }
+
+    .inspoclip-area-icon-button {
       cursor: pointer;
-      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-      white-space: nowrap;
     }
 
-    .inspoclip-area-action:hover,
-    .inspoclip-area-action-icon:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 8px rgba(74,48,40,0.12);
+    .inspoclip-area-icon-button svg,
+    .inspoclip-area-icon-status svg {
+      display: block;
+      width: 16px;
+      height: 16px;
     }
 
-    .inspoclip-area-action:disabled {
-      opacity: 0.65;
-      cursor: not-allowed;
+    .inspoclip-area-icon-button:hover {
+      z-index: 2;
+      background: #f0dfc4;
+      box-shadow: 0 4px 10px rgba(74, 48, 40, 0.13);
+      transform: translateY(-2px);
+    }
+
+    .inspoclip-area-icon-button:active {
+      transform: translateY(0) scale(0.94);
+    }
+
+    .inspoclip-area-icon-button:focus-visible {
+      outline: 2px solid rgba(192, 120, 74, 0.55);
+      outline-offset: 2px;
+    }
+
+    .inspoclip-area-icon-button:disabled {
+      opacity: 0.62;
+      cursor: wait;
       transform: none;
       box-shadow: none;
     }
 
-    .inspoclip-area-action-primary {
+    .inspoclip-area-icon-button-primary {
       background: #c0784a;
+      color: #fffaf2;
+    }
+
+    .inspoclip-area-icon-button-primary:hover {
+      background: #ad6840;
       color: #fff;
+    }
+
+    .inspoclip-area-icon-button-quiet {
+      background: transparent;
+      color: #8a7060;
+    }
+
+    .inspoclip-area-icon-button-active,
+    .inspoclip-area-icon-status.inspoclip-area-icon-button-active {
+      background: rgba(192, 120, 74, 0.14);
+      color: #a65f37;
+      box-shadow: inset 0 0 0 1px rgba(192, 120, 74, 0.24);
+    }
+
+    .inspoclip-area-toolbar-separator {
+      width: 1px;
+      height: 18px;
+      margin: 0 2px;
+      background: rgba(192, 120, 74, 0.22);
+      flex: 0 0 1px;
+    }
+
+    .inspoclip-area-record-time {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 58px;
+      padding: 0 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: #4a3028;
+      white-space: nowrap;
+    }
+
+    .inspoclip-area-record-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #f44336;
+      box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.13);
+      animation: inspoclip-record-breathe 1.4s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    .inspoclip-area-toolbar [data-tooltip] {
+      position: relative;
+    }
+
+    .inspoclip-area-toolbar [data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 10px);
+      z-index: 8;
+      width: max-content;
+      max-width: 190px;
+      padding: 6px 9px;
+      border-radius: 8px;
+      background: #4a3028;
+      color: #fffaf2;
+      box-shadow: 0 6px 18px rgba(74, 48, 40, 0.2);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.35;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(4px) scale(0.96);
+      transform-origin: bottom right;
+      transition: opacity 0.15s ease, visibility 0.15s ease, transform 0.15s ease;
+    }
+
+    .inspoclip-area-toolbar[data-placement="top"] [data-tooltip]::after {
+      top: calc(100% + 10px);
+      bottom: auto;
+      transform-origin: top right;
+    }
+
+    .inspoclip-area-toolbar [data-tooltip]:hover::after,
+    .inspoclip-area-toolbar [data-tooltip]:focus-visible::after,
+    .inspoclip-area-action-confirm::after {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
     }
 
     .inspoclip-area-action-confirm {
       background: #d75b4a;
       color: #fff;
+      animation: inspoclip-retake-confirm 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
     }
 
-    .inspoclip-area-audio-status {
-      border-radius: 999px;
-      background: rgba(192, 120, 74, 0.12);
-      color: #a65f37;
-      padding: 4px 7px;
-      font-size: 10px;
-      font-weight: 700;
-      white-space: nowrap;
+    .inspoclip-area-action-processing[data-action="retake"] svg {
+      animation: inspoclip-retake-turn 0.64s cubic-bezier(0.4, 0, 0.2, 1) both;
     }
 
-    .inspoclip-area-action-icon {
-      width: 30px;
-      height: 30px;
-      padding: 0;
-      font-size: 17px;
-      line-height: 1;
-      background: rgba(232, 213, 176, 0.72);
+    .inspoclip-area-action-completing {
+      animation: inspoclip-complete-bounce 0.52s cubic-bezier(0.2, 0.9, 0.25, 1.3) both;
     }
 
-    .inspoclip-area-record-dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 999px;
-      background: #f44336;
-      box-shadow: 0 0 0 4px rgba(244, 67, 54, 0.12);
-      animation: inspoclip-record-pulse 1s ease-in-out infinite;
-      flex-shrink: 0;
+    .inspoclip-area-icon-swap {
+      animation: inspoclip-area-icon-swap 0.22s cubic-bezier(0.2, 0.9, 0.25, 1.25) both;
     }
 
-    .inspoclip-area-record-time {
-      min-width: 42px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
-      font-weight: 700;
-      color: #4a3028;
+    .inspoclip-area-sound-pop {
+      animation: inspoclip-area-sound-pop 0.36s cubic-bezier(0.2, 0.9, 0.25, 1.3) both;
     }
 
-    @keyframes inspoclip-record-pulse {
+    .inspoclip-area-sound-pop::before {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border: 1px solid #c0784a;
+      border-radius: 7px;
+      pointer-events: none;
+      animation: inspoclip-area-sound-ring 0.52s ease-out both;
+    }
+
+    .inspoclip-area-toolbar-state-change {
+      animation: inspoclip-area-dock-arrive 0.36s cubic-bezier(0.2, 0.9, 0.25, 1.25) both;
+    }
+
+    @keyframes inspoclip-area-dock-arrive {
+      from { opacity: 0; transform: translateY(-7px) scale(0.94); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes inspoclip-area-sound-pop {
+      0% { transform: scale(0.82); }
+      65% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes inspoclip-area-icon-swap {
+      0% { transform: scale(0.86); }
+      70% { transform: scale(1.06); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes inspoclip-area-sound-ring {
+      from { opacity: 0.7; transform: scale(0.65); }
+      to { opacity: 0; transform: scale(1.7); }
+    }
+
+    @keyframes inspoclip-record-breathe {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.55; transform: scale(0.86); }
+      50% { opacity: 0.48; transform: scale(0.78); }
+    }
+
+    @keyframes inspoclip-retake-confirm {
+      0%, 100% { transform: translateX(0); }
+      30% { transform: translateX(-2px); }
+      55% { transform: translateX(2px); }
+      75% { transform: translateX(-1px); }
+    }
+
+    @keyframes inspoclip-retake-turn {
+      from { transform: rotate(0); }
+      to { transform: rotate(-360deg); }
+    }
+
+    @keyframes inspoclip-complete-bounce {
+      0% { transform: scale(1); }
+      45% { transform: scale(0.88); }
+      72% { transform: scale(1.14); }
+      100% { transform: scale(1); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .inspoclip-area-toolbar,
+      .inspoclip-area-toolbar *,
+      .inspoclip-area-toolbar *::before,
+      .inspoclip-area-toolbar *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+      }
     }
 
     /* Video analysis modal */

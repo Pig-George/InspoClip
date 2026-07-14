@@ -327,7 +327,7 @@ export const config: PlasmoCSConfig = {
   function renderAreaToolbarIconButton(action, dataAction, className = '', pressed) {
     const label = getAreaToolbarActionLabel(action, getAreaToolbarLocale());
     const pressedAttribute = typeof pressed === 'boolean' ? ` aria-pressed="${pressed}"` : '';
-    return `<button class="inspoclip-area-icon-button ${className}" data-action="${dataAction}" data-tooltip="${label}" aria-label="${label}"${pressedAttribute}>${getAreaToolbarActionIcon(action)}</button>`;
+    return `<button type="button" class="inspoclip-area-icon-button ${className}" data-action="${dataAction}" data-tooltip="${label}" aria-label="${label}"${pressedAttribute}>${getAreaToolbarActionIcon(action)}</button>`;
   }
 
   function setAreaToolbarButtonAction(button, action) {
@@ -336,6 +336,9 @@ export const config: PlasmoCSConfig = {
     button.innerHTML = getAreaToolbarActionIcon(action);
     button.dataset.tooltip = label;
     button.setAttribute('aria-label', label);
+    button.classList.remove('inspoclip-area-icon-swap');
+    void button.offsetWidth;
+    button.classList.add('inspoclip-area-icon-swap');
   }
 
   function showAreaCaptureControls(overlay, selection, hoverHighlight, instructions, rect, mode) {
@@ -451,7 +454,7 @@ export const config: PlasmoCSConfig = {
   }
 
   function positionAreaToolbar(toolbar, rect) {
-    const fallbackWidth = toolbar.classList.contains('inspoclip-area-toolbar-recording') ? 242 : 186;
+    const fallbackWidth = toolbar.classList.contains('inspoclip-area-toolbar-recording') ? 228 : 165;
     const position = getAreaCaptureToolbarPosition(
       rect,
       { width: window.innerWidth, height: window.innerHeight },
@@ -580,6 +583,9 @@ export const config: PlasmoCSConfig = {
         ${renderAreaToolbarIconButton('retake', 'retake')}
         ${renderAreaToolbarIconButton('finish', 'finish', 'inspoclip-area-icon-button-primary')}
       `;
+      toolbar.style.animation = 'none';
+      void toolbar.offsetWidth;
+      toolbar.style.animation = '';
       positionAreaToolbar(toolbar, rect);
       toolbar.addEventListener('mousedown', (event) => event.stopPropagation());
       toolbar.addEventListener('mouseup', (event) => event.stopPropagation());
