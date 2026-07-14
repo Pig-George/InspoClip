@@ -22,6 +22,54 @@ export type SourceSize = {
 
 export const DEFAULT_AREA_RECORDING_AUDIO_ENABLED = false
 
+export type AreaToolbarAction =
+  | "screenshot"
+  | "record"
+  | "sound-on"
+  | "sound-off"
+  | "cancel"
+  | "pause"
+  | "resume"
+  | "retake"
+  | "confirm-retake"
+  | "finish"
+
+type AreaToolbarLocale = "zh" | "en"
+
+const AREA_TOOLBAR_LABELS: Record<AreaToolbarAction, Record<AreaToolbarLocale, string>> = {
+  screenshot: { zh: "截图", en: "Screenshot" },
+  record: { zh: "开始录屏", en: "Start recording" },
+  "sound-on": { zh: "录制标签页声音：已开启", en: "Record tab audio: on" },
+  "sound-off": { zh: "录制标签页声音：已关闭", en: "Record tab audio: off" },
+  cancel: { zh: "取消", en: "Cancel" },
+  pause: { zh: "暂停", en: "Pause" },
+  resume: { zh: "继续", en: "Resume" },
+  retake: { zh: "重录", en: "Retake" },
+  "confirm-retake": { zh: "再次点击确认重录", en: "Click again to confirm retake" },
+  finish: { zh: "完成并分析", en: "Finish and analyze" }
+}
+
+const AREA_TOOLBAR_ICON_PATHS: Record<AreaToolbarAction, string> = {
+  screenshot: '<path d="M5 3H3v2M11 3h2v2M5 13H3v-2M11 13h2v-2"/><rect x="5" y="5" width="6" height="6" rx="1.5"/>',
+  record: '<rect x="2.5" y="4" width="8" height="8" rx="2"/><path d="m10.5 7 3-1.5v5l-3-1.5z"/>',
+  "sound-on": '<path d="M3 7v2h2l3 2.5v-7L5 7z"/><path d="M10.5 6a3 3 0 0 1 0 4M12 4.5a5 5 0 0 1 0 7"/>',
+  "sound-off": '<path d="M3 7v2h2l3 2.5v-7L5 7z"/><path d="m10.5 6.5 3 3M13.5 6.5l-3 3"/>',
+  cancel: '<path d="m4 4 8 8M12 4l-8 8"/>',
+  pause: '<path d="M5.5 4v8M10.5 4v8"/>',
+  resume: '<path d="m5 3.5 7 4.5-7 4.5z"/>',
+  retake: '<path d="M4 5H1.8V2.8"/><path d="M2.2 5.2A6 6 0 1 1 2 10"/>',
+  "confirm-retake": '<path d="M4 5H1.8V2.8"/><path d="M2.2 5.2A6 6 0 1 1 2 10"/>',
+  finish: '<path d="m3.5 8 3 3 6-6"/>'
+}
+
+export function getAreaToolbarActionLabel(action: AreaToolbarAction, locale: AreaToolbarLocale): string {
+  return AREA_TOOLBAR_LABELS[action][locale]
+}
+
+export function getAreaToolbarActionIcon(action: AreaToolbarAction): string {
+  return `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${AREA_TOOLBAR_ICON_PATHS[action]}</svg>`
+}
+
 export type AreaRecordingTimerState = {
   startedAt: number
   pausedAt: number

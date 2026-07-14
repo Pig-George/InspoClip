@@ -10,6 +10,8 @@ import {
   getAreaRecordingInnerRect,
   getAreaRecordingSourceRect,
   getAreaCaptureToolbarPosition,
+  getAreaToolbarActionIcon,
+  getAreaToolbarActionLabel,
   getPreferredRecordingMimeType,
   getRecordingUploadMimeType,
   moveAreaRect,
@@ -17,6 +19,42 @@ import {
 } from "./area-recording"
 
 describe("area recording helpers", () => {
+  test("localizes every area toolbar action", () => {
+    expect(getAreaToolbarActionLabel("screenshot", "zh")).toBe("截图")
+    expect(getAreaToolbarActionLabel("record", "en")).toBe("Start recording")
+    expect(getAreaToolbarActionLabel("sound-on", "zh")).toBe("录制标签页声音：已开启")
+    expect(getAreaToolbarActionLabel("sound-off", "en")).toBe("Record tab audio: off")
+    expect(getAreaToolbarActionLabel("cancel", "zh")).toBe("取消")
+    expect(getAreaToolbarActionLabel("pause", "en")).toBe("Pause")
+    expect(getAreaToolbarActionLabel("resume", "zh")).toBe("继续")
+    expect(getAreaToolbarActionLabel("retake", "en")).toBe("Retake")
+    expect(getAreaToolbarActionLabel("confirm-retake", "zh")).toBe("再次点击确认重录")
+    expect(getAreaToolbarActionLabel("finish", "en")).toBe("Finish and analyze")
+  })
+
+  test("renders every toolbar action as a currentColor inline svg without emoji", () => {
+    const actions = [
+      "screenshot",
+      "record",
+      "sound-on",
+      "sound-off",
+      "cancel",
+      "pause",
+      "resume",
+      "retake",
+      "confirm-retake",
+      "finish"
+    ] as const
+
+    actions.forEach((action) => {
+      const icon = getAreaToolbarActionIcon(action)
+      expect(icon).toContain("<svg")
+      expect(icon).toContain('stroke="currentColor"')
+      expect(icon).toContain('aria-hidden="true"')
+      expect(icon).not.toMatch(/[📷🎥🔊🔇⏸▶↻✅❌]/u)
+    })
+  })
+
   test("keeps tab audio disabled by default", () => {
     expect(DEFAULT_AREA_RECORDING_AUDIO_ENABLED).toBe(false)
   })
