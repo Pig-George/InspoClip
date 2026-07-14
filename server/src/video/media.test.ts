@@ -118,4 +118,23 @@ describe('video media validation', () => {
       'recording.model.mp4',
     ]);
   });
+
+  it('pads a short browser-recorded webm to the recorded duration for model input', async () => {
+    const run = vi.fn().mockResolvedValue({ stdout: '' });
+    await expect(ensureModelCompatibleVideo('recording.webm', 'recording.model.mp4', run, { targetDurationMs: 10_000 })).resolves.toBe('recording.model.mp4');
+    expect(run).toHaveBeenCalledWith('ffmpeg', [
+      '-y',
+      '-i', 'recording.webm',
+      '-an',
+      '-r', '30',
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '23',
+      '-pix_fmt', 'yuv420p',
+      '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,tpad=stop_mode=clone:stop_duration=10.000',
+      '-t', '10.000',
+      '-movflags', '+faststart',
+      'recording.model.mp4',
+    ]);
+  });
 });

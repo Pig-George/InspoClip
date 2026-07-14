@@ -57,7 +57,7 @@ type ActiveRecording = {
   video: HTMLVideoElement
   recorder: MediaRecorder
   chunks: Blob[]
-  animationFrameId: number
+  frameTimerId: number
   mimeType: string
 }
 
@@ -76,6 +76,11 @@ export function getPreferredRecordingMimeType(
 export function getRecordingUploadMimeType(recordingMimeType: string): string {
   const baseMimeType = recordingMimeType.split(";")[0]?.trim().toLowerCase()
   return baseMimeType || "video/webm"
+}
+
+export function getOffscreenRecordingFrameIntervalMs(fps: number): number {
+  const safeFps = Number.isFinite(fps) ? Math.min(30, Math.max(1, Math.round(fps))) : 30
+  return Math.round(1000 / safeFps)
 }
 
 export function getAreaRecordingSourceRect(
@@ -113,7 +118,7 @@ function waitForVideoReady(video: HTMLVideoElement): Promise<void> {
 }
 
 function cleanupRecording(recording: ActiveRecording): void {
-  cancelAnimationFrame(recording.animationFrameId)
+  clearInterval(recording.frameTimerId)
   recording.sourceStream.getTracks().forEach((track) => track.stop())
   recording.outputStream.getTracks().forEach((track) => track.stop())
   recording.video.pause()
@@ -126,6 +131,7 @@ function stopMediaRecorder(recorder: MediaRecorder): Promise<void> {
       resolve()
       return
     }
+    recorder.requestData()
     recorder.addEventListener("stop", () => resolve(), { once: true })
     recorder.stop()
   })
@@ -168,6 +174,7 @@ export class OffscreenAreaRecorder {
     }
 
     const outputStream = canvas.captureStream(30)
+    const canvasTrack = outputStream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined
     const mimeType = getPreferredRecordingMimeType(MediaRecorder)
     const recorder = new MediaRecorder(outputStream, mimeType ? { mimeType } : undefined)
     const chunks: Blob[] = []
@@ -182,7 +189,7 @@ export class OffscreenAreaRecorder {
       video,
       recorder,
       chunks,
-      animationFrameId: 0,
+      frameTimerId: 0,
       mimeType
     }
     this.recordings.set(command.recordingId, recording)
@@ -201,12 +208,13 @@ export class OffscreenAreaRecorder {
           canvas.width,
           canvas.height
         )
+        canvasTrack?.requestFrame?.()
       }
-      recording.animationFrameId = requestAnimationFrame(drawFrame)
     }
 
     recorder.start(1000)
     drawFrame()
+    recording.frameTimerId = window.setInterval(drawFrame, getOffscreenRecordingFrameIntervalMs(30))
 
     return {
       recordingId: command.recordingId,

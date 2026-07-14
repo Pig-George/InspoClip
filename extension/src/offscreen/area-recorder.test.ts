@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest"
 
-import { getAreaRecordingSourceRect, getTabCaptureMediaConstraints } from "./area-recorder"
+import { getAreaRecordingSourceRect, getOffscreenRecordingFrameIntervalMs, getTabCaptureMediaConstraints } from "./area-recorder"
 
 describe("offscreen area recorder helpers", () => {
   test("creates tab capture media constraints", () => {
@@ -21,5 +21,11 @@ describe("offscreen area recorder helpers", () => {
       { width: 1600, height: 1200 },
       { width: 800, height: 600 }
     )).toEqual({ x: 20, y: 40, width: 400, height: 200 })
+  })
+
+  test("uses a fixed timer interval suitable for offscreen recording", () => {
+    expect(getOffscreenRecordingFrameIntervalMs(30)).toBe(33)
+    expect(getOffscreenRecordingFrameIntervalMs(60)).toBe(33)
+    expect(getOffscreenRecordingFrameIntervalMs(10)).toBe(100)
   })
 })

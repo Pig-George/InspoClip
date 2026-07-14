@@ -13,6 +13,10 @@ export interface InspectVideoOptions {
   fallbackDurationMs?: number;
 }
 
+export interface ModelCompatibleVideoOptions {
+  targetDurationMs?: number;
+}
+
 const defaultRunner: CommandRunner = (command, args) => new Promise((resolve, reject) => {
   execFile(command, args, { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 }, (error, stdout) => {
     if (error) reject(error);
@@ -148,7 +152,13 @@ export async function ensureModelCompatibleVideo(
   inputPath: string,
   outputPath: string,
   run: CommandRunner = defaultRunner,
+  options: ModelCompatibleVideoOptions = {},
 ): Promise<string> {
+  const targetDurationSeconds = normalizeFallbackDurationMs(options.targetDurationMs) / 1000;
+  const videoFilter = targetDurationSeconds > 0
+    ? `scale=trunc(iw/2)*2:trunc(ih/2)*2,tpad=stop_mode=clone:stop_duration=${targetDurationSeconds.toFixed(3)}`
+    : 'scale=trunc(iw/2)*2:trunc(ih/2)*2';
+  const durationArgs = targetDurationSeconds > 0 ? ['-t', targetDurationSeconds.toFixed(3)] : [];
   await run('ffmpeg', [
     '-y',
     '-i', inputPath,
@@ -158,7 +168,8 @@ export async function ensureModelCompatibleVideo(
     '-preset', 'veryfast',
     '-crf', '23',
     '-pix_fmt', 'yuv420p',
-    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+    '-vf', videoFilter,
+    ...durationArgs,
     '-movflags', '+faststart',
     outputPath,
   ]);

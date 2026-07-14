@@ -70,6 +70,10 @@ describe('model video routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.toString()).toBe('mp4-bytes');
     expect(response.headers['content-type']).toContain('video/mp4');
-    expect(prepareModelVideo).toHaveBeenCalledWith(path.join(tmpDir, 'recording.webm'), path.join(tmpDir, 'recording.model.mp4'));
+    expect(prepareModelVideo).toHaveBeenCalledWith(
+      path.join(tmpDir, 'recording.webm'),
+      path.join(tmpDir, 'recording.model.mp4'),
+      { targetDurationMs: 10_000 },
+    );
   });
 });

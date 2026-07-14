@@ -9,7 +9,7 @@ export interface ModelVideosRouterDependencies {
   repository: VideoRepository;
   tokens: ModelVideoAccessTokens;
   videoRoot: string;
-  prepareModelVideo(inputPath: string, outputPath: string): Promise<string>;
+  prepareModelVideo(inputPath: string, outputPath: string, options?: { targetDurationMs?: number }): Promise<string>;
 }
 
 function modelCompatibleFileName(filePath: string): string {
@@ -31,7 +31,7 @@ export function createModelVideosRouter(overrides: Partial<ModelVideosRouterDepe
     repository: overrides.repository ?? new DrizzleVideoRepository(),
     tokens: overrides.tokens ?? new ModelVideoAccessTokens(),
     videoRoot: overrides.videoRoot ?? process.env.VIDEO_UPLOAD_DIR ?? './videos',
-    prepareModelVideo: overrides.prepareModelVideo ?? ensureModelCompatibleVideo,
+    prepareModelVideo: overrides.prepareModelVideo ?? ((inputPath, outputPath, options) => ensureModelCompatibleVideo(inputPath, outputPath, undefined, options)),
   };
   const router = Router();
 
@@ -54,7 +54,7 @@ export function createModelVideosRouter(overrides: Partial<ModelVideosRouterDepe
       const modelFileName = modelCompatibleFileName(storedFileName);
       const modelPath = path.join(videoRoot, modelFileName);
       if (!(await fileExists(modelPath))) {
-        await deps.prepareModelVideo(path.join(videoRoot, storedFileName), modelPath);
+        await deps.prepareModelVideo(path.join(videoRoot, storedFileName), modelPath, { targetDurationMs: video.durationMs });
       }
       fileName = modelFileName;
     }
