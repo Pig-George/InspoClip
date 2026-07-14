@@ -434,6 +434,7 @@ export const config: PlasmoCSConfig = {
     };
 
     try {
+      overlay.classList.add('inspoclip-area-overlay-recording');
       const startResponse = await sendRuntimeMessage({
         type: 'START_AREA_RECORDING',
         recordingId,
@@ -442,7 +443,6 @@ export const config: PlasmoCSConfig = {
       });
       if (!startResponse?.success) throw new Error(startResponse?.error || 'Failed to start recording');
 
-      overlay.classList.add('inspoclip-area-overlay-recording');
       toolbar.classList.add('inspoclip-area-toolbar-recording');
       toolbar.innerHTML = `
         <span class="inspoclip-area-record-dot"></span>

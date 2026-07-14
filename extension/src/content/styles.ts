@@ -571,9 +571,11 @@
     }
 
     .inspoclip-area-overlay-recording .inspoclip-area-selection {
-      box-shadow: 0 0 0 1px rgba(192, 120, 74, 0.18), 0 0 18px rgba(192, 120, 74, 0.2);
+      border-color: transparent;
+      box-shadow: none;
       background: transparent;
       pointer-events: none;
+      opacity: 0;
     }
 
     .inspoclip-area-overlay-paused .inspoclip-area-selection {
