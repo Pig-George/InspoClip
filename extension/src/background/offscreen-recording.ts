@@ -4,6 +4,32 @@ export function getTabCaptureStreamOptions(tabId: number): chrome.tabCapture.Get
   }
 }
 
+type PrepareTabCaptureMessage = {
+  type: "PREPARE_OFFSCREEN_AREA_RECORDING_SOURCE"
+  sourceId: string
+  streamId: string
+}
+
+type PrepareTabCaptureDependencies<T> = {
+  getStreamId(options: chrome.tabCapture.GetMediaStreamOptions): Promise<string>
+  ensureOffscreenDocument(): Promise<void>
+  sendOffscreenMessage(message: PrepareTabCaptureMessage): Promise<T>
+}
+
+export async function prepareTabCaptureSource<T>(
+  tabId: number,
+  sourceId: string,
+  dependencies: PrepareTabCaptureDependencies<T>
+): Promise<T> {
+  const streamId = await dependencies.getStreamId(getTabCaptureStreamOptions(tabId))
+  await dependencies.ensureOffscreenDocument()
+  return dependencies.sendOffscreenMessage({
+    type: "PREPARE_OFFSCREEN_AREA_RECORDING_SOURCE",
+    sourceId,
+    streamId
+  })
+}
+
 export function getOffscreenDocumentOptions(url: string): chrome.offscreen.CreateParameters {
   return {
     url,

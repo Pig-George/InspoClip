@@ -2,7 +2,7 @@ import { CONTEXT_MENUS } from "./src/background/constants"
 import { captureAndUpload } from "./src/background/capture"
 import { fetchImageAsDataUrl, sendContentMessage } from "./src/background/messages"
 import offscreenDocumentUrl from "url:./offscreen.html"
-import { getExtensionRelativeUrl, getOffscreenDocumentOptions, getTabCaptureStreamOptions, normalizeTabCaptureErrorMessage } from "./src/background/offscreen-recording"
+import { getExtensionRelativeUrl, getOffscreenDocumentOptions, getTabCaptureStreamOptions, normalizeTabCaptureErrorMessage, prepareTabCaptureSource } from "./src/background/offscreen-recording"
 import { openVideoInApp, saveVideoFromUrl } from "./src/background/video"
 
 const OFFSCREEN_DOCUMENT_PATH = getExtensionRelativeUrl(offscreenDocumentUrl)
@@ -134,12 +134,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     ;(async () => {
-      await ensureOffscreenDocument()
-      const streamId = await getMediaStreamId(getTabCaptureStreamOptions(tabId))
-      return sendOffscreenMessage({
-        type: "PREPARE_OFFSCREEN_AREA_RECORDING_SOURCE",
-        sourceId: message.sourceId,
-        streamId
+      return prepareTabCaptureSource(tabId, message.sourceId, {
+        getStreamId: getMediaStreamId,
+        ensureOffscreenDocument,
+        sendOffscreenMessage
       })
     })()
       .then((response) => sendResponse(response))
