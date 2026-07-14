@@ -51,6 +51,13 @@ export async function sendCurrentTabMessage(message: unknown, accessMessages?: T
   await sendTabMessageWithContentScriptFallback(tab.id, message)
 }
 
+export async function requestAreaCaptureSession(mode: "analyze" | "save"): Promise<void> {
+  const response = await chrome.runtime.sendMessage({ type: "START_AREA_CAPTURE_SESSION", mode })
+  if (!response?.success) {
+    throw new Error(response?.error || "Failed to prepare area capture")
+  }
+}
+
 async function sendTabMessageWithContentScriptFallback(tabId: number, message: unknown): Promise<void> {
   try {
     await chrome.tabs.sendMessage(tabId, message)

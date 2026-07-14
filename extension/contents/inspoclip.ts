@@ -14,6 +14,7 @@ import {
   moveAreaRect,
   resizeAreaRect,
 } from "../src/content/area-recording"
+import { createAreaRecordingSource } from "../src/content/area-recording-source"
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive, shouldExpandContentRoot } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
@@ -114,7 +115,7 @@ export const config: PlasmoCSConfig = {
       sendResponse({ ok: true });
     }
     if (msg.type === 'START_AREA_CAPTURE') {
-      startAreaCapture(msg.mode);
+      startAreaCapture(msg.mode, msg.recordingSourceId);
       sendResponse({ ok: true });
     }
     if (msg.type === 'START_ASSET_ANALYSIS') {
@@ -157,7 +158,7 @@ export const config: PlasmoCSConfig = {
   let activeAreaRecording = null;
   let preparedAreaRecordingSource = null;
 
-  function startAreaCapture(mode) {
+  function startAreaCapture(mode, recordingSourceId) {
     // Remove any existing overlay
     removeAreaOverlay();
 
@@ -182,15 +183,11 @@ export const config: PlasmoCSConfig = {
     overlay.appendChild(selection);
     container.appendChild(overlay);
     areaOverlay = overlay;
-    const sourceId = crypto.randomUUID?.() || `area-source-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    preparedAreaRecordingSource = {
-      sourceId,
-      promise: sendRuntimeMessage({ type: 'PREPARE_AREA_RECORDING', sourceId })
-        .then((response) => {
-          if (!response?.success) throw new Error(response?.error || 'Failed to prepare recording');
-          return response;
-        })
-    };
+    preparedAreaRecordingSource = createAreaRecordingSource(
+      recordingSourceId,
+      () => crypto.randomUUID?.() || `area-source-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      (sourceId) => sendRuntimeMessage({ type: 'PREPARE_AREA_RECORDING', sourceId })
+    );
     syncContentRootInteractivity();
 
     let startX = 0, startY = 0;

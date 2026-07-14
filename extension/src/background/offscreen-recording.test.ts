@@ -5,7 +5,8 @@ import {
   getOffscreenDocumentOptions,
   getTabCaptureStreamOptions,
   normalizeTabCaptureErrorMessage,
-  prepareTabCaptureSource
+  prepareTabCaptureSource,
+  startAreaCaptureWithPreparedSource
 } from "./offscreen-recording"
 
 describe("offscreen recording helpers", () => {
@@ -54,5 +55,46 @@ describe("offscreen recording helpers", () => {
 
     expect(calls).toEqual(["stream:42", "offscreen", "prepare:stream-1"])
     expect(response).toEqual({ success: true })
+  })
+
+  test("prepares the recording source before opening the area selector", async () => {
+    const calls: string[] = []
+
+    await startAreaCaptureWithPreparedSource(42, "analyze", {
+      createSourceId: () => "source-1",
+      prepareSource: async (tabId, sourceId) => {
+        calls.push(`prepare:${tabId}:${sourceId}`)
+      },
+      sendContentMessage: async (tabId, message) => {
+        calls.push(`content:${tabId}:${message.recordingSourceId}`)
+      },
+      releaseSource: async (sourceId) => {
+        calls.push(`release:${sourceId}`)
+      }
+    })
+
+    expect(calls).toEqual(["prepare:42:source-1", "content:42:source-1"])
+  })
+
+  test("releases a prepared source when the selector cannot be opened", async () => {
+    const calls: string[] = []
+
+    await expect(
+      startAreaCaptureWithPreparedSource(42, "save", {
+        createSourceId: () => "source-2",
+        prepareSource: async () => {
+          calls.push("prepare")
+        },
+        sendContentMessage: async () => {
+          calls.push("content")
+          throw new Error("content unavailable")
+        },
+        releaseSource: async (sourceId) => {
+          calls.push(`release:${sourceId}`)
+        }
+      })
+    ).rejects.toThrow("content unavailable")
+
+    expect(calls).toEqual(["prepare", "content", "release:source-2"])
   })
 })

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { DEFAULT_APP_URL, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS, I18N, MAX_VIDEO_SIZE_BYTES, detectBrowserLocale } from "../constants"
 import { buildAssetAnalysisMessage, detectAssetKind } from "../services/assets"
 import { loadPopupSettings, normalizeAppUrl, normalizeServerUrl, savePopupSettings } from "../services/settings"
-import { openOrFocusApp, sendCurrentTabMessage } from "../services/tabs"
+import { openOrFocusApp, requestAreaCaptureSession, sendCurrentTabMessage } from "../services/tabs"
 import type { CaptureMode, ConnectionState, Locale, ShortcutTarget, StatusMessage } from "../types"
 
 export function usePopupController() {
@@ -83,9 +83,12 @@ export function usePopupController() {
 
   async function triggerAnalyze() {
     setAnalyzing(true)
-    const msg = captureMode === "area" ? { type: "START_AREA_CAPTURE", mode: "analyze" } : { type: "ANALYZE_PAGE" }
     try {
-      await sendCurrentTabMessage(msg, t)
+      if (captureMode === "area") {
+        await requestAreaCaptureSession("analyze")
+      } else {
+        await sendCurrentTabMessage({ type: "ANALYZE_PAGE" }, t)
+      }
       setTimeout(() => window.close(), 200)
     } catch (err) {
       showStatus(err instanceof Error ? err.message : "Failed to start analysis", "error")
@@ -95,12 +98,12 @@ export function usePopupController() {
 
   async function triggerSave() {
     setSaving(true)
-    const msg =
-      captureMode === "area"
-        ? { type: "START_AREA_CAPTURE", mode: "save" }
-        : { type: "SAVE_IMAGE", imageUrl: null, isImage: false }
     try {
-      await sendCurrentTabMessage(msg, t)
+      if (captureMode === "area") {
+        await requestAreaCaptureSession("save")
+      } else {
+        await sendCurrentTabMessage({ type: "SAVE_IMAGE", imageUrl: null, isImage: false }, t)
+      }
       setTimeout(() => window.close(), 200)
     } catch (err) {
       showStatus(err instanceof Error ? err.message : "Failed to start save", "error")

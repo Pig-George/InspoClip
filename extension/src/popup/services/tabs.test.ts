@@ -1,8 +1,12 @@
-import { describe, expect, test } from "vitest"
+import { afterEach, describe, expect, test, vi } from "vitest"
 
-import { getManifestContentScriptFiles, getTabAccessErrorMessage, isInjectableTabUrl } from "./tabs"
+import { getManifestContentScriptFiles, getTabAccessErrorMessage, isInjectableTabUrl, requestAreaCaptureSession } from "./tabs"
 
 describe("popup tab messaging helpers", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   test("reads generated Plasmo content script files from the manifest", () => {
     expect(
       getManifestContentScriptFiles({
@@ -39,5 +43,22 @@ describe("popup tab messaging helpers", () => {
 
     expect(getTabAccessErrorMessage("chrome://extensions/", messages)).toBe(messages.inaccessiblePage)
     expect(getTabAccessErrorMessage("file:///Users/demo/video.html", messages)).toBe(messages.inaccessibleFilePage)
+  })
+
+  test("starts area capture through the background permission session", async () => {
+    const sendMessage = vi.fn().mockResolvedValue({ success: true })
+    vi.stubGlobal("chrome", { runtime: { sendMessage } })
+
+    await requestAreaCaptureSession("analyze")
+
+    expect(sendMessage).toHaveBeenCalledWith({ type: "START_AREA_CAPTURE_SESSION", mode: "analyze" })
+  })
+
+  test("surfaces background preparation failures", async () => {
+    vi.stubGlobal("chrome", {
+      runtime: { sendMessage: vi.fn().mockResolvedValue({ success: false, error: "permission denied" }) }
+    })
+
+    await expect(requestAreaCaptureSession("save")).rejects.toThrow("permission denied")
   })
 })

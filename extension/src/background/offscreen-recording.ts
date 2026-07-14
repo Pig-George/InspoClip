@@ -16,6 +16,21 @@ type PrepareTabCaptureDependencies<T> = {
   sendOffscreenMessage(message: PrepareTabCaptureMessage): Promise<T>
 }
 
+type AreaCaptureMode = "analyze" | "save"
+
+type AreaCaptureMessage = {
+  type: "START_AREA_CAPTURE"
+  mode: AreaCaptureMode
+  recordingSourceId: string
+}
+
+type StartAreaCaptureDependencies = {
+  createSourceId(): string
+  prepareSource(tabId: number, sourceId: string): Promise<unknown>
+  sendContentMessage(tabId: number, message: AreaCaptureMessage): Promise<unknown>
+  releaseSource(sourceId: string): Promise<unknown>
+}
+
 export async function prepareTabCaptureSource<T>(
   tabId: number,
   sourceId: string,
@@ -28,6 +43,26 @@ export async function prepareTabCaptureSource<T>(
     sourceId,
     streamId
   })
+}
+
+export async function startAreaCaptureWithPreparedSource(
+  tabId: number,
+  mode: AreaCaptureMode,
+  dependencies: StartAreaCaptureDependencies
+): Promise<void> {
+  const sourceId = dependencies.createSourceId()
+  await dependencies.prepareSource(tabId, sourceId)
+
+  try {
+    await dependencies.sendContentMessage(tabId, {
+      type: "START_AREA_CAPTURE",
+      mode,
+      recordingSourceId: sourceId
+    })
+  } catch (error) {
+    await dependencies.releaseSource(sourceId).catch(() => undefined)
+    throw error
+  }
 }
 
 export function getOffscreenDocumentOptions(url: string): chrome.offscreen.CreateParameters {

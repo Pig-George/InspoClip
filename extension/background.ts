@@ -2,7 +2,7 @@ import { CONTEXT_MENUS } from "./src/background/constants"
 import { captureAndUpload } from "./src/background/capture"
 import { fetchImageAsDataUrl, sendContentMessage } from "./src/background/messages"
 import offscreenDocumentUrl from "url:./offscreen.html"
-import { getExtensionRelativeUrl, getOffscreenDocumentOptions, getTabCaptureStreamOptions, normalizeTabCaptureErrorMessage, prepareTabCaptureSource } from "./src/background/offscreen-recording"
+import { getExtensionRelativeUrl, getOffscreenDocumentOptions, getTabCaptureStreamOptions, normalizeTabCaptureErrorMessage, prepareTabCaptureSource, startAreaCaptureWithPreparedSource } from "./src/background/offscreen-recording"
 import { openVideoInApp, saveVideoFromUrl } from "./src/background/video"
 
 const OFFSCREEN_DOCUMENT_PATH = getExtensionRelativeUrl(offscreenDocumentUrl)
@@ -17,11 +17,11 @@ chrome.commands.onCommand.addListener(async (command) => {
   if (!tab?.id) return
 
   if (command === "area-analyze") {
-    await sendContentMessage(tab.id, { type: "START_AREA_CAPTURE", mode: "analyze" })
+    await startAreaCaptureSession(tab.id, "analyze")
   }
 
   if (command === "area-save") {
-    await sendContentMessage(tab.id, { type: "START_AREA_CAPTURE", mode: "save" })
+    await startAreaCaptureSession(tab.id, "save")
   }
 })
 
@@ -86,7 +86,40 @@ function getMediaStreamId(options: chrome.tabCapture.GetMediaStreamOptions): Pro
   })
 }
 
+function releasePreparedSource(sourceId: string): Promise<unknown> {
+  return sendOffscreenMessage({
+    type: "RELEASE_OFFSCREEN_AREA_RECORDING_SOURCE",
+    sourceId
+  })
+}
+
+function startAreaCaptureSession(tabId: number, mode: "analyze" | "save"): Promise<void> {
+  return startAreaCaptureWithPreparedSource(tabId, mode, {
+    createSourceId: () => crypto.randomUUID(),
+    prepareSource: (currentTabId, sourceId) =>
+      prepareTabCaptureSource(currentTabId, sourceId, {
+        getStreamId: getMediaStreamId,
+        ensureOffscreenDocument,
+        sendOffscreenMessage
+      }),
+    sendContentMessage,
+    releaseSource: releasePreparedSource
+  })
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "START_AREA_CAPTURE_SESSION") {
+    ;(async () => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+      if (!tab?.id) throw new Error("No active tab")
+      await startAreaCaptureSession(tab.id, message.mode)
+      return { success: true }
+    })()
+      .then((response) => sendResponse(response))
+      .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to prepare area capture" }))
+    return true
+  }
+
   if (message.type === "CAPTURE_TAB") {
     const tabId = sender.tab?.id
     if (!tabId) return
