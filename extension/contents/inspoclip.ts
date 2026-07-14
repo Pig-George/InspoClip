@@ -4,6 +4,7 @@ import type { PlasmoCSConfig } from "plasmo"
 import {
   formatRecordingDuration,
   getAreaCaptureToolbarPosition,
+  getAreaRecordingInnerRect,
 } from "../src/content/area-recording"
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
@@ -414,6 +415,7 @@ export const config: PlasmoCSConfig = {
     }
 
     const recordingId = crypto.randomUUID?.() || `area-recording-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const recordingRect = getAreaRecordingInnerRect(rect);
     const visualViewport = window.visualViewport;
     const viewport = {
       width: window.innerWidth,
@@ -438,7 +440,7 @@ export const config: PlasmoCSConfig = {
       const startResponse = await sendRuntimeMessage({
         type: 'START_AREA_RECORDING',
         recordingId,
-        rect,
+        rect: recordingRect,
         viewport,
       });
       if (!startResponse?.success) throw new Error(startResponse?.error || 'Failed to start recording');

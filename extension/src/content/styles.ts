@@ -571,11 +571,10 @@
     }
 
     .inspoclip-area-overlay-recording .inspoclip-area-selection {
-      border-color: transparent;
+      border-color: #c0784a;
       box-shadow: none;
       background: transparent;
       pointer-events: none;
-      opacity: 0;
     }
 
     .inspoclip-area-overlay-paused .inspoclip-area-selection {

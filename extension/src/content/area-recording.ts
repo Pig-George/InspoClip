@@ -49,6 +49,17 @@ export function formatRecordingDuration(elapsedMs: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
 }
 
+export function getAreaRecordingInnerRect(rect: AreaRect, inset = 2): AreaRect {
+  const safeInset = Math.max(0, Math.min(inset, Math.floor((Math.min(rect.width, rect.height) - 1) / 2)))
+
+  return {
+    x: rect.x + safeInset,
+    y: rect.y + safeInset,
+    width: Math.max(1, rect.width - safeInset * 2),
+    height: Math.max(1, rect.height - safeInset * 2)
+  }
+}
+
 export function getPreferredRecordingMimeType(
   mediaRecorder: Pick<typeof MediaRecorder, "isTypeSupported"> | undefined
 ): string {

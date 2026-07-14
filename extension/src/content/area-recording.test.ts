@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest"
 
 import {
   formatRecordingDuration,
+  getAreaRecordingInnerRect,
   getAreaRecordingSourceRect,
   getAreaCaptureToolbarPosition,
   getPreferredRecordingMimeType,
@@ -45,6 +46,24 @@ describe("area recording helpers", () => {
   test("formats recording duration as mm:ss", () => {
     expect(formatRecordingDuration(0)).toBe("00:00")
     expect(formatRecordingDuration(65_000)).toBe("01:05")
+  })
+
+  test("returns an inner recording rect that excludes the visible selection border", () => {
+    expect(getAreaRecordingInnerRect({ x: 100, y: 80, width: 240, height: 120 }, 2)).toEqual({
+      x: 102,
+      y: 82,
+      width: 236,
+      height: 116
+    })
+  })
+
+  test("keeps inner recording rect valid for tiny selections", () => {
+    expect(getAreaRecordingInnerRect({ x: 10, y: 20, width: 3, height: 3 }, 2)).toEqual({
+      x: 11,
+      y: 21,
+      width: 1,
+      height: 1
+    })
   })
 
   test("chooses the first supported recording mime type", () => {
