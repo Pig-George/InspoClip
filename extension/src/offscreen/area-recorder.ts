@@ -21,7 +21,7 @@ export type ViewportSize = {
 export type RecordingCommand =
   | { type: "PREPARE_OFFSCREEN_AREA_RECORDING_SOURCE"; sourceId: string; streamId: string }
   | { type: "RELEASE_OFFSCREEN_AREA_RECORDING_SOURCE"; sourceId: string }
-  | { type: "START_OFFSCREEN_AREA_RECORDING"; recordingId: string; sourceId?: string; streamId?: string; rect: AreaRect; viewport: ViewportSize }
+  | { type: "START_OFFSCREEN_AREA_RECORDING"; recordingId: string; sourceId?: string; streamId?: string; rect: AreaRect; viewport: ViewportSize; includeTabAudio: boolean }
   | { type: "PAUSE_OFFSCREEN_AREA_RECORDING"; recordingId: string }
   | { type: "RESUME_OFFSCREEN_AREA_RECORDING"; recordingId: string }
   | { type: "STOP_OFFSCREEN_AREA_RECORDING"; recordingId: string }
@@ -34,7 +34,12 @@ export type RecordingResult = {
 }
 
 export type TabCaptureMediaConstraints = {
-  audio: false
+  audio: {
+    mandatory: {
+      chromeMediaSource: "tab"
+      chromeMediaSourceId: string
+    }
+  }
   video: {
     mandatory: {
       chromeMediaSource: "tab"
@@ -45,7 +50,12 @@ export type TabCaptureMediaConstraints = {
 
 export function getTabCaptureMediaConstraints(streamId: string): TabCaptureMediaConstraints {
   return {
-    audio: false,
+    audio: {
+      mandatory: {
+        chromeMediaSource: "tab",
+        chromeMediaSourceId: streamId
+      }
+    },
     video: {
       mandatory: {
         chromeMediaSource: "tab",
@@ -53,6 +63,17 @@ export function getTabCaptureMediaConstraints(streamId: string): TabCaptureMedia
       }
     }
   }
+}
+
+export function getAreaRecordingOutputTracks(
+  canvasStream: Pick<MediaStream, "getVideoTracks">,
+  sourceStream: Pick<MediaStream, "getAudioTracks">,
+  includeTabAudio: boolean
+): MediaStreamTrack[] {
+  return [
+    ...canvasStream.getVideoTracks(),
+    ...(includeTabAudio ? sourceStream.getAudioTracks() : [])
+  ]
 }
 
 type SourceSize = {
@@ -76,12 +97,14 @@ type ActiveRecording = {
   chunks: Blob[]
   frameTimerId: number
   mimeType: string
+  audioContext?: AudioContext
 }
 
 type PreparedSource = {
   sourceId: string
   sourceStream: MediaStream
   video: HTMLVideoElement
+  audioContext?: AudioContext
 }
 
 export function getPreferredRecordingMimeType(
@@ -191,12 +214,22 @@ function cleanupRecording(recording: ActiveRecording): void {
   recording.outputStream.getTracks().forEach((track) => track.stop())
   recording.video.pause()
   recording.video.srcObject = null
+  void recording.audioContext?.close().catch(() => undefined)
 }
 
 function cleanupPreparedSource(source: PreparedSource): void {
   source.sourceStream.getTracks().forEach((track) => track.stop())
   source.video.pause()
   source.video.srcObject = null
+  void source.audioContext?.close().catch(() => undefined)
+}
+
+function createTabAudioMonitor(sourceStream: MediaStream): AudioContext | undefined {
+  if (!sourceStream.getAudioTracks().length) return undefined
+  const audioContext = new AudioContext()
+  audioContext.createMediaStreamSource(sourceStream).connect(audioContext.destination)
+  void audioContext.resume().catch(() => undefined)
+  return audioContext
 }
 
 function stopMediaRecorder(recorder: MediaRecorder): Promise<void> {
@@ -232,11 +265,13 @@ export class OffscreenAreaRecorder {
     video.srcObject = sourceStream
     await waitForVideoReady(video)
     await video.play()
+    const audioContext = createTabAudioMonitor(sourceStream)
 
     this.preparedSources.set(command.sourceId, {
       sourceId: command.sourceId,
       sourceStream,
-      video
+      video,
+      audioContext
     })
 
     return { sourceId: command.sourceId }
@@ -289,8 +324,9 @@ export class OffscreenAreaRecorder {
       throw new Error("Failed to create recording canvas")
     }
 
-    const outputStream = canvas.captureStream(30)
-    const canvasTrack = outputStream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined
+    const canvasStream = canvas.captureStream(30)
+    const outputStream = new MediaStream(getAreaRecordingOutputTracks(canvasStream, sourceStream, Boolean(command.includeTabAudio)))
+    const canvasTrack = canvasStream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined
     const mimeType = getPreferredRecordingMimeType(MediaRecorder)
     const recorder = new MediaRecorder(outputStream, mimeType ? { mimeType } : undefined)
     const chunks: Blob[] = []
@@ -306,7 +342,8 @@ export class OffscreenAreaRecorder {
       recorder,
       chunks,
       frameTimerId: 0,
-      mimeType
+      mimeType,
+      audioContext: preparedSource?.audioContext || createTabAudioMonitor(sourceStream)
     }
     this.recordings.set(command.recordingId, recording)
 

@@ -1,11 +1,21 @@
 import { describe, expect, test } from "vitest"
 
-import { getAreaRecordingSourceRect, getOffscreenRecordingFrameIntervalMs, getTabCaptureMediaConstraints } from "./area-recorder"
+import {
+  getAreaRecordingOutputTracks,
+  getAreaRecordingSourceRect,
+  getOffscreenRecordingFrameIntervalMs,
+  getTabCaptureMediaConstraints
+} from "./area-recorder"
 
 describe("offscreen area recorder helpers", () => {
   test("creates tab capture media constraints", () => {
     expect(getTabCaptureMediaConstraints("stream-1")).toEqual({
-      audio: false,
+      audio: {
+        mandatory: {
+          chromeMediaSource: "tab",
+          chromeMediaSourceId: "stream-1"
+        }
+      },
       video: {
         mandatory: {
           chromeMediaSource: "tab",
@@ -13,6 +23,20 @@ describe("offscreen area recorder helpers", () => {
         }
       }
     })
+  })
+
+  test("only includes the tab audio track when audio recording is enabled", () => {
+    const videoTrack = { id: "cropped-video" } as MediaStreamTrack
+    const audioTrack = { id: "tab-audio" } as MediaStreamTrack
+    const canvasStream = {
+      getVideoTracks: () => [videoTrack]
+    } as Pick<MediaStream, "getVideoTracks">
+    const sourceStream = {
+      getAudioTracks: () => [audioTrack]
+    } as Pick<MediaStream, "getAudioTracks">
+
+    expect(getAreaRecordingOutputTracks(canvasStream, sourceStream, false)).toEqual([videoTrack])
+    expect(getAreaRecordingOutputTracks(canvasStream, sourceStream, true)).toEqual([videoTrack, audioTrack])
   })
 
   test("maps viewport coordinates to native tab stream pixels", () => {
