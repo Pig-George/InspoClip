@@ -6,18 +6,16 @@ const { createLucideElement } = vi.hoisted(() => ({
   }))
 }))
 
-vi.mock("lucide", () => ({
-  createElement: createLucideElement,
-  Scan: ["scan"],
-  Video: ["video"],
-  Volume2: ["volume-2"],
-  VolumeX: ["volume-x"],
-  X: ["x"],
-  Pause: ["pause"],
-  Play: ["play"],
-  RotateCcw: ["rotate-ccw"],
-  Check: ["check"]
-}))
+vi.mock("lucide/dist/esm/createElement.js", () => ({ default: createLucideElement }))
+vi.mock("lucide/dist/esm/icons/scan.js", () => ({ default: ["scan"] }))
+vi.mock("lucide/dist/esm/icons/video.js", () => ({ default: ["video"] }))
+vi.mock("lucide/dist/esm/icons/volume-2.js", () => ({ default: ["volume-2"] }))
+vi.mock("lucide/dist/esm/icons/volume-x.js", () => ({ default: ["volume-x"] }))
+vi.mock("lucide/dist/esm/icons/x.js", () => ({ default: ["x"] }))
+vi.mock("lucide/dist/esm/icons/pause.js", () => ({ default: ["pause"] }))
+vi.mock("lucide/dist/esm/icons/play.js", () => ({ default: ["play"] }))
+vi.mock("lucide/dist/esm/icons/rotate-ccw.js", () => ({ default: ["rotate-ccw"] }))
+vi.mock("lucide/dist/esm/icons/check.js", () => ({ default: ["check"] }))
 
 import {
   AREA_TOOLBAR_ICON_NAMES,

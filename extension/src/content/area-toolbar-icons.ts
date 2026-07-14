@@ -1,16 +1,15 @@
-import {
-  Check,
-  Pause,
-  Play,
-  RotateCcw,
-  Scan,
-  Video,
-  Volume2,
-  VolumeX,
-  X,
-  createElement as createLucideElement,
-  type IconNode
-} from "lucide"
+import createLucideElement from "lucide/dist/esm/createElement.js"
+import Check from "lucide/dist/esm/icons/check.js"
+import Pause from "lucide/dist/esm/icons/pause.js"
+import Play from "lucide/dist/esm/icons/play.js"
+import RotateCcw from "lucide/dist/esm/icons/rotate-ccw.js"
+import Scan from "lucide/dist/esm/icons/scan.js"
+import Video from "lucide/dist/esm/icons/video.js"
+import Volume2 from "lucide/dist/esm/icons/volume-2.js"
+import VolumeX from "lucide/dist/esm/icons/volume-x.js"
+import X from "lucide/dist/esm/icons/x.js"
+
+type IconNode = readonly unknown[]
 
 export type AreaToolbarAction =
   | "screenshot"
