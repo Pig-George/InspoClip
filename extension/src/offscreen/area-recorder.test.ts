@@ -41,9 +41,9 @@ describe("offscreen area recorder helpers", () => {
         clientWidth: 800,
         clientHeight: 600,
         captureInsetLeft: 8.5,
-        captureWidthPadding: 17
+        captureWidthPadding: 34
       }
-    )).toEqual({ x: 212, y: 40, width: 384, height: 200 })
+    )).toEqual({ x: 212, y: 40, width: 376, height: 200 })
   })
 
   test("applies visual viewport offsets before mapping to native tab stream pixels", () => {
