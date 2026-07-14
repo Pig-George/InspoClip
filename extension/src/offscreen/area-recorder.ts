@@ -15,10 +15,7 @@ export type ViewportSize = {
   visualOffsetLeft?: number
   visualOffsetTop?: number
   visualScale?: number
-  captureInsetLeft?: number
-  captureInsetTop?: number
-  captureWidthPadding?: number
-  captureHeightPadding?: number
+  captureBounds?: AreaRect
 }
 
 export type RecordingCommand =
@@ -62,12 +59,10 @@ type SourceSize = {
 }
 
 type CaptureCoordinateSpace = {
+  x: number
+  y: number
   width: number
   height: number
-  widthScaleWidth: number
-  heightScaleHeight: number
-  offsetLeft: number
-  offsetTop: number
 }
 
 type ActiveRecording = {
@@ -118,19 +113,13 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function getCaptureCoordinateSpace(viewport: ViewportSize): CaptureCoordinateSpace {
-  const captureInsetLeft = getFiniteNumber(viewport.captureInsetLeft) ?? 0
-  const captureInsetTop = getFiniteNumber(viewport.captureInsetTop) ?? 0
-  const layoutWidth = getPositiveNumber(viewport.clientWidth) ?? getPositiveNumber(viewport.width) ?? 1
-  const layoutHeight = getPositiveNumber(viewport.clientHeight) ?? getPositiveNumber(viewport.height) ?? 1
-  const width = Math.max(1, layoutWidth + Math.max(0, captureInsetLeft) * 2)
-  const height = Math.max(1, layoutHeight + Math.max(0, captureInsetTop) * 2)
+  const bounds = viewport.captureBounds
+
   return {
-    width,
-    height,
-    widthScaleWidth: Math.max(1, width + Math.max(0, getFiniteNumber(viewport.captureWidthPadding) ?? 0)),
-    heightScaleHeight: Math.max(1, height + Math.max(0, getFiniteNumber(viewport.captureHeightPadding) ?? 0)),
-    offsetLeft: (getFiniteNumber(viewport.visualOffsetLeft) ?? 0) + captureInsetLeft,
-    offsetTop: (getFiniteNumber(viewport.visualOffsetTop) ?? 0) + captureInsetTop
+    x: getFiniteNumber(bounds?.x) ?? 0,
+    y: getFiniteNumber(bounds?.y) ?? 0,
+    width: getPositiveNumber(bounds?.width) ?? getPositiveNumber(viewport.width) ?? 1,
+    height: getPositiveNumber(bounds?.height) ?? getPositiveNumber(viewport.height) ?? 1
   }
 }
 
@@ -142,12 +131,10 @@ export function getAreaRecordingSourceRect(
   const coordinateSpace = getCaptureCoordinateSpace(viewport)
   const scaleX = source.width / coordinateSpace.width
   const scaleY = source.height / coordinateSpace.height
-  const widthScaleX = source.width / coordinateSpace.widthScaleWidth
-  const heightScaleY = source.height / coordinateSpace.heightScaleHeight
-  const sourceX = clamp(Math.round((rect.x + coordinateSpace.offsetLeft) * scaleX), 0, Math.max(0, source.width - 1))
-  const sourceY = clamp(Math.round((rect.y + coordinateSpace.offsetTop) * scaleY), 0, Math.max(0, source.height - 1))
-  const sourceWidth = Math.max(1, Math.round(rect.width * widthScaleX))
-  const sourceHeight = Math.max(1, Math.round(rect.height * heightScaleY))
+  const sourceX = clamp(Math.round((rect.x - coordinateSpace.x) * scaleX), 0, Math.max(0, source.width - 1))
+  const sourceY = clamp(Math.round((rect.y - coordinateSpace.y) * scaleY), 0, Math.max(0, source.height - 1))
+  const sourceWidth = Math.max(1, Math.round(rect.width * scaleX))
+  const sourceHeight = Math.max(1, Math.round(rect.height * scaleY))
 
   return {
     x: sourceX,

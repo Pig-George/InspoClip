@@ -28,10 +28,10 @@ describe("offscreen area recorder helpers", () => {
       { x: 100, y: 20, width: 200, height: 100 },
       { width: 1600, height: 1200 },
       { width: 817, height: 600, clientWidth: 800, clientHeight: 600 }
-    )).toEqual({ x: 200, y: 40, width: 400, height: 200 })
+    )).toEqual({ x: 196, y: 40, width: 392, height: 200 })
   })
 
-  test("uses capture inset for origin without widening the selected area", () => {
+  test("uses explicit capture bounds as the single source of coordinate truth", () => {
     expect(getAreaRecordingSourceRect(
       { x: 100, y: 20, width: 200, height: 100 },
       { width: 1600, height: 1200 },
@@ -40,10 +40,9 @@ describe("offscreen area recorder helpers", () => {
         height: 600,
         clientWidth: 800,
         clientHeight: 600,
-        captureInsetLeft: 8.5,
-        captureWidthPadding: 34
+        captureBounds: { x: 0, y: 0, width: 817, height: 600 }
       }
-    )).toEqual({ x: 212, y: 40, width: 376, height: 200 })
+    )).toEqual({ x: 196, y: 40, width: 392, height: 200 })
   })
 
   test("applies visual viewport offsets before mapping to native tab stream pixels", () => {
@@ -61,7 +60,7 @@ describe("offscreen area recorder helpers", () => {
         visualHeight: 400,
         visualScale: 2
       }
-    )).toEqual({ x: 110, y: 70, width: 100, height: 80 })
+    )).toEqual({ x: 10, y: 20, width: 100, height: 80 })
   })
 
   test("clamps mapped source rect inside the native tab stream", () => {

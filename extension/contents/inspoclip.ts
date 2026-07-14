@@ -415,24 +415,22 @@ export const config: PlasmoCSConfig = {
 
     const recordingId = crypto.randomUUID?.() || `area-recording-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const visualViewport = window.visualViewport;
-    const clientWidth = document.documentElement?.clientWidth || window.innerWidth;
-    const clientHeight = document.documentElement?.clientHeight || window.innerHeight;
-    const horizontalViewportGap = Math.max(0, window.innerWidth - clientWidth);
-    const verticalViewportGap = Math.max(0, window.innerHeight - clientHeight);
     const viewport = {
       width: window.innerWidth,
       height: window.innerHeight,
-      clientWidth,
-      clientHeight,
+      clientWidth: document.documentElement?.clientWidth || window.innerWidth,
+      clientHeight: document.documentElement?.clientHeight || window.innerHeight,
       visualWidth: visualViewport?.width || window.innerWidth,
       visualHeight: visualViewport?.height || window.innerHeight,
       visualOffsetLeft: visualViewport?.offsetLeft || 0,
       visualOffsetTop: visualViewport?.offsetTop || 0,
       visualScale: visualViewport?.scale || 1,
-      captureInsetLeft: horizontalViewportGap / 2,
-      captureInsetTop: verticalViewportGap / 2,
-      captureWidthPadding: horizontalViewportGap * 2,
-      captureHeightPadding: verticalViewportGap * 2,
+      captureBounds: {
+        x: 0,
+        y: 0,
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
     };
 
     try {
