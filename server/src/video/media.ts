@@ -9,6 +9,10 @@ export interface VideoMetadata {
 
 export type CommandRunner = (command: string, args: string[]) => Promise<{ stdout: string }>;
 
+export interface InspectVideoOptions {
+  fallbackDurationMs?: number;
+}
+
 const defaultRunner: CommandRunner = (command, args) => new Promise((resolve, reject) => {
   execFile(command, args, { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 }, (error, stdout) => {
     if (error) reject(error);
@@ -97,7 +101,16 @@ export function validateVideoMetadata(metadata: VideoMetadata): VideoMetadata {
   return metadata;
 }
 
-export async function inspectVideo(filePath: string, run: CommandRunner = defaultRunner): Promise<VideoMetadata> {
+function normalizeFallbackDurationMs(value: unknown): number {
+  const durationMs = Number(value);
+  return Number.isFinite(durationMs) && durationMs > 0 ? Math.round(durationMs) : 0;
+}
+
+export async function inspectVideo(
+  filePath: string,
+  run: CommandRunner = defaultRunner,
+  options: InspectVideoOptions = {},
+): Promise<VideoMetadata> {
   const { stdout } = await run('ffprobe', [
     '-v', 'error', '-show_entries', 'format=duration,format_name:stream=codec_type,width,height',
     '-of', 'json', filePath,
@@ -111,7 +124,8 @@ export async function inspectVideo(filePath: string, run: CommandRunner = defaul
   const formatDurationMs = durationMsFromSeconds(parsed.format?.duration);
   const fallbackDurationMs = formatDurationMs
     || await inspectPacketDuration(filePath, run)
-    || await inspectFrameDuration(filePath, run);
+    || await inspectFrameDuration(filePath, run)
+    || normalizeFallbackDurationMs(options.fallbackDurationMs);
   const metadata: VideoMetadata = {
     durationMs: fallbackDurationMs,
     width: stream.width ?? 0,

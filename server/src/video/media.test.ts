@@ -58,6 +58,23 @@ describe('video media validation', () => {
     expect(run).toHaveBeenLastCalledWith('ffprobe', expect.arrayContaining(['frame=best_effort_timestamp_time,pkt_pts_time,pts_time,pkt_duration_time']));
   });
 
+  it('uses a caller-provided duration as the final fallback for metadata-less browser recordings', async () => {
+    const run = vi.fn()
+      .mockResolvedValueOnce({ stdout: JSON.stringify({
+        format: { duration: 'N/A', format_name: 'matroska,webm' },
+        streams: [{ codec_type: 'video', width: 640, height: 360 }],
+      }) })
+      .mockResolvedValueOnce({ stdout: JSON.stringify({ packets: [] }) })
+      .mockResolvedValueOnce({ stdout: JSON.stringify({ frames: [] }) });
+
+    await expect(inspectVideo('recording.webm', run, { fallbackDurationMs: 3210 })).resolves.toEqual({
+      durationMs: 3210,
+      width: 640,
+      height: 360,
+      container: 'webm',
+    });
+  });
+
   it.each([
     [{ durationMs: 0, width: 1, height: 1, container: 'mp4' }, 'valid duration'],
     [{ durationMs: Number.NaN, width: 1, height: 1, container: 'mp4' }, 'valid duration'],

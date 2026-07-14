@@ -19,12 +19,13 @@ function setup() {
     next();
   };
   const removeFile = vi.fn().mockResolvedValue(undefined);
+  const inspect = vi.fn().mockResolvedValue({ durationMs: 20_000, width: 1280, height: 720, container: 'mp4' });
   const app = express();
   app.use(express.json());
   app.use('/api/videos', createVideosRouter({
     repository: repo,
     upload,
-    inspect: vi.fn().mockResolvedValue({ durationMs: 20_000, width: 1280, height: 720, container: 'mp4' }),
+    inspect,
     thumbnail: vi.fn().mockResolvedValue('demo.thumb.jpg'),
     removeFile,
     getModelSettings: async () => ({ model: 'qwen3.7-plus', fps: 3 }),
@@ -33,7 +34,7 @@ function setup() {
     resolvePlacement: async () => ({ weekId: 'week-today', dayOfWeek: 0 }),
   }));
   app.use('/api/video-jobs', createVideoJobsRouter(repo));
-  return { app, repo, removeFile };
+  return { app, repo, removeFile, inspect };
 }
 
 describe('video routes', () => {
@@ -51,6 +52,13 @@ describe('video routes', () => {
     expect(response.body).toMatchObject({ status: 'pending' });
     expect(await repo.getVideo(response.body.videoId)).toMatchObject({ durationMs: 20_000, source: 'client', weekId: 'week-a', dayOfWeek: 4 });
     expect(await repo.getJob(response.body.jobId)).toMatchObject({ model: 'qwen3.7-plus', fps: 3 });
+  });
+
+  it('passes extension-provided duration as an inspect fallback', async () => {
+    const { app, inspect } = setup();
+    const response = await request(app).post('/api/videos').send({ source: 'extension', durationMs: '4321' });
+    expect(response.status).toBe(202);
+    expect(inspect).toHaveBeenCalledWith('C:/videos/demo.mp4', { fallbackDurationMs: 4321 });
   });
 
   it('keeps draft uploads out of weekly lists until explicitly saved', async () => {

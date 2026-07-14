@@ -485,6 +485,7 @@ export const config: PlasmoCSConfig = {
         if (recording.stopping) return;
         recording.stopping = true;
         recording.shouldAnalyze = true;
+        const elapsedMs = Math.max(1, (pausedAt || Date.now()) - startedAt - pausedTotal);
         const finishBtn = toolbar.querySelector('[data-action="finish"]');
         if (finishBtn) {
           finishBtn.disabled = true;
@@ -499,7 +500,7 @@ export const config: PlasmoCSConfig = {
           if (!response?.success) throw new Error(response?.error || 'Recording failed');
           const blob = dataUrlToBlob(response.dataUrl);
           if (!blob.size) throw new Error('No recording data');
-          await analyzeRecordedAreaVideo(blob);
+          await analyzeRecordedAreaVideo(blob, elapsedMs);
         } catch (err) {
           cleanupAreaRecording(recording);
           activeAreaRecording = null;
@@ -551,12 +552,15 @@ export const config: PlasmoCSConfig = {
     });
   }
 
-  async function analyzeRecordedAreaVideo(videoBlob) {
+  async function analyzeRecordedAreaVideo(videoBlob, durationMs) {
     showToast(locale === 'zh' ? '正在上传录屏...' : 'Uploading recording...', 'loading');
     const formData = new FormData();
     formData.append('video', videoBlob, 'area-recording.webm');
     formData.append('source', 'extension');
     formData.append('draft', 'true');
+    if (Number.isFinite(durationMs) && durationMs > 0) {
+      formData.append('durationMs', String(Math.round(durationMs)));
+    }
     const uploadRes = await fetch(`${serverUrl}/api/videos`, { method: 'POST', body: formData });
     if (!uploadRes.ok) throw new Error(await readableError(uploadRes, 'Video upload failed'));
     const uploadResult = await uploadRes.json();

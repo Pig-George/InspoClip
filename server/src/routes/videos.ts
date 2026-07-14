@@ -17,7 +17,7 @@ const PURPOSES = new Set<Purpose>(['general', 'video-generation', 'frontend', 'm
 export interface VideosRouterDependencies {
   repository: VideoRepository;
   upload: RequestHandler;
-  inspect(filePath: string): Promise<VideoMetadata>;
+  inspect(filePath: string, options?: { fallbackDurationMs?: number }): Promise<VideoMetadata>;
   thumbnail(inputPath: string, outputPath: string): Promise<string>;
   removeFile(filePath: string): Promise<void>;
   getModelSettings(): Promise<{ model: string; fps: number }>;
@@ -61,12 +61,18 @@ function optionalString(value: unknown, name: string, fallback = ''): string {
   return value.trim();
 }
 
+function optionalPositiveNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue > 0 ? Math.round(numberValue) : undefined;
+}
+
 export function createVideosRouter(overrides: Partial<VideosRouterDependencies> = {}): Router {
   const videoRoot = overrides.videoRoot ?? process.env.VIDEO_UPLOAD_DIR ?? './videos';
   const deps: VideosRouterDependencies = {
     repository: overrides.repository ?? new DrizzleVideoRepository(),
     upload: overrides.upload ?? videoUpload.single('video'),
-    inspect: overrides.inspect ?? inspectVideo,
+    inspect: overrides.inspect ?? ((filePath, options) => inspectVideo(filePath, undefined, options)),
     thumbnail: overrides.thumbnail ?? generateVideoThumbnail,
     removeFile: overrides.removeFile ?? (async (filePath) => { await unlink(filePath); }),
     getModelSettings: overrides.getModelSettings ?? (async () => {
@@ -87,7 +93,7 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
     const file = req.file;
     if (!file) { res.status(400).json({ error: 'No video file provided' }); return; }
     try {
-      const metadata = await deps.inspect(file.path);
+      const metadata = await deps.inspect(file.path, { fallbackDurationMs: optionalPositiveNumber(req.body?.durationMs) });
       const thumbnailPath = `${file.filename}.thumb.jpg`;
       const generatedThumbnail = await deps.thumbnail(file.path, safeStoredPath(videoRoot, thumbnailPath)).catch(() => null);
       const source: VideoSource = req.body?.source === 'extension' ? 'extension' : 'client';
