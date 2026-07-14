@@ -2,6 +2,9 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 import {
+  DEFAULT_AREA_RECORDING_AUDIO_ENABLED,
+  createAreaRecordingStartMessage,
+  createAreaRecordingTimerState,
   formatRecordingDuration,
   getAreaCaptureToolbarPosition,
   getAreaRecordingInnerRect,
@@ -331,6 +334,11 @@ export const config: PlasmoCSConfig = {
     toolbar.innerHTML = `
       <div class="inspoclip-area-toolbar-main">
         <button class="inspoclip-area-action" data-action="screenshot">${locale === 'zh' ? '截图' : 'Screenshot'}</button>
+        <label class="inspoclip-area-audio-toggle" title="${locale === 'zh' ? '在录屏文件中包含当前标签页播放的声音' : 'Include audio playing in the current tab'}">
+          <input type="checkbox" data-option="tab-audio" ${DEFAULT_AREA_RECORDING_AUDIO_ENABLED ? 'checked' : ''}>
+          <span class="inspoclip-area-audio-switch" aria-hidden="true"></span>
+          <span>${locale === 'zh' ? '标签页声音' : 'Tab audio'}</span>
+        </label>
         <button class="inspoclip-area-action inspoclip-area-action-primary" data-action="record">${locale === 'zh' ? '录屏' : 'Record'}</button>
         <button class="inspoclip-area-action-icon" data-action="cancel" title="${locale === 'zh' ? '取消' : 'Cancel'}">×</button>
       </div>
@@ -403,7 +411,8 @@ export const config: PlasmoCSConfig = {
       processAreaScreenshot(mode, currentRect, overlay);
     });
     toolbar.querySelector('[data-action="record"]')?.addEventListener('click', () => {
-      startAreaRecording(currentRect, overlay, toolbar);
+      const includeTabAudio = Boolean(toolbar.querySelector('[data-option="tab-audio"]')?.checked);
+      startAreaRecording(currentRect, overlay, toolbar, includeTabAudio);
     });
     toolbar.querySelector('[data-action="cancel"]')?.addEventListener('click', () => {
       removeAreaOverlay();
@@ -412,10 +421,11 @@ export const config: PlasmoCSConfig = {
   }
 
   function positionAreaToolbar(toolbar, rect) {
+    const fallbackWidth = toolbar.querySelector('[data-option="tab-audio"]') ? 430 : 360;
     const position = getAreaCaptureToolbarPosition(
       rect,
       { width: window.innerWidth, height: window.innerHeight },
-      { width: 278, height: 44 }
+      { width: toolbar.offsetWidth || fallbackWidth, height: toolbar.offsetHeight || 44 }
     );
     toolbar.style.left = position.left + 'px';
     toolbar.style.top = position.top + 'px';
@@ -485,7 +495,7 @@ export const config: PlasmoCSConfig = {
     }
   }
 
-  async function startAreaRecording(rect, overlay, toolbar) {
+  async function startAreaRecording(rect, overlay, toolbar, includeTabAudio = DEFAULT_AREA_RECORDING_AUDIO_ENABLED) {
     const recordBtn = toolbar.querySelector('[data-action="record"]');
     if (recordBtn) {
       recordBtn.disabled = true;
@@ -520,20 +530,22 @@ export const config: PlasmoCSConfig = {
       syncContentRootInteractivity();
       await preparedSource.promise;
       preparedAreaRecordingSource = null;
-      const startResponse = await sendRuntimeMessage({
-        type: 'START_AREA_RECORDING',
+      const startResponse = await sendRuntimeMessage(createAreaRecordingStartMessage({
         recordingId,
         sourceId: preparedSource.sourceId,
         rect: recordingRect,
         viewport,
-      });
+        includeTabAudio,
+      }));
       if (!startResponse?.success) throw new Error(startResponse?.error || 'Failed to start recording');
 
       toolbar.classList.add('inspoclip-area-toolbar-recording');
       toolbar.innerHTML = `
         <span class="inspoclip-area-record-dot"></span>
         <span class="inspoclip-area-record-time">00:00</span>
+        ${includeTabAudio ? `<span class="inspoclip-area-audio-status" title="${locale === 'zh' ? '正在录制标签页声音' : 'Recording tab audio'}">${locale === 'zh' ? '声音' : 'Audio'}</span>` : ''}
         <button class="inspoclip-area-action" data-action="pause">${locale === 'zh' ? '暂停' : 'Pause'}</button>
+        <button class="inspoclip-area-action inspoclip-area-action-retake" data-action="retake">${locale === 'zh' ? '重录' : 'Retake'}</button>
         <button class="inspoclip-area-action inspoclip-area-action-primary" data-action="finish">${locale === 'zh' ? '完成' : 'Done'}</button>
       `;
       positionAreaToolbar(toolbar, rect);
@@ -542,20 +554,20 @@ export const config: PlasmoCSConfig = {
       toolbar.addEventListener('click', (event) => event.stopPropagation());
 
       let timerId = 0;
-      let startedAt = Date.now();
-      let pausedAt = 0;
-      let pausedTotal = 0;
+      let timerState = createAreaRecordingTimerState();
       const recording = {
         recordingId,
         timerId: 0,
         shouldAnalyze: true,
         stopping: false,
+        commandPending: false,
+        retakeConfirmTimer: 0,
       };
       activeAreaRecording = recording;
 
       const timeEl = toolbar.querySelector('.inspoclip-area-record-time');
       const updateTimer = () => {
-        const elapsed = (pausedAt || Date.now()) - startedAt - pausedTotal;
+        const elapsed = (timerState.pausedAt || Date.now()) - timerState.startedAt - timerState.pausedTotal;
         if (timeEl) timeEl.textContent = formatRecordingDuration(elapsed);
       };
       timerId = window.setInterval(updateTimer, 500);
@@ -564,17 +576,18 @@ export const config: PlasmoCSConfig = {
       toolbar.querySelector('[data-action="pause"]')?.addEventListener('click', async () => {
         const pauseBtn = toolbar.querySelector('[data-action="pause"]');
         try {
-          if (!pausedAt) {
+          if (recording.commandPending || recording.stopping) return;
+          if (!timerState.pausedAt) {
             const response = await sendRuntimeMessage({ type: 'PAUSE_AREA_RECORDING', recordingId });
             if (!response?.success) throw new Error(response?.error || 'Pause failed');
-            pausedAt = Date.now();
+            timerState.pausedAt = Date.now();
             overlay.classList.add('inspoclip-area-overlay-paused');
             if (pauseBtn) pauseBtn.textContent = locale === 'zh' ? '继续' : 'Resume';
           } else {
             const response = await sendRuntimeMessage({ type: 'RESUME_AREA_RECORDING', recordingId });
             if (!response?.success) throw new Error(response?.error || 'Resume failed');
-            pausedTotal += Date.now() - pausedAt;
-            pausedAt = 0;
+            timerState.pausedTotal += Date.now() - timerState.pausedAt;
+            timerState.pausedAt = 0;
             overlay.classList.remove('inspoclip-area-overlay-paused');
             if (pauseBtn) pauseBtn.textContent = locale === 'zh' ? '暂停' : 'Pause';
           }
@@ -585,11 +598,55 @@ export const config: PlasmoCSConfig = {
         }
       });
 
+      toolbar.querySelector('[data-action="retake"]')?.addEventListener('click', async () => {
+        if (recording.commandPending || recording.stopping) return;
+        const retakeBtn = toolbar.querySelector('[data-action="retake"]');
+        if (!retakeBtn) return;
+
+        if (retakeBtn.dataset.confirming !== 'true') {
+          retakeBtn.dataset.confirming = 'true';
+          retakeBtn.classList.add('inspoclip-area-action-confirm');
+          retakeBtn.textContent = locale === 'zh' ? '确认重录' : 'Confirm';
+          recording.retakeConfirmTimer = window.setTimeout(() => {
+            retakeBtn.dataset.confirming = 'false';
+            retakeBtn.classList.remove('inspoclip-area-action-confirm');
+            retakeBtn.textContent = locale === 'zh' ? '重录' : 'Retake';
+            recording.retakeConfirmTimer = 0;
+          }, 2500);
+          return;
+        }
+
+        if (recording.retakeConfirmTimer) clearTimeout(recording.retakeConfirmTimer);
+        recording.retakeConfirmTimer = 0;
+        recording.commandPending = true;
+        retakeBtn.disabled = true;
+        retakeBtn.textContent = locale === 'zh' ? '重录中...' : 'Restarting...';
+
+        try {
+          const response = await sendRuntimeMessage({ type: 'RETAKE_AREA_RECORDING', recordingId });
+          if (!response?.success) throw new Error(response?.error || 'Retake failed');
+          timerState = createAreaRecordingTimerState();
+          overlay.classList.remove('inspoclip-area-overlay-paused');
+          const pauseBtn = toolbar.querySelector('[data-action="pause"]');
+          if (pauseBtn) pauseBtn.textContent = locale === 'zh' ? '暂停' : 'Pause';
+          updateTimer();
+        } catch (err) {
+          showToast(locale === 'zh' ? `重录失败: ${err.message}` : `Retake failed: ${err.message}`, 'error');
+          setTimeout(removeToast, 3000);
+        } finally {
+          recording.commandPending = false;
+          retakeBtn.disabled = false;
+          retakeBtn.dataset.confirming = 'false';
+          retakeBtn.classList.remove('inspoclip-area-action-confirm');
+          retakeBtn.textContent = locale === 'zh' ? '重录' : 'Retake';
+        }
+      });
+
       toolbar.querySelector('[data-action="finish"]')?.addEventListener('click', async () => {
-        if (recording.stopping) return;
+        if (recording.stopping || recording.commandPending) return;
         recording.stopping = true;
         recording.shouldAnalyze = true;
-        const elapsedMs = Math.max(1, (pausedAt || Date.now()) - startedAt - pausedTotal);
+        const elapsedMs = Math.max(1, (timerState.pausedAt || Date.now()) - timerState.startedAt - timerState.pausedTotal);
         const finishBtn = toolbar.querySelector('[data-action="finish"]');
         if (finishBtn) {
           finishBtn.disabled = true;
@@ -631,6 +688,7 @@ export const config: PlasmoCSConfig = {
   function cleanupAreaRecording(recording) {
     if (!recording) return;
     if (recording.timerId) clearInterval(recording.timerId);
+    if (recording.retakeConfirmTimer) clearTimeout(recording.retakeConfirmTimer);
     if (activeAreaRecording === recording) activeAreaRecording = null;
   }
 

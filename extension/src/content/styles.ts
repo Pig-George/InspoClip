@@ -688,6 +688,7 @@
       position: fixed;
       z-index: 4;
       min-width: 278px;
+      max-width: calc(100vw - 24px);
       box-sizing: border-box;
       border: 1px solid rgba(224, 190, 148, 0.92);
       border-radius: 14px;
@@ -728,6 +729,67 @@
       gap: 7px;
     }
 
+    .inspoclip-area-toolbar-main {
+      flex-wrap: wrap;
+    }
+
+    .inspoclip-area-audio-toggle {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #6b5448;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .inspoclip-area-audio-toggle input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .inspoclip-area-audio-switch {
+      position: relative;
+      width: 28px;
+      height: 16px;
+      border-radius: 999px;
+      background: #d9c7a9;
+      box-shadow: inset 0 0 0 1px rgba(74, 48, 40, 0.08);
+      transition: background 0.18s ease, box-shadow 0.18s ease;
+      flex-shrink: 0;
+    }
+
+    .inspoclip-area-audio-switch::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fffaf2;
+      box-shadow: 0 1px 3px rgba(74, 48, 40, 0.28);
+      transition: transform 0.18s ease;
+    }
+
+    .inspoclip-area-audio-toggle input:checked + .inspoclip-area-audio-switch {
+      background: #c0784a;
+    }
+
+    .inspoclip-area-audio-toggle input:checked + .inspoclip-area-audio-switch::after {
+      transform: translateX(12px);
+    }
+
+    .inspoclip-area-audio-toggle input:focus-visible + .inspoclip-area-audio-switch {
+      box-shadow: 0 0 0 3px rgba(192, 120, 74, 0.2);
+    }
+
     .inspoclip-area-action,
     .inspoclip-area-action-icon {
       border: none;
@@ -758,6 +820,21 @@
     .inspoclip-area-action-primary {
       background: #c0784a;
       color: #fff;
+    }
+
+    .inspoclip-area-action-confirm {
+      background: #d75b4a;
+      color: #fff;
+    }
+
+    .inspoclip-area-audio-status {
+      border-radius: 999px;
+      background: rgba(192, 120, 74, 0.12);
+      color: #a65f37;
+      padding: 4px 7px;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
     }
 
     .inspoclip-area-action-icon {

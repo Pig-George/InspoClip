@@ -20,6 +20,35 @@ export type SourceSize = {
   height: number
 }
 
+export const DEFAULT_AREA_RECORDING_AUDIO_ENABLED = false
+
+export type AreaRecordingTimerState = {
+  startedAt: number
+  pausedAt: number
+  pausedTotal: number
+}
+
+export function createAreaRecordingTimerState(now = Date.now()): AreaRecordingTimerState {
+  return {
+    startedAt: now,
+    pausedAt: 0,
+    pausedTotal: 0
+  }
+}
+
+export function createAreaRecordingStartMessage<TViewport extends ViewportSize>(options: {
+  recordingId: string
+  sourceId: string
+  rect: AreaRect
+  viewport: TViewport
+  includeTabAudio: boolean
+}) {
+  return {
+    type: "START_AREA_RECORDING" as const,
+    ...options
+  }
+}
+
 export const AREA_RESIZE_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const
 
 export type AreaResizeHandle = typeof AREA_RESIZE_HANDLES[number]

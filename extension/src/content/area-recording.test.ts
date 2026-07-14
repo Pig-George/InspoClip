@@ -2,6 +2,9 @@ import { describe, expect, test } from "vitest"
 
 import {
   AREA_RESIZE_HANDLES,
+  DEFAULT_AREA_RECORDING_AUDIO_ENABLED,
+  createAreaRecordingStartMessage,
+  createAreaRecordingTimerState,
   formatRecordingDuration,
   getAreaResizeHandlesMarkup,
   getAreaRecordingInnerRect,
@@ -14,6 +17,35 @@ import {
 } from "./area-recording"
 
 describe("area recording helpers", () => {
+  test("keeps tab audio disabled by default", () => {
+    expect(DEFAULT_AREA_RECORDING_AUDIO_ENABLED).toBe(false)
+  })
+
+  test("includes the selected tab audio option in the start message", () => {
+    expect(createAreaRecordingStartMessage({
+      recordingId: "recording-1",
+      sourceId: "source-1",
+      rect: { x: 10, y: 20, width: 300, height: 180 },
+      viewport: { width: 1200, height: 800 },
+      includeTabAudio: true
+    })).toEqual({
+      type: "START_AREA_RECORDING",
+      recordingId: "recording-1",
+      sourceId: "source-1",
+      rect: { x: 10, y: 20, width: 300, height: 180 },
+      viewport: { width: 1200, height: 800 },
+      includeTabAudio: true
+    })
+  })
+
+  test("creates a fresh timer state for a retake", () => {
+    expect(createAreaRecordingTimerState(42_000)).toEqual({
+      startedAt: 42_000,
+      pausedAt: 0,
+      pausedTotal: 0
+    })
+  })
+
   test("places the toolbar below the selected area when there is enough room", () => {
     const position = getAreaCaptureToolbarPosition(
       { x: 100, y: 120, width: 240, height: 120 },
