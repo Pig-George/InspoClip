@@ -8,6 +8,13 @@ export type AreaRect = {
 export type ViewportSize = {
   width: number
   height: number
+  clientWidth?: number
+  clientHeight?: number
+  visualWidth?: number
+  visualHeight?: number
+  visualOffsetLeft?: number
+  visualOffsetTop?: number
+  visualScale?: number
 }
 
 export type RecordingCommand =
@@ -50,6 +57,13 @@ type SourceSize = {
   height: number
 }
 
+type CaptureCoordinateSpace = {
+  width: number
+  height: number
+  offsetLeft: number
+  offsetTop: number
+}
+
 type ActiveRecording = {
   recordingId: string
   sourceStream: MediaStream
@@ -83,18 +97,47 @@ export function getOffscreenRecordingFrameIntervalMs(fps: number): number {
   return Math.round(1000 / safeFps)
 }
 
+function getPositiveNumber(value: unknown): number | undefined {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : undefined
+}
+
+function getFiniteNumber(value: unknown): number | undefined {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : undefined
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+function getCaptureCoordinateSpace(viewport: ViewportSize): CaptureCoordinateSpace {
+  return {
+    width: getPositiveNumber(viewport.clientWidth) ?? getPositiveNumber(viewport.width) ?? 1,
+    height: getPositiveNumber(viewport.clientHeight) ?? getPositiveNumber(viewport.height) ?? 1,
+    offsetLeft: getFiniteNumber(viewport.visualOffsetLeft) ?? 0,
+    offsetTop: getFiniteNumber(viewport.visualOffsetTop) ?? 0
+  }
+}
+
 export function getAreaRecordingSourceRect(
   rect: AreaRect,
   source: SourceSize,
   viewport: ViewportSize
 ): AreaRect {
-  const scaleX = source.width / viewport.width
-  const scaleY = source.height / viewport.height
+  const coordinateSpace = getCaptureCoordinateSpace(viewport)
+  const scaleX = source.width / coordinateSpace.width
+  const scaleY = source.height / coordinateSpace.height
+  const sourceX = clamp(Math.round((rect.x + coordinateSpace.offsetLeft) * scaleX), 0, Math.max(0, source.width - 1))
+  const sourceY = clamp(Math.round((rect.y + coordinateSpace.offsetTop) * scaleY), 0, Math.max(0, source.height - 1))
+  const sourceWidth = Math.max(1, Math.round(rect.width * scaleX))
+  const sourceHeight = Math.max(1, Math.round(rect.height * scaleY))
+
   return {
-    x: Math.round(rect.x * scaleX),
-    y: Math.round(rect.y * scaleY),
-    width: Math.max(1, Math.round(rect.width * scaleX)),
-    height: Math.max(1, Math.round(rect.height * scaleY))
+    x: sourceX,
+    y: sourceY,
+    width: Math.max(1, Math.min(sourceWidth, source.width - sourceX)),
+    height: Math.max(1, Math.min(sourceHeight, source.height - sourceY))
   }
 }
 

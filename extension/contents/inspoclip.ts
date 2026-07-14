@@ -414,13 +414,25 @@ export const config: PlasmoCSConfig = {
     }
 
     const recordingId = crypto.randomUUID?.() || `area-recording-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const visualViewport = window.visualViewport;
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      clientWidth: document.documentElement?.clientWidth || window.innerWidth,
+      clientHeight: document.documentElement?.clientHeight || window.innerHeight,
+      visualWidth: visualViewport?.width || window.innerWidth,
+      visualHeight: visualViewport?.height || window.innerHeight,
+      visualOffsetLeft: visualViewport?.offsetLeft || 0,
+      visualOffsetTop: visualViewport?.offsetTop || 0,
+      visualScale: visualViewport?.scale || 1,
+    };
 
     try {
       const startResponse = await sendRuntimeMessage({
         type: 'START_AREA_RECORDING',
         recordingId,
         rect,
-        viewport: { width: window.innerWidth, height: window.innerHeight },
+        viewport,
       });
       if (!startResponse?.success) throw new Error(startResponse?.error || 'Failed to start recording');
 
