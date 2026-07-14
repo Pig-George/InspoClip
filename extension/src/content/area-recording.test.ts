@@ -4,7 +4,6 @@ import {
   formatRecordingDuration,
   getAreaRecordingSourceRect,
   getAreaCaptureToolbarPosition,
-  getRecordingFrameIntervalMs,
   getPreferredRecordingMimeType,
   getRecordingUploadMimeType
 } from "./area-recording"
@@ -68,11 +67,5 @@ describe("area recording helpers", () => {
       { width: 1600, height: 1200 },
       { width: 800, height: 600 }
     )).toEqual({ x: 100, y: 160, width: 400, height: 240 })
-  })
-
-  test("uses a captureVisibleTab-safe frame interval", () => {
-    expect(getRecordingFrameIntervalMs(2)).toBe(500)
-    expect(getRecordingFrameIntervalMs(10)).toBe(500)
-    expect(getRecordingFrameIntervalMs(1)).toBe(1000)
   })
 })

@@ -1,0 +1,300 @@
+export type AreaRect = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export type ViewportSize = {
+  width: number
+  height: number
+}
+
+export type RecordingCommand =
+  | { type: "START_OFFSCREEN_AREA_RECORDING"; recordingId: string; streamId: string; rect: AreaRect; viewport: ViewportSize }
+  | { type: "PAUSE_OFFSCREEN_AREA_RECORDING"; recordingId: string }
+  | { type: "RESUME_OFFSCREEN_AREA_RECORDING"; recordingId: string }
+  | { type: "STOP_OFFSCREEN_AREA_RECORDING"; recordingId: string }
+  | { type: "CANCEL_OFFSCREEN_AREA_RECORDING"; recordingId: string }
+
+export type RecordingResult = {
+  dataUrl: string
+  mimeType: string
+  size: number
+}
+
+export type TabCaptureMediaConstraints = {
+  audio: false
+  video: {
+    mandatory: {
+      chromeMediaSource: "tab"
+      chromeMediaSourceId: string
+    }
+  }
+}
+
+export function getTabCaptureMediaConstraints(streamId: string): TabCaptureMediaConstraints {
+  return {
+    audio: false,
+    video: {
+      mandatory: {
+        chromeMediaSource: "tab",
+        chromeMediaSourceId: streamId
+      }
+    }
+  }
+}
+
+type SourceSize = {
+  width: number
+  height: number
+}
+
+type ActiveRecording = {
+  recordingId: string
+  sourceStream: MediaStream
+  outputStream: MediaStream
+  video: HTMLVideoElement
+  recorder: MediaRecorder
+  chunks: Blob[]
+  animationFrameId: number
+  mimeType: string
+}
+
+export function getPreferredRecordingMimeType(
+  mediaRecorder: Pick<typeof MediaRecorder, "isTypeSupported"> | undefined
+): string {
+  const candidates = [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm"
+  ]
+
+  return candidates.find((type) => mediaRecorder?.isTypeSupported?.(type)) || ""
+}
+
+export function getRecordingUploadMimeType(recordingMimeType: string): string {
+  const baseMimeType = recordingMimeType.split(";")[0]?.trim().toLowerCase()
+  return baseMimeType || "video/webm"
+}
+
+export function getAreaRecordingSourceRect(
+  rect: AreaRect,
+  source: SourceSize,
+  viewport: ViewportSize
+): AreaRect {
+  const scaleX = source.width / viewport.width
+  const scaleY = source.height / viewport.height
+  return {
+    x: Math.round(rect.x * scaleX),
+    y: Math.round(rect.y * scaleY),
+    width: Math.max(1, Math.round(rect.width * scaleX)),
+    height: Math.max(1, Math.round(rect.height * scaleY))
+  }
+}
+
+function waitForVideoReady(video: HTMLVideoElement): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      video.removeEventListener("loadedmetadata", onReady)
+      video.removeEventListener("error", onError)
+    }
+    const onReady = () => {
+      cleanup()
+      resolve()
+    }
+    const onError = () => {
+      cleanup()
+      reject(new Error("Failed to initialize tab recording stream"))
+    }
+    video.addEventListener("loadedmetadata", onReady, { once: true })
+    video.addEventListener("error", onError, { once: true })
+  })
+}
+
+function cleanupRecording(recording: ActiveRecording): void {
+  cancelAnimationFrame(recording.animationFrameId)
+  recording.sourceStream.getTracks().forEach((track) => track.stop())
+  recording.outputStream.getTracks().forEach((track) => track.stop())
+  recording.video.pause()
+  recording.video.srcObject = null
+}
+
+function stopMediaRecorder(recorder: MediaRecorder): Promise<void> {
+  return new Promise((resolve) => {
+    if (recorder.state === "inactive") {
+      resolve()
+      return
+    }
+    recorder.addEventListener("stop", () => resolve(), { once: true })
+    recorder.stop()
+  })
+}
+
+function normalizeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || "Recording failed")
+}
+
+export class OffscreenAreaRecorder {
+  private recordings = new Map<string, ActiveRecording>()
+
+  async start(command: Extract<RecordingCommand, { type: "START_OFFSCREEN_AREA_RECORDING" }>): Promise<{ recordingId: string; width: number; height: number; mimeType: string }> {
+    if (this.recordings.has(command.recordingId)) {
+      throw new Error("Recording already exists")
+    }
+
+    const sourceStream = await navigator.mediaDevices.getUserMedia(
+      getTabCaptureMediaConstraints(command.streamId) as unknown as MediaStreamConstraints
+    )
+    const video = document.createElement("video")
+    video.muted = true
+    video.playsInline = true
+    video.srcObject = sourceStream
+    await waitForVideoReady(video)
+    await video.play()
+
+    const sourceRect = getAreaRecordingSourceRect(
+      command.rect,
+      { width: video.videoWidth, height: video.videoHeight },
+      command.viewport
+    )
+    const canvas = document.createElement("canvas")
+    canvas.width = sourceRect.width
+    canvas.height = sourceRect.height
+    const context = canvas.getContext("2d")
+    if (!context) {
+      sourceStream.getTracks().forEach((track) => track.stop())
+      throw new Error("Failed to create recording canvas")
+    }
+
+    const outputStream = canvas.captureStream(30)
+    const mimeType = getPreferredRecordingMimeType(MediaRecorder)
+    const recorder = new MediaRecorder(outputStream, mimeType ? { mimeType } : undefined)
+    const chunks: Blob[] = []
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data?.size) chunks.push(event.data)
+    })
+
+    const recording: ActiveRecording = {
+      recordingId: command.recordingId,
+      sourceStream,
+      outputStream,
+      video,
+      recorder,
+      chunks,
+      animationFrameId: 0,
+      mimeType
+    }
+    this.recordings.set(command.recordingId, recording)
+
+    const drawFrame = () => {
+      if (!this.recordings.has(command.recordingId)) return
+      if (recorder.state === "recording") {
+        context.drawImage(
+          video,
+          sourceRect.x,
+          sourceRect.y,
+          sourceRect.width,
+          sourceRect.height,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        )
+      }
+      recording.animationFrameId = requestAnimationFrame(drawFrame)
+    }
+
+    recorder.start(1000)
+    drawFrame()
+
+    return {
+      recordingId: command.recordingId,
+      width: canvas.width,
+      height: canvas.height,
+      mimeType: getRecordingUploadMimeType(mimeType)
+    }
+  }
+
+  pause(recordingId: string): void {
+    const recording = this.requireRecording(recordingId)
+    if (recording.recorder.state === "recording") recording.recorder.pause()
+  }
+
+  resume(recordingId: string): void {
+    const recording = this.requireRecording(recordingId)
+    if (recording.recorder.state === "paused") recording.recorder.resume()
+  }
+
+  async stop(recordingId: string): Promise<RecordingResult> {
+    const recording = this.requireRecording(recordingId)
+    await stopMediaRecorder(recording.recorder)
+    this.recordings.delete(recordingId)
+    cleanupRecording(recording)
+    const blob = new Blob(recording.chunks, { type: getRecordingUploadMimeType(recording.mimeType) })
+    return encodeRecordingBlob(blob)
+  }
+
+  async cancel(recordingId: string): Promise<void> {
+    const recording = this.recordings.get(recordingId)
+    if (!recording) return
+    await stopMediaRecorder(recording.recorder)
+    this.recordings.delete(recordingId)
+    cleanupRecording(recording)
+  }
+
+  async handle(command: RecordingCommand): Promise<unknown> {
+    if (command.type === "START_OFFSCREEN_AREA_RECORDING") return this.start(command)
+    if (command.type === "PAUSE_OFFSCREEN_AREA_RECORDING") {
+      this.pause(command.recordingId)
+      return { recordingId: command.recordingId }
+    }
+    if (command.type === "RESUME_OFFSCREEN_AREA_RECORDING") {
+      this.resume(command.recordingId)
+      return { recordingId: command.recordingId }
+    }
+    if (command.type === "STOP_OFFSCREEN_AREA_RECORDING") return this.stop(command.recordingId)
+    if (command.type === "CANCEL_OFFSCREEN_AREA_RECORDING") {
+      await this.cancel(command.recordingId)
+      return { recordingId: command.recordingId }
+    }
+  }
+
+  private requireRecording(recordingId: string): ActiveRecording {
+    const recording = this.recordings.get(recordingId)
+    if (!recording) throw new Error("Recording not found")
+    return recording
+  }
+}
+
+export function isRecordingCommand(value: unknown): value is RecordingCommand {
+  return Boolean(value && typeof value === "object" && "type" in value && String((value as { type: unknown }).type).includes("_OFFSCREEN_AREA_RECORDING"))
+}
+
+export function createAreaRecorderMessageHandler(recorder = new OffscreenAreaRecorder()) {
+  return (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void): boolean => {
+    if (!isRecordingCommand(message)) return false
+    recorder
+      .handle(message)
+      .then((result) => sendResponse({ success: true, ...(typeof result === "object" && result ? result : {}) }))
+      .catch((error) => sendResponse({ success: false, error: normalizeError(error) }))
+    return true
+  }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(String(reader.result || ""))
+    reader.onerror = () => reject(new Error("Failed to encode recording"))
+    reader.readAsDataURL(blob)
+  })
+}
+
+export async function encodeRecordingBlob(blob: Blob): Promise<{ dataUrl: string; mimeType: string; size: number }> {
+  return {
+    dataUrl: await blobToDataUrl(blob),
+    mimeType: blob.type || "video/webm",
+    size: blob.size
+  }
+}

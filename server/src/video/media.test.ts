@@ -34,6 +34,30 @@ describe('video media validation', () => {
     expect(run).toHaveBeenLastCalledWith('ffprobe', expect.arrayContaining(['packet=pts_time,dts_time,duration_time']));
   });
 
+  it('falls back to frame timestamps when browser-recorded webm packets have no duration', async () => {
+    const run = vi.fn()
+      .mockResolvedValueOnce({ stdout: JSON.stringify({
+        format: { duration: 'N/A', format_name: 'matroska,webm' },
+        streams: [{ codec_type: 'video', width: 640, height: 360 }],
+      }) })
+      .mockResolvedValueOnce({ stdout: JSON.stringify({ packets: [] }) })
+      .mockResolvedValueOnce({ stdout: JSON.stringify({
+        frames: [
+          { best_effort_timestamp_time: '0.000000', pkt_duration_time: '0.033000' },
+          { best_effort_timestamp_time: '3.967000', pkt_duration_time: '0.033000' },
+        ],
+      }) });
+
+    await expect(inspectVideo('recording.webm', run)).resolves.toEqual({
+      durationMs: 4000,
+      width: 640,
+      height: 360,
+      container: 'webm',
+    });
+    expect(run).toHaveBeenCalledTimes(3);
+    expect(run).toHaveBeenLastCalledWith('ffprobe', expect.arrayContaining(['frame=best_effort_timestamp_time,pkt_pts_time,pts_time,pkt_duration_time']));
+  });
+
   it.each([
     [{ durationMs: 0, width: 1, height: 1, container: 'mp4' }, 'valid duration'],
     [{ durationMs: Number.NaN, width: 1, height: 1, container: 'mp4' }, 'valid duration'],

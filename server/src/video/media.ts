@@ -28,20 +28,45 @@ function durationMsFromSeconds(value: unknown): number {
   return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 0;
 }
 
-function durationMsFromPackets(stdout: string): number {
-  const parsed = JSON.parse(stdout) as {
-    packets?: Array<{ pts_time?: string; dts_time?: string; duration_time?: string }>;
-  };
-  const endTimes = (parsed.packets ?? [])
+function durationMsFromTimedItems(
+  items: Array<{
+    pts_time?: string;
+    dts_time?: string;
+    duration_time?: string;
+    best_effort_timestamp_time?: string;
+    pkt_pts_time?: string;
+    pkt_duration_time?: string;
+  }> = [],
+): number {
+  const endTimes = items
     .map((packet) => {
-      const timestamp = Number(packet.pts_time ?? packet.dts_time);
-      const duration = Number(packet.duration_time ?? 0);
+      const timestamp = Number(packet.pts_time ?? packet.dts_time ?? packet.best_effort_timestamp_time ?? packet.pkt_pts_time);
+      const duration = Number(packet.duration_time ?? packet.pkt_duration_time ?? 0);
       if (!Number.isFinite(timestamp) || timestamp < 0) return 0;
       return timestamp + (Number.isFinite(duration) && duration > 0 ? duration : 0);
     })
     .filter((value) => Number.isFinite(value) && value > 0);
   if (endTimes.length === 0) return 0;
   return Math.round(Math.max(...endTimes) * 1000);
+}
+
+function durationMsFromPackets(stdout: string): number {
+  const parsed = JSON.parse(stdout) as {
+    packets?: Array<{ pts_time?: string; dts_time?: string; duration_time?: string }>;
+  };
+  return durationMsFromTimedItems(parsed.packets);
+}
+
+function durationMsFromFrames(stdout: string): number {
+  const parsed = JSON.parse(stdout) as {
+    frames?: Array<{
+      best_effort_timestamp_time?: string;
+      pkt_pts_time?: string;
+      pts_time?: string;
+      pkt_duration_time?: string;
+    }>;
+  };
+  return durationMsFromTimedItems(parsed.frames);
 }
 
 async function inspectPacketDuration(filePath: string, run: CommandRunner): Promise<number> {
@@ -51,6 +76,15 @@ async function inspectPacketDuration(filePath: string, run: CommandRunner): Prom
     '-of', 'json', filePath,
   ]);
   return durationMsFromPackets(stdout);
+}
+
+async function inspectFrameDuration(filePath: string, run: CommandRunner): Promise<number> {
+  const { stdout } = await run('ffprobe', [
+    '-v', 'error', '-select_streams', 'v:0',
+    '-show_entries', 'frame=best_effort_timestamp_time,pkt_pts_time,pts_time,pkt_duration_time',
+    '-of', 'json', filePath,
+  ]);
+  return durationMsFromFrames(stdout);
 }
 
 export function validateVideoMetadata(metadata: VideoMetadata): VideoMetadata {
@@ -75,8 +109,11 @@ export async function inspectVideo(filePath: string, run: CommandRunner = defaul
   const stream = parsed.streams?.find((item) => item.codec_type === 'video');
   if (!stream) throw new Error('Media has no video stream');
   const formatDurationMs = durationMsFromSeconds(parsed.format?.duration);
+  const fallbackDurationMs = formatDurationMs
+    || await inspectPacketDuration(filePath, run)
+    || await inspectFrameDuration(filePath, run);
   const metadata: VideoMetadata = {
-    durationMs: formatDurationMs || await inspectPacketDuration(filePath, run),
+    durationMs: fallbackDurationMs,
     width: stream.width ?? 0,
     height: stream.height ?? 0,
     container: normalizeContainer(parsed.format?.format_name ?? ''),

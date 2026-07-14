@@ -80,8 +80,3 @@ export function getAreaRecordingSourceRect(
     height: Math.max(1, Math.round(rect.height * scaleY))
   }
 }
-
-export function getRecordingFrameIntervalMs(fps: number): number {
-  const safeFps = Number.isFinite(fps) ? Math.min(2, Math.max(1, Math.floor(fps))) : 2
-  return Math.round(1000 / safeFps)
-}

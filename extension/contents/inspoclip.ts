@@ -4,9 +4,6 @@ import type { PlasmoCSConfig } from "plasmo"
 import {
   formatRecordingDuration,
   getAreaCaptureToolbarPosition,
-  getPreferredRecordingMimeType,
-  getRecordingFrameIntervalMs,
-  getRecordingUploadMimeType,
 } from "../src/content/area-recording"
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
@@ -410,19 +407,23 @@ export const config: PlasmoCSConfig = {
   }
 
   async function startAreaRecording(rect, overlay, toolbar) {
-    if (typeof MediaRecorder === 'undefined') {
-      showToast(locale === 'zh' ? '当前浏览器不支持录屏' : 'Screen recording is not supported in this browser', 'error');
-      setTimeout(removeToast, 3000);
-      return;
-    }
-
     const recordBtn = toolbar.querySelector('[data-action="record"]');
     if (recordBtn) {
       recordBtn.disabled = true;
       recordBtn.textContent = locale === 'zh' ? '准备中...' : 'Preparing...';
     }
 
+    const recordingId = crypto.randomUUID?.() || `area-recording-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
     try {
+      const startResponse = await sendRuntimeMessage({
+        type: 'START_AREA_RECORDING',
+        recordingId,
+        rect,
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+      });
+      if (!startResponse?.success) throw new Error(startResponse?.error || 'Failed to start recording');
+
       overlay.classList.add('inspoclip-area-overlay-recording');
       toolbar.classList.add('inspoclip-area-toolbar-recording');
       toolbar.innerHTML = `
@@ -436,51 +437,17 @@ export const config: PlasmoCSConfig = {
       toolbar.addEventListener('mouseup', (event) => event.stopPropagation());
       toolbar.addEventListener('click', (event) => event.stopPropagation());
 
-      const firstFrame = await captureAreaRecordingFrame(overlay);
-      const firstImage = await loadImage(firstFrame);
-      const scaleX = firstImage.naturalWidth / window.innerWidth;
-      const scaleY = firstImage.naturalHeight / window.innerHeight;
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(rect.width * scaleX));
-      canvas.height = Math.max(1, Math.round(rect.height * scaleY));
-      const ctx = canvas.getContext('2d');
-      drawAreaRecordingFrame(ctx, firstImage, rect, scaleX, scaleY, canvas);
-      const frameIntervalMs = getRecordingFrameIntervalMs(2);
-      const canvasStream = canvas.captureStream(1000 / frameIntervalMs);
-      const mimeType = getPreferredRecordingMimeType(MediaRecorder);
-      const recorder = new MediaRecorder(canvasStream, mimeType ? { mimeType } : undefined);
-      const chunks = [];
-      let frameTimerId = 0;
       let timerId = 0;
       let startedAt = Date.now();
       let pausedAt = 0;
       let pausedTotal = 0;
-
       const recording = {
-        recorder,
-        canvasStream,
-        frameTimerId: 0,
+        recordingId,
         timerId: 0,
         shouldAnalyze: true,
+        stopping: false,
       };
       activeAreaRecording = recording;
-
-      const drawFrame = async () => {
-        if (activeAreaRecording !== recording || recorder.state === 'inactive') return;
-        if (recorder.state !== 'inactive') {
-          if (recorder.state === 'recording') {
-            try {
-              const frame = await captureAreaRecordingFrame(overlay);
-              const image = await loadImage(frame);
-              drawAreaRecordingFrame(ctx, image, rect, scaleX, scaleY, canvas);
-            } catch {
-              // Keep the previous frame if a single captureVisibleTab call is throttled or interrupted.
-            }
-          }
-          frameTimerId = window.setTimeout(drawFrame, frameIntervalMs);
-          recording.frameTimerId = frameTimerId;
-        }
-      };
 
       const timeEl = toolbar.querySelector('.inspoclip-area-record-time');
       const updateTimer = () => {
@@ -490,50 +457,61 @@ export const config: PlasmoCSConfig = {
       timerId = window.setInterval(updateTimer, 500);
       recording.timerId = timerId;
 
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) chunks.push(event.data);
-      };
-      recorder.onstop = async () => {
-        cleanupAreaRecording(recording);
-        const shouldAnalyze = recording.shouldAnalyze;
-        removeAreaOverlay();
-        if (!shouldAnalyze) return;
+      toolbar.querySelector('[data-action="pause"]')?.addEventListener('click', async () => {
+        const pauseBtn = toolbar.querySelector('[data-action="pause"]');
         try {
-          const blob = new Blob(chunks, { type: getRecordingUploadMimeType(mimeType) });
+          if (!pausedAt) {
+            const response = await sendRuntimeMessage({ type: 'PAUSE_AREA_RECORDING', recordingId });
+            if (!response?.success) throw new Error(response?.error || 'Pause failed');
+            pausedAt = Date.now();
+            overlay.classList.add('inspoclip-area-overlay-paused');
+            if (pauseBtn) pauseBtn.textContent = locale === 'zh' ? '继续' : 'Resume';
+          } else {
+            const response = await sendRuntimeMessage({ type: 'RESUME_AREA_RECORDING', recordingId });
+            if (!response?.success) throw new Error(response?.error || 'Resume failed');
+            pausedTotal += Date.now() - pausedAt;
+            pausedAt = 0;
+            overlay.classList.remove('inspoclip-area-overlay-paused');
+            if (pauseBtn) pauseBtn.textContent = locale === 'zh' ? '暂停' : 'Pause';
+          }
+          updateTimer();
+        } catch (err) {
+          showToast(locale === 'zh' ? `录屏控制失败: ${err.message}` : `Recording control failed: ${err.message}`, 'error');
+          setTimeout(removeToast, 3000);
+        }
+      });
+
+      toolbar.querySelector('[data-action="finish"]')?.addEventListener('click', async () => {
+        if (recording.stopping) return;
+        recording.stopping = true;
+        recording.shouldAnalyze = true;
+        const finishBtn = toolbar.querySelector('[data-action="finish"]');
+        if (finishBtn) {
+          finishBtn.disabled = true;
+          finishBtn.textContent = locale === 'zh' ? '处理中...' : 'Processing...';
+        }
+
+        try {
+          const response = await sendRuntimeMessage({ type: 'STOP_AREA_RECORDING', recordingId });
+          cleanupAreaRecording(recording);
+          activeAreaRecording = null;
+          removeAreaOverlay();
+          if (!response?.success) throw new Error(response?.error || 'Recording failed');
+          const blob = dataUrlToBlob(response.dataUrl);
           if (!blob.size) throw new Error('No recording data');
           await analyzeRecordedAreaVideo(blob);
         } catch (err) {
+          cleanupAreaRecording(recording);
+          activeAreaRecording = null;
+          removeAreaOverlay();
           showToast(locale === 'zh' ? `录屏分析失败: ${err.message}` : `Recording analysis failed: ${err.message}`, 'error');
           setTimeout(removeToast, 5000);
         }
-      };
-
-      toolbar.querySelector('[data-action="pause"]')?.addEventListener('click', () => {
-        const pauseBtn = toolbar.querySelector('[data-action="pause"]');
-        if (recorder.state === 'recording') {
-          recorder.pause();
-          pausedAt = Date.now();
-          overlay.classList.add('inspoclip-area-overlay-paused');
-          if (pauseBtn) pauseBtn.textContent = locale === 'zh' ? '继续' : 'Resume';
-        } else if (recorder.state === 'paused') {
-          recorder.resume();
-          pausedTotal += Date.now() - pausedAt;
-          pausedAt = 0;
-          overlay.classList.remove('inspoclip-area-overlay-paused');
-          if (pauseBtn) pauseBtn.textContent = locale === 'zh' ? '暂停' : 'Pause';
-        }
-        updateTimer();
-      });
-      toolbar.querySelector('[data-action="finish"]')?.addEventListener('click', () => {
-        recording.shouldAnalyze = true;
-        if (recorder.state !== 'inactive') recorder.stop();
       });
 
-      recorder.start(1000);
-      drawFrame();
       updateTimer();
     } catch (err) {
-      cancelActiveAreaRecording();
+      await sendRuntimeMessage({ type: 'CANCEL_AREA_RECORDING', recordingId }).catch(() => {});
       overlay.classList.remove('inspoclip-area-overlay-recording');
       if (recordBtn) {
         recordBtn.disabled = false;
@@ -546,21 +524,31 @@ export const config: PlasmoCSConfig = {
 
   function cleanupAreaRecording(recording) {
     if (!recording) return;
-    if (recording.frameTimerId) clearTimeout(recording.frameTimerId);
     if (recording.timerId) clearInterval(recording.timerId);
-    recording.canvasStream?.getTracks?.().forEach((track) => track.stop());
     if (activeAreaRecording === recording) activeAreaRecording = null;
   }
 
-  function cancelActiveAreaRecording() {
+  async function cancelActiveAreaRecording() {
     const recording = activeAreaRecording;
     if (!recording) return;
     recording.shouldAnalyze = false;
-    if (recording.recorder && recording.recorder.state !== 'inactive') {
-      recording.recorder.stop();
-    } else {
-      cleanupAreaRecording(recording);
-    }
+    cleanupAreaRecording(recording);
+    try {
+      await sendRuntimeMessage({ type: 'CANCEL_AREA_RECORDING', recordingId: recording.recordingId });
+    } catch {}
+  }
+
+  function sendRuntimeMessage(message) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        const error = chrome.runtime.lastError;
+        if (error) {
+          reject(new Error(error.message));
+          return;
+        }
+        resolve(response);
+      });
+    });
   }
 
   async function analyzeRecordedAreaVideo(videoBlob) {
@@ -585,41 +573,6 @@ export const config: PlasmoCSConfig = {
     const detail = await detailRes.json();
     pushVideoHistory(detail);
     transitionToVideoModal(detail, window.innerWidth - 20, 20);
-  }
-
-  async function captureAreaRecordingFrame(overlay) {
-    const previousVisibility = overlay.style.visibility;
-    overlay.style.visibility = 'hidden';
-    try {
-      await new Promise((r) => setTimeout(r, 40));
-      return await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' }, (response) => {
-          if (response?.dataUrl) resolve(response.dataUrl);
-          else reject(new Error(response?.error || 'Capture failed'));
-        });
-      });
-    } finally {
-      overlay.style.visibility = previousVisibility;
-    }
-  }
-
-  function loadImage(dataUrl) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Failed to load recording frame'));
-      img.src = dataUrl;
-    });
-  }
-
-  function drawAreaRecordingFrame(ctx, image, rect, scaleX, scaleY, canvas) {
-    ctx.drawImage(
-      image,
-      rect.x * scaleX, rect.y * scaleY,
-      rect.width * scaleX, rect.height * scaleY,
-      0, 0,
-      canvas.width, canvas.height
-    );
   }
 
   function removeAreaOverlay() {
