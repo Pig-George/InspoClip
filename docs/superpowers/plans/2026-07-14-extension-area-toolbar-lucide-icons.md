@@ -12,7 +12,7 @@
 
 ## 文件结构
 
-- 创建 `extension/src/content/area-toolbar-icons.ts`：封装 Lucide 按需导入、动作映射、占位标记和局部渲染。
+- 创建 `extension/src/content/area-toolbar-icons.ts`：封装 Lucide 按需导入、动作映射、占位标记和基于 SVG 元素工厂的局部渲染。
 - 创建 `extension/src/content/area-toolbar-icons.test.ts`：验证完整映射、占位标记和局部 Lucide 渲染参数。
 - 修改 `extension/src/content/area-recording.ts`：移除手写 SVG 路径，复用图标模块导出的动作类型与占位函数。
 - 修改 `extension/src/content/area-recording.test.ts`：将手写 SVG 断言改为 Lucide 映射断言。
@@ -22,10 +22,10 @@
 ### 任务 1：建立 Lucide 图标映射与局部渲染
 
 - [ ] 在 `area-toolbar-icons.test.ts` 编写失败测试，断言 `screenshot → scan`、`record → video`、`sound-on → volume-2`、`sound-off → volume-x`、`cancel → x`、`pause → pause`、`resume → play`、`retake/confirm-retake → rotate-ccw`、`finish → check`。
-- [ ] 添加失败测试，断言图标占位使用 `data-lucide` 且没有内联 SVG，并验证局部渲染传入 `root`、按需图标集合、16px 尺寸、1.75px 描边和无障碍属性。
+- [ ] 添加失败测试，断言图标占位使用 `data-lucide` 且没有内联 SVG，并验证只查询传入的操作栏根节点，使用 Lucide SVG 元素工厂设置 16px 尺寸、1.75px 描边和无障碍属性。
 - [ ] 运行 `pnpm --dir extension test -- src/content/area-toolbar-icons.test.ts`，确认因模块缺失或行为缺失而失败。
 - [ ] 使用 `pnpm --dir extension add lucide@0.468.0` 安装依赖。
-- [ ] 实现 `area-toolbar-icons.ts`，只导入 `Scan`、`Video`、`Volume2`、`VolumeX`、`X`、`Pause`、`Play`、`RotateCcw`、`Check` 与 `createIcons`。
+- [ ] 实现 `area-toolbar-icons.ts`，只导入 `Scan`、`Video`、`Volume2`、`VolumeX`、`X`、`Pause`、`Play`、`RotateCcw`、`Check` 与 Lucide 默认 SVG 元素工厂；不得全局扫描宿主页面。
 - [ ] 重跑定向测试，确认映射和局部渲染通过。
 
 ### 任务 2：接入框选与录制状态

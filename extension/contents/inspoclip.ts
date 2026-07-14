@@ -15,6 +15,7 @@ import {
   resizeAreaRect,
 } from "../src/content/area-recording"
 import { createAreaRecordingSource } from "../src/content/area-recording-source"
+import { renderAreaToolbarIcons } from "../src/content/area-toolbar-icons"
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive, shouldExpandContentRoot } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
@@ -331,6 +332,7 @@ export const config: PlasmoCSConfig = {
     if (!button) return;
     const label = getAreaToolbarActionLabel(action, getAreaToolbarLocale());
     button.innerHTML = getAreaToolbarActionIcon(action);
+    renderAreaToolbarIcons(button);
     button.dataset.tooltip = label;
     button.setAttribute('aria-label', label);
     button.classList.remove('inspoclip-area-icon-swap');
@@ -361,6 +363,7 @@ export const config: PlasmoCSConfig = {
         ${renderAreaToolbarIconButton('cancel', 'cancel', 'inspoclip-area-icon-button-quiet')}
       </div>
     `;
+    renderAreaToolbarIcons(toolbar);
     positionAreaToolbar(toolbar, currentRect);
     let adjustment = null;
 
@@ -580,6 +583,7 @@ export const config: PlasmoCSConfig = {
         ${renderAreaToolbarIconButton('retake', 'retake')}
         ${renderAreaToolbarIconButton('finish', 'finish', 'inspoclip-area-icon-button-primary')}
       `;
+      renderAreaToolbarIcons(toolbar);
       toolbar.style.animation = 'none';
       void toolbar.offsetWidth;
       toolbar.style.animation = '';

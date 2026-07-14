@@ -32,7 +32,7 @@ describe("area recording helpers", () => {
     expect(getAreaToolbarActionLabel("finish", "en")).toBe("Finish and analyze")
   })
 
-  test("renders every toolbar action as a currentColor inline svg without emoji", () => {
+  test("renders every toolbar action as a Lucide placeholder without hand-written svg", () => {
     const actions = [
       "screenshot",
       "record",
@@ -48,9 +48,9 @@ describe("area recording helpers", () => {
 
     actions.forEach((action) => {
       const icon = getAreaToolbarActionIcon(action)
-      expect(icon).toContain("<svg")
-      expect(icon).toContain('stroke="currentColor"')
+      expect(icon).toContain("data-lucide=")
       expect(icon).toContain('aria-hidden="true"')
+      expect(icon).not.toContain("<svg")
       expect(icon).not.toMatch(/[📷🎥🔊🔇⏸▶↻✅❌]/u)
     })
   })
