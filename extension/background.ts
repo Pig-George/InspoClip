@@ -53,6 +53,24 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 })
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "GET_TAB_CAPTURE_STREAM_ID") {
+    const tabId = sender.tab?.id
+    if (!tabId) {
+      sendResponse({ success: false, error: "No active tab" })
+      return
+    }
+
+    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
+      const error = chrome.runtime.lastError
+      if (error || !streamId) {
+        sendResponse({ success: false, error: error?.message || "Failed to capture current tab" })
+        return
+      }
+      sendResponse({ success: true, streamId })
+    })
+    return true
+  }
+
   if (message.type === "CAPTURE_TAB") {
     const tabId = sender.tab?.id
     if (!tabId) return

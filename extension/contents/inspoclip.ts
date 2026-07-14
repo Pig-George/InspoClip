@@ -4,8 +4,10 @@ import type { PlasmoCSConfig } from "plasmo"
 import {
   formatRecordingDuration,
   getAreaCaptureToolbarPosition,
+  getAreaRecordingSourceRect,
   getPreferredRecordingMimeType,
-  getRecordingUploadMimeType
+  getRecordingUploadMimeType,
+  getTabCaptureMediaConstraints
 } from "../src/content/area-recording"
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
@@ -422,10 +424,11 @@ export const config: PlasmoCSConfig = {
     }
 
     try {
-      const sourceStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 30 },
-        audio: false,
-      });
+      const streamResponse = await chrome.runtime.sendMessage({ type: 'GET_TAB_CAPTURE_STREAM_ID' });
+      if (!streamResponse?.success || !streamResponse.streamId) {
+        throw new Error(streamResponse?.error || 'Failed to capture current tab');
+      }
+      const sourceStream = await navigator.mediaDevices.getUserMedia(getTabCaptureMediaConstraints(streamResponse.streamId));
       overlay.classList.add('inspoclip-area-overlay-recording');
       toolbar.classList.add('inspoclip-area-toolbar-recording');
       toolbar.innerHTML = `
@@ -449,11 +452,14 @@ export const config: PlasmoCSConfig = {
       });
       await sourceVideo.play();
 
-      const scaleX = sourceVideo.videoWidth / window.innerWidth;
-      const scaleY = sourceVideo.videoHeight / window.innerHeight;
+      const sourceRect = getAreaRecordingSourceRect(
+        rect,
+        { width: sourceVideo.videoWidth, height: sourceVideo.videoHeight },
+        { width: window.innerWidth, height: window.innerHeight }
+      );
       const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(rect.width * scaleX));
-      canvas.height = Math.max(1, Math.round(rect.height * scaleY));
+      canvas.width = sourceRect.width;
+      canvas.height = sourceRect.height;
       const ctx = canvas.getContext('2d');
       const canvasStream = canvas.captureStream(30);
       const mimeType = getPreferredRecordingMimeType(MediaRecorder);
@@ -480,10 +486,10 @@ export const config: PlasmoCSConfig = {
         if (recorder.state !== 'inactive') {
           ctx.drawImage(
             sourceVideo,
-            rect.x * scaleX,
-            rect.y * scaleY,
-            rect.width * scaleX,
-            rect.height * scaleY,
+            sourceRect.x,
+            sourceRect.y,
+            sourceRect.width,
+            sourceRect.height,
             0,
             0,
             canvas.width,

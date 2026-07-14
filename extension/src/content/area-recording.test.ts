@@ -2,8 +2,10 @@ import { describe, expect, test } from "vitest"
 
 import {
   formatRecordingDuration,
+  getAreaRecordingSourceRect,
   getAreaCaptureToolbarPosition,
   getPreferredRecordingMimeType,
+  getTabCaptureMediaConstraints,
   getRecordingUploadMimeType
 } from "./area-recording"
 
@@ -58,5 +60,25 @@ describe("area recording helpers", () => {
     expect(getRecordingUploadMimeType("video/webm;codecs=vp9")).toBe("video/webm")
     expect(getRecordingUploadMimeType(" video/webm; codecs=vp8 ")).toBe("video/webm")
     expect(getRecordingUploadMimeType("")).toBe("video/webm")
+  })
+
+  test("maps viewport selection to tab capture source pixels", () => {
+    expect(getAreaRecordingSourceRect(
+      { x: 50, y: 80, width: 200, height: 120 },
+      { width: 1600, height: 1200 },
+      { width: 800, height: 600 }
+    )).toEqual({ x: 100, y: 160, width: 400, height: 240 })
+  })
+
+  test("creates current tab capture constraints from a stream id", () => {
+    expect(getTabCaptureMediaConstraints("stream-1")).toEqual({
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: "tab",
+          chromeMediaSourceId: "stream-1"
+        }
+      }
+    })
   })
 })

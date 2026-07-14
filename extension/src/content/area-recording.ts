@@ -15,6 +15,21 @@ export type ToolbarSize = {
   height: number
 }
 
+export type SourceSize = {
+  width: number
+  height: number
+}
+
+export type TabCaptureMediaConstraints = {
+  audio: false
+  video: {
+    mandatory: {
+      chromeMediaSource: "tab"
+      chromeMediaSourceId: string
+    }
+  }
+}
+
 export function getAreaCaptureToolbarPosition(
   rect: AreaRect,
   viewport: ViewportSize,
@@ -59,4 +74,31 @@ export function getPreferredRecordingMimeType(
 export function getRecordingUploadMimeType(recordingMimeType: string): string {
   const baseMimeType = recordingMimeType.split(";")[0]?.trim().toLowerCase()
   return baseMimeType || "video/webm"
+}
+
+export function getAreaRecordingSourceRect(
+  rect: AreaRect,
+  source: SourceSize,
+  viewport: ViewportSize
+): AreaRect {
+  const scaleX = source.width / viewport.width
+  const scaleY = source.height / viewport.height
+  return {
+    x: Math.round(rect.x * scaleX),
+    y: Math.round(rect.y * scaleY),
+    width: Math.max(1, Math.round(rect.width * scaleX)),
+    height: Math.max(1, Math.round(rect.height * scaleY))
+  }
+}
+
+export function getTabCaptureMediaConstraints(streamId: string): TabCaptureMediaConstraints {
+  return {
+    audio: false,
+    video: {
+      mandatory: {
+        chromeMediaSource: "tab",
+        chromeMediaSourceId: streamId
+      }
+    }
+  }
 }
