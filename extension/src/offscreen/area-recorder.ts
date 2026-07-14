@@ -15,6 +15,8 @@ export type ViewportSize = {
   visualOffsetLeft?: number
   visualOffsetTop?: number
   visualScale?: number
+  captureInsetLeft?: number
+  captureInsetTop?: number
 }
 
 export type RecordingCommand =
@@ -115,8 +117,8 @@ function getCaptureCoordinateSpace(viewport: ViewportSize): CaptureCoordinateSpa
   return {
     width: getPositiveNumber(viewport.clientWidth) ?? getPositiveNumber(viewport.width) ?? 1,
     height: getPositiveNumber(viewport.clientHeight) ?? getPositiveNumber(viewport.height) ?? 1,
-    offsetLeft: getFiniteNumber(viewport.visualOffsetLeft) ?? 0,
-    offsetTop: getFiniteNumber(viewport.visualOffsetTop) ?? 0
+    offsetLeft: (getFiniteNumber(viewport.visualOffsetLeft) ?? 0) + (getFiniteNumber(viewport.captureInsetLeft) ?? 0),
+    offsetTop: (getFiniteNumber(viewport.visualOffsetTop) ?? 0) + (getFiniteNumber(viewport.captureInsetTop) ?? 0)
   }
 }
 

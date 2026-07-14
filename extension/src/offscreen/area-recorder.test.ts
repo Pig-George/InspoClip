@@ -31,6 +31,20 @@ describe("offscreen area recorder helpers", () => {
     )).toEqual({ x: 200, y: 40, width: 400, height: 200 })
   })
 
+  test("applies capture left inset when tab capture frame starts before the layout viewport", () => {
+    expect(getAreaRecordingSourceRect(
+      { x: 100, y: 20, width: 200, height: 100 },
+      { width: 1600, height: 1200 },
+      {
+        width: 817,
+        height: 600,
+        clientWidth: 800,
+        clientHeight: 600,
+        captureInsetLeft: 8.5
+      }
+    )).toEqual({ x: 217, y: 40, width: 400, height: 200 })
+  })
+
   test("applies visual viewport offsets before mapping to native tab stream pixels", () => {
     expect(getAreaRecordingSourceRect(
       { x: 10, y: 20, width: 100, height: 80 },
