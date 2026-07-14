@@ -21,25 +21,25 @@
 
 ### 任务 1：建立 Lucide 图标映射与局部渲染
 
-- [ ] 在 `area-toolbar-icons.test.ts` 编写失败测试，断言 `screenshot → scan`、`record → video`、`sound-on → volume-2`、`sound-off → volume-x`、`cancel → x`、`pause → pause`、`resume → play`、`retake/confirm-retake → rotate-ccw`、`finish → check`。
-- [ ] 添加失败测试，断言图标占位使用 `data-lucide` 且没有内联 SVG，并验证只查询传入的操作栏根节点，使用 Lucide SVG 元素工厂设置 16px 尺寸、1.75px 描边和无障碍属性。
-- [ ] 运行 `pnpm --dir extension test -- src/content/area-toolbar-icons.test.ts`，确认因模块缺失或行为缺失而失败。
-- [ ] 使用 `pnpm --dir extension add lucide@0.468.0` 安装依赖。
-- [ ] 实现 `area-toolbar-icons.ts`，只导入 `Scan`、`Video`、`Volume2`、`VolumeX`、`X`、`Pause`、`Play`、`RotateCcw`、`Check` 与 Lucide 默认 SVG 元素工厂；不得全局扫描宿主页面。
-- [ ] 重跑定向测试，确认映射和局部渲染通过。
+- [x] 在 `area-toolbar-icons.test.ts` 编写失败测试，断言 `screenshot → scan`、`record → video`、`sound-on → volume-2`、`sound-off → volume-x`、`cancel → x`、`pause → pause`、`resume → play`、`retake/confirm-retake → rotate-ccw`、`finish → check`。
+- [x] 添加失败测试，断言图标占位使用 `data-lucide` 且没有内联 SVG，并验证只查询传入的操作栏根节点，使用 Lucide SVG 元素工厂设置 16px 尺寸、1.75px 描边和无障碍属性。
+- [x] 运行 `pnpm --dir extension test -- src/content/area-toolbar-icons.test.ts`，确认因模块缺失或行为缺失而失败。
+- [x] 使用 `pnpm --dir extension add lucide@0.468.0` 安装依赖。
+- [x] 实现 `area-toolbar-icons.ts`，只导入 `Scan`、`Video`、`Volume2`、`VolumeX`、`X`、`Pause`、`Play`、`RotateCcw`、`Check` 与 Lucide 默认 SVG 元素工厂；不得全局扫描宿主页面。
+- [x] 重跑定向测试，确认映射和局部渲染通过。
 
 ### 任务 2：接入框选与录制状态
 
-- [ ] 先修改 `area-recording.test.ts` 形成失败断言，要求所有动作返回对应 Lucide 占位标记而不是 `<svg>` 手写路径。
-- [ ] 运行 `pnpm --dir extension test -- src/content/area-recording.test.ts`，确认旧实现导致断言失败。
-- [ ] 从 `area-recording.ts` 移除 `AREA_TOOLBAR_ICON_PATHS`，改为复用图标模块。
-- [ ] 在 `inspoclip.ts` 的框选 Dock、录制 Dock、声音开关、暂停/继续切换后调用 `renderAreaToolbarIcons()`，渲染范围限制在当前 toolbar 或 button。
-- [ ] 运行两个定向测试文件并确认通过。
-- [ ] 提交 `feat(extension): use lucide icons in area toolbar`。
+- [x] 先修改 `area-recording.test.ts` 形成失败断言，要求所有动作返回对应 Lucide 占位标记而不是 `<svg>` 手写路径。
+- [x] 运行 `pnpm --dir extension test -- src/content/area-recording.test.ts`，确认旧实现导致断言失败。
+- [x] 从 `area-recording.ts` 移除 `AREA_TOOLBAR_ICON_PATHS`，改为复用图标模块。
+- [x] 在 `inspoclip.ts` 的框选 Dock、录制 Dock、声音开关、暂停/继续切换后调用 `renderAreaToolbarIcons()`，渲染范围限制在当前 toolbar 或 button。
+- [x] 运行两个定向测试文件并确认通过。
+- [x] 提交 `feat(extension): use lucide icons in area toolbar`。
 
 ### 任务 3：完整验证与构建
 
-- [ ] 运行 `pnpm --dir extension test`，确认全部测试通过。
-- [ ] 运行 `pnpm --dir extension typecheck`，确认 TypeScript 无错误。
-- [ ] 运行 `pnpm --dir extension build`，确认 Chrome MV3 构建成功并更新 `extension/build/chrome-mv3-prod`。
-- [ ] 检查 `git diff --check` 和 `git status --short`，确保未暂存用户无关文件且不推送远程仓库。
+- [x] 运行 `pnpm --dir extension test`，确认全部测试通过。
+- [x] 运行 `pnpm --dir extension typecheck`，确认 TypeScript 无错误。
+- [x] 运行 `pnpm --dir extension build`，确认 Chrome MV3 构建成功并更新 `extension/build/chrome-mv3-prod`。
+- [x] 检查 `git diff --check` 和 `git status --short`，确保未暂存用户无关文件且不推送远程仓库。
