@@ -363,6 +363,31 @@ export const config: PlasmoCSConfig = {
     if (badge) badge.textContent = getAreaRecordingDelayBadge(delaySeconds);
   }
 
+  async function runAreaRecordingCountdown(overlay, delaySeconds) {
+    const countdownElement = document.createElement('div');
+    countdownElement.className = 'inspoclip-area-recording-countdown';
+    countdownElement.setAttribute('role', 'status');
+    countdownElement.setAttribute('aria-live', 'polite');
+    const countdown = createRecordingCountdown(delaySeconds, {
+      onTick: (remainingSeconds) => {
+        countdownElement.textContent = String(remainingSeconds);
+        countdownElement.dataset.value = String(remainingSeconds);
+        if (!countdownElement.isConnected) {
+          overlay.querySelector('.inspoclip-area-selection')?.appendChild(countdownElement);
+        }
+        countdownElement.style.animation = 'none';
+        void countdownElement.offsetWidth;
+        countdownElement.style.animation = '';
+      },
+    });
+    activeAreaRecordingCountdown?.cancel();
+    activeAreaRecordingCountdown = countdown;
+    const result = await countdown.promise;
+    if (activeAreaRecordingCountdown === countdown) activeAreaRecordingCountdown = null;
+    countdownElement.remove();
+    return result === 'completed' && areaOverlay === overlay;
+  }
+
   function showAreaCaptureControls(overlay, selection, hoverHighlight, instructions, rect, mode) {
     hoverHighlight.style.display = 'none';
     instructions.style.display = 'none';
@@ -601,27 +626,7 @@ export const config: PlasmoCSConfig = {
       await preparedSource.promise;
       if (areaOverlay !== overlay) return;
 
-      const countdownElement = document.createElement('div');
-      countdownElement.className = 'inspoclip-area-recording-countdown';
-      countdownElement.setAttribute('role', 'status');
-      countdownElement.setAttribute('aria-live', 'polite');
-      const countdown = createRecordingCountdown(delaySeconds, {
-        onTick: (remainingSeconds) => {
-          countdownElement.textContent = String(remainingSeconds);
-          countdownElement.dataset.value = String(remainingSeconds);
-          if (!countdownElement.isConnected) {
-            overlay.querySelector('.inspoclip-area-selection')?.appendChild(countdownElement);
-          }
-          countdownElement.style.animation = 'none';
-          void countdownElement.offsetWidth;
-          countdownElement.style.animation = '';
-        },
-      });
-      activeAreaRecordingCountdown = countdown;
-      const countdownResult = await countdown.promise;
-      if (activeAreaRecordingCountdown === countdown) activeAreaRecordingCountdown = null;
-      countdownElement.remove();
-      if (countdownResult === 'cancelled' || areaOverlay !== overlay) return;
+      if (!await runAreaRecordingCountdown(overlay, delaySeconds)) return;
 
       preparedAreaRecordingSource = null;
       const startResponse = await sendRuntimeMessage(createAreaRecordingStartMessage({
@@ -721,25 +726,40 @@ export const config: PlasmoCSConfig = {
         if (recording.retakeConfirmTimer) clearTimeout(recording.retakeConfirmTimer);
         recording.retakeConfirmTimer = 0;
         recording.commandPending = true;
-        retakeBtn.disabled = true;
+        const recordingButtons = Array.from(toolbar.querySelectorAll('button'));
+        recordingButtons.forEach((button) => { button.disabled = true; });
         retakeBtn.classList.add('inspoclip-area-action-processing');
-        retakeBtn.dataset.tooltip = locale === 'zh' ? '正在重新录制' : 'Restarting recording';
+        retakeBtn.dataset.tooltip = locale === 'zh' ? '正在准备重录' : 'Preparing retake';
         retakeBtn.setAttribute('aria-label', retakeBtn.dataset.tooltip);
 
+        let retakePrepared = false;
         try {
-          const response = await sendRuntimeMessage({ type: 'RETAKE_AREA_RECORDING', recordingId });
-          if (!response?.success) throw new Error(response?.error || 'Retake failed');
+          const prepareResponse = await sendRuntimeMessage({ type: 'PREPARE_RETAKE_AREA_RECORDING', recordingId });
+          if (!prepareResponse?.success) throw new Error(prepareResponse?.error || 'Failed to prepare retake');
+          retakePrepared = true;
+          overlay.classList.add('inspoclip-area-overlay-paused');
+
+          if (!await runAreaRecordingCountdown(overlay, areaRecordingDelaySeconds)) return;
+
+          const startResponse = await sendRuntimeMessage({ type: 'START_RETAKE_AREA_RECORDING', recordingId });
+          if (!startResponse?.success) throw new Error(startResponse?.error || 'Retake failed to start');
+          if (areaOverlay !== overlay) {
+            await sendRuntimeMessage({ type: 'CANCEL_AREA_RECORDING', recordingId }).catch(() => {});
+            return;
+          }
           timerState = createAreaRecordingTimerState();
           overlay.classList.remove('inspoclip-area-overlay-paused');
           const pauseBtn = toolbar.querySelector('[data-action="pause"]');
           setAreaToolbarButtonAction(pauseBtn, 'pause');
           updateTimer();
         } catch (err) {
+          if (areaOverlay !== overlay) return;
           showToast(locale === 'zh' ? `重录失败: ${err.message}` : `Retake failed: ${err.message}`, 'error');
           setTimeout(removeToast, 3000);
+          if (retakePrepared) removeAreaOverlay();
         } finally {
           recording.commandPending = false;
-          retakeBtn.disabled = false;
+          recordingButtons.forEach((button) => { button.disabled = false; });
           retakeBtn.dataset.confirming = 'false';
           retakeBtn.classList.remove('inspoclip-area-action-confirm');
           retakeBtn.classList.remove('inspoclip-area-action-processing');

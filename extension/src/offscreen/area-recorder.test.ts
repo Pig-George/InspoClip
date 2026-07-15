@@ -1,11 +1,13 @@
-import { describe, expect, test } from "vitest"
+import { describe, expect, test, vi } from "vitest"
 
 import {
   getAreaRecordingOutputTracks,
   getAreaRecordingSourceRect,
   getOffscreenRecordingFrameIntervalMs,
   getTabCaptureMediaConstraints,
-  restartAreaRecordingMediaRecorder
+  prepareAreaRecordingMediaRecorderRetake,
+  restartAreaRecordingMediaRecorder,
+  startPreparedAreaRecordingMediaRecorder
 } from "./area-recorder"
 
 describe("offscreen area recorder helpers", () => {
@@ -76,6 +78,54 @@ describe("offscreen area recorder helpers", () => {
     expect(restarted.outputStream).toBe(outputStream)
     expect(restarted.chunks).toEqual([])
     expect(oldChunks).toHaveLength(1)
+  })
+
+  test("prepares a retake without starting the replacement recorder", async () => {
+    const calls: string[] = []
+    const oldRecorder = {
+      state: "recording",
+      requestData: () => calls.push("old:requestData"),
+      addEventListener: (type: string, listener: () => void) => {
+        if (type === "stop") (oldRecorder as { onStop?: () => void }).onStop = listener
+      },
+      stop: () => {
+        calls.push("old:stop")
+        ;(oldRecorder as { onStop?: () => void }).onStop?.()
+      }
+    } as unknown as MediaRecorder
+    const newRecorder = {
+      state: "inactive",
+      addEventListener: (type: string) => calls.push(`new:listen:${type}`),
+      start: (timeslice: number) => calls.push(`new:start:${timeslice}`)
+    } as unknown as MediaRecorder
+    const outputStream = { id: "existing-output" } as unknown as MediaStream
+
+    const prepared = await prepareAreaRecordingMediaRecorderRetake(
+      { recorder: oldRecorder, outputStream, mimeType: "video/webm", chunks: [new Blob(["old"])] },
+      () => newRecorder
+    )
+
+    expect(calls).toEqual([
+      "old:requestData",
+      "old:stop",
+      "new:listen:dataavailable"
+    ])
+    expect(prepared.recorder).toBe(newRecorder)
+    expect(prepared.chunks).toEqual([])
+  })
+
+  test("starts a prepared retake only when the countdown has completed", () => {
+    const start = vi.fn()
+    const recorder = { state: "inactive", start } as unknown as MediaRecorder
+
+    startPreparedAreaRecordingMediaRecorder({
+      recorder,
+      outputStream: {} as MediaStream,
+      mimeType: "video/webm",
+      chunks: []
+    })
+
+    expect(start).toHaveBeenCalledWith(1000)
   })
 
   test("maps viewport coordinates to native tab stream pixels", () => {

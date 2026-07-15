@@ -24,6 +24,8 @@ export type RecordingCommand =
   | { type: "START_OFFSCREEN_AREA_RECORDING"; recordingId: string; sourceId?: string; streamId?: string; rect: AreaRect; viewport: ViewportSize; includeTabAudio: boolean }
   | { type: "PAUSE_OFFSCREEN_AREA_RECORDING"; recordingId: string }
   | { type: "RESUME_OFFSCREEN_AREA_RECORDING"; recordingId: string }
+  | { type: "PREPARE_RETAKE_OFFSCREEN_AREA_RECORDING"; recordingId: string }
+  | { type: "START_RETAKE_OFFSCREEN_AREA_RECORDING"; recordingId: string }
   | { type: "RETAKE_OFFSCREEN_AREA_RECORDING"; recordingId: string }
   | { type: "STOP_OFFSCREEN_AREA_RECORDING"; recordingId: string }
   | { type: "CANCEL_OFFSCREEN_AREA_RECORDING"; recordingId: string }
@@ -257,18 +259,19 @@ type MediaRecorderFactory = (stream: MediaStream, options?: MediaRecorderOptions
 function createAreaRecordingMediaRecorder(
   outputStream: MediaStream,
   mimeType: string,
-  createRecorder: MediaRecorderFactory = (stream, options) => new MediaRecorder(stream, options)
+  createRecorder: MediaRecorderFactory = (stream, options) => new MediaRecorder(stream, options),
+  startImmediately = true
 ): AreaRecordingMediaRecorderState {
   const recorder = createRecorder(outputStream, mimeType ? { mimeType } : undefined)
   const chunks: Blob[] = []
   recorder.addEventListener("dataavailable", (event) => {
     if (event.data?.size) chunks.push(event.data)
   })
-  recorder.start(1000)
+  if (startImmediately) recorder.start(1000)
   return { recorder, outputStream, mimeType, chunks }
 }
 
-export async function restartAreaRecordingMediaRecorder(
+export async function prepareAreaRecordingMediaRecorderRetake(
   recording: AreaRecordingMediaRecorderState,
   createRecorder?: MediaRecorderFactory
 ): Promise<AreaRecordingMediaRecorderState> {
@@ -276,8 +279,27 @@ export async function restartAreaRecordingMediaRecorder(
   return createAreaRecordingMediaRecorder(
     recording.outputStream,
     recording.mimeType,
-    createRecorder
+    createRecorder,
+    false
   )
+}
+
+export function startPreparedAreaRecordingMediaRecorder(
+  recording: AreaRecordingMediaRecorderState
+): AreaRecordingMediaRecorderState {
+  if (recording.recorder.state !== "inactive") {
+    throw new Error("Retake recorder is not ready to start")
+  }
+  recording.recorder.start(1000)
+  return recording
+}
+
+export async function restartAreaRecordingMediaRecorder(
+  recording: AreaRecordingMediaRecorderState,
+  createRecorder?: MediaRecorderFactory
+): Promise<AreaRecordingMediaRecorderState> {
+  const prepared = await prepareAreaRecordingMediaRecorderRetake(recording, createRecorder)
+  return startPreparedAreaRecordingMediaRecorder(prepared)
 }
 
 function normalizeError(error: unknown): string {
@@ -419,10 +441,20 @@ export class OffscreenAreaRecorder {
   }
 
   async retake(recordingId: string): Promise<void> {
+    await this.prepareRetake(recordingId)
+    this.startRetake(recordingId)
+  }
+
+  async prepareRetake(recordingId: string): Promise<void> {
     const recording = this.requireRecording(recordingId)
-    const restarted = await restartAreaRecordingMediaRecorder(recording)
-    recording.recorder = restarted.recorder
-    recording.chunks = restarted.chunks
+    const prepared = await prepareAreaRecordingMediaRecorderRetake(recording)
+    recording.recorder = prepared.recorder
+    recording.chunks = prepared.chunks
+  }
+
+  startRetake(recordingId: string): void {
+    const recording = this.requireRecording(recordingId)
+    startPreparedAreaRecordingMediaRecorder(recording)
   }
 
   async stop(recordingId: string): Promise<RecordingResult> {
@@ -455,6 +487,14 @@ export class OffscreenAreaRecorder {
     }
     if (command.type === "RESUME_OFFSCREEN_AREA_RECORDING") {
       this.resume(command.recordingId)
+      return { recordingId: command.recordingId }
+    }
+    if (command.type === "PREPARE_RETAKE_OFFSCREEN_AREA_RECORDING") {
+      await this.prepareRetake(command.recordingId)
+      return { recordingId: command.recordingId }
+    }
+    if (command.type === "START_RETAKE_OFFSCREEN_AREA_RECORDING") {
+      this.startRetake(command.recordingId)
       return { recordingId: command.recordingId }
     }
     if (command.type === "RETAKE_OFFSCREEN_AREA_RECORDING") {
