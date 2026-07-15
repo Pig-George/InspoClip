@@ -53,8 +53,13 @@ export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onN
   useEffect(() => {
     if (nextWeekBlockedAttempt <= 0 || prefersReducedMotion) return;
     void nextWeekControls.start({
-      x: [0, -4, 4, -3, 3, 0],
-      transition: { duration: 0.25, ease: 'easeInOut' },
+      x: [0, -2.4, 1.2, -0.4, 0],
+      scale: [1, 0.985, 1, 0.997, 1],
+      transition: {
+        duration: 0.38,
+        times: [0, 0.26, 0.56, 0.8, 1],
+        ease: [0.22, 1, 0.36, 1],
+      },
     });
   }, [nextWeekBlockedAttempt, nextWeekControls, prefersReducedMotion]);
 
