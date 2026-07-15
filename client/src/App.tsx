@@ -16,6 +16,7 @@ import { getMonday, formatISODate } from '@/lib/utils';
 import type { WeekData, ViewMode } from '@/types';
 import { VideoAnalysisView } from '@/components/video/VideoAnalysisView';
 import { uploadVideo } from '@/lib/video-api';
+import { canNavigateToNextWeek } from '@/lib/week-navigation';
 
 function AppInner() {
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
@@ -31,6 +32,7 @@ function AppInner() {
   const [videoId, setVideoId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('video'));
   const [videoOpen, setVideoOpen] = useState(() => new URLSearchParams(window.location.search).has('video'));
   const [videoJobId, setVideoJobId] = useState<string | undefined>();
+  const [nextWeekBlockedAttempt, setNextWeekBlockedAttempt] = useState(0);
   const pendingPasteRef = useRef<{ file: File; weekId: string; dayOfWeek: number } | null>(null);
   const { locale } = useLanguage();
 
@@ -173,7 +175,13 @@ function AppInner() {
     setCurrentMonday(prev);
   };
 
-  const goToNextWeek = () => {
+  const canGoNextWeek = canNavigateToNextWeek(currentMonday);
+
+  const attemptNextWeek = () => {
+    if (!canGoNextWeek) {
+      setNextWeekBlockedAttempt((attempt) => attempt + 1);
+      return;
+    }
     const next = new Date(currentMonday);
     next.setDate(next.getDate() + 7);
     setCurrentMonday(next);
@@ -183,7 +191,7 @@ function AppInner() {
 
   useKeyboardShortcuts({
     onPrevWeek: viewMode === 'week' ? goToPrevWeek : undefined,
-    onNextWeek: viewMode === 'week' ? goToNextWeek : undefined,
+    onNextWeek: viewMode === 'week' ? attemptNextWeek : undefined,
     onOpenSearch: () => setSearchOpen(true),
     onCloseDialog: () => {
       setSearchOpen(false);
@@ -207,7 +215,9 @@ function AppInner() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onPrevWeek={viewMode === 'week' ? goToPrevWeek : undefined}
-        onNextWeek={viewMode === 'week' ? goToNextWeek : undefined}
+        onNextWeek={viewMode === 'week' ? attemptNextWeek : undefined}
+        canGoNext={canGoNextWeek}
+        nextWeekBlockedAttempt={nextWeekBlockedAttempt}
         searchOpen={searchOpen}
         onSearchOpenChange={setSearchOpen}
         onOpenVideo={openVideo}
