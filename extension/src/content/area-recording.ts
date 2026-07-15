@@ -25,10 +25,14 @@ export type SourceSize = {
 }
 
 export const DEFAULT_AREA_RECORDING_AUDIO_ENABLED = false
+export const AREA_RECORDING_DELAY_OPTIONS = [0, 3, 5] as const
+export type AreaRecordingDelaySeconds = typeof AREA_RECORDING_DELAY_OPTIONS[number]
+export const DEFAULT_AREA_RECORDING_DELAY_SECONDS: AreaRecordingDelaySeconds = 3
 
 type AreaToolbarLocale = "zh" | "en"
 
 const AREA_TOOLBAR_LABELS: Record<AreaToolbarAction, Record<AreaToolbarLocale, string>> = {
+  delay: { zh: "录屏延时", en: "Recording delay" },
   screenshot: { zh: "截图", en: "Screenshot" },
   record: { zh: "开始录屏", en: "Start recording" },
   "sound-on": { zh: "录制标签页声音：已开启", en: "Record tab audio: on" },
@@ -47,6 +51,35 @@ export function getAreaToolbarActionLabel(action: AreaToolbarAction, locale: Are
 
 export function getAreaToolbarActionIcon(action: AreaToolbarAction): string {
   return getAreaToolbarIconMarkup(action)
+}
+
+export function normalizeAreaRecordingDelay(value: unknown): AreaRecordingDelaySeconds {
+  const numericValue = typeof value === "string" && value.trim() !== ""
+    ? Number(value)
+    : value
+
+  return AREA_RECORDING_DELAY_OPTIONS.includes(numericValue as AreaRecordingDelaySeconds)
+    ? numericValue as AreaRecordingDelaySeconds
+    : DEFAULT_AREA_RECORDING_DELAY_SECONDS
+}
+
+export function getNextAreaRecordingDelay(value: unknown): AreaRecordingDelaySeconds {
+  const current = normalizeAreaRecordingDelay(value)
+  const currentIndex = AREA_RECORDING_DELAY_OPTIONS.indexOf(current)
+  return AREA_RECORDING_DELAY_OPTIONS[(currentIndex + 1) % AREA_RECORDING_DELAY_OPTIONS.length]
+}
+
+export function getAreaRecordingDelayLabel(
+  value: unknown,
+  locale: AreaToolbarLocale
+): string {
+  const delay = normalizeAreaRecordingDelay(value)
+  if (locale === "zh") {
+    return delay === 0
+      ? "录屏延时：关闭"
+      : `录屏延时：${delay} 秒`
+  }
+  return delay === 0 ? "Recording delay: off" : `Recording delay: ${delay} seconds`
 }
 
 export type AreaRecordingTimerState = {

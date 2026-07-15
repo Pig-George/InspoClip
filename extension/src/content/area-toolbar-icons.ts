@@ -4,6 +4,7 @@ import Pause from "lucide/dist/esm/icons/pause.js"
 import Play from "lucide/dist/esm/icons/play.js"
 import RotateCcw from "lucide/dist/esm/icons/rotate-ccw.js"
 import Scan from "lucide/dist/esm/icons/scan.js"
+import Timer from "lucide/dist/esm/icons/timer.js"
 import Video from "lucide/dist/esm/icons/video.js"
 import Volume2 from "lucide/dist/esm/icons/volume-2.js"
 import VolumeX from "lucide/dist/esm/icons/volume-x.js"
@@ -21,6 +22,7 @@ export type AreaToolbarAction =
   | "resume"
   | "retake"
   | "confirm-retake"
+  | "delay"
   | "finish"
 
 export const AREA_TOOLBAR_ICON_NAMES: Record<AreaToolbarAction, string> = {
@@ -33,6 +35,7 @@ export const AREA_TOOLBAR_ICON_NAMES: Record<AreaToolbarAction, string> = {
   resume: "play",
   retake: "rotate-ccw",
   "confirm-retake": "rotate-ccw",
+  delay: "timer",
   finish: "check"
 }
 
@@ -45,6 +48,7 @@ const AREA_TOOLBAR_ICONS: Record<string, IconNode> = {
   pause: Pause,
   play: Play,
   "rotate-ccw": RotateCcw,
+  timer: Timer,
   check: Check
 }
 

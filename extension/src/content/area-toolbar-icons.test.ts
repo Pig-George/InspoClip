@@ -16,6 +16,7 @@ vi.mock("lucide/dist/esm/icons/pause.js", () => ({ default: ["pause"] }))
 vi.mock("lucide/dist/esm/icons/play.js", () => ({ default: ["play"] }))
 vi.mock("lucide/dist/esm/icons/rotate-ccw.js", () => ({ default: ["rotate-ccw"] }))
 vi.mock("lucide/dist/esm/icons/check.js", () => ({ default: ["check"] }))
+vi.mock("lucide/dist/esm/icons/timer.js", () => ({ default: ["timer"] }))
 
 import {
   AREA_TOOLBAR_ICON_NAMES,
@@ -39,6 +40,7 @@ describe("area toolbar Lucide icons", () => {
       resume: "play",
       retake: "rotate-ccw",
       "confirm-retake": "rotate-ccw",
+      delay: "timer",
       finish: "check"
     })
   })
@@ -46,6 +48,7 @@ describe("area toolbar Lucide icons", () => {
   test("renders a Lucide placeholder instead of maintaining SVG paths", () => {
     expect(getAreaToolbarIconMarkup("screenshot")).toBe('<i data-lucide="scan" aria-hidden="true"></i>')
     expect(getAreaToolbarIconMarkup("confirm-retake")).toBe('<i data-lucide="rotate-ccw" aria-hidden="true"></i>')
+    expect(getAreaToolbarIconMarkup("delay")).toBe('<i data-lucide="timer" aria-hidden="true"></i>')
   })
 
   test("replaces icons only inside the supplied toolbar root", () => {

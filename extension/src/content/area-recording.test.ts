@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest"
 
 import {
+  AREA_RECORDING_DELAY_OPTIONS,
   AREA_RESIZE_HANDLES,
   DEFAULT_AREA_RECORDING_AUDIO_ENABLED,
+  DEFAULT_AREA_RECORDING_DELAY_SECONDS,
   createAreaRecordingStartMessage,
   createAreaRecordingTimerState,
   formatRecordingDuration,
@@ -12,9 +14,12 @@ import {
   getAreaCaptureToolbarPosition,
   getAreaToolbarActionIcon,
   getAreaToolbarActionLabel,
+  getAreaRecordingDelayLabel,
+  getNextAreaRecordingDelay,
   getPreferredRecordingMimeType,
   getRecordingUploadMimeType,
   moveAreaRect,
+  normalizeAreaRecordingDelay,
   resizeAreaRect
 } from "./area-recording"
 
@@ -43,6 +48,7 @@ describe("area recording helpers", () => {
       "resume",
       "retake",
       "confirm-retake",
+      "delay",
       "finish"
     ] as const
 
@@ -57,6 +63,38 @@ describe("area recording helpers", () => {
 
   test("keeps tab audio disabled by default", () => {
     expect(DEFAULT_AREA_RECORDING_AUDIO_ENABLED).toBe(false)
+  })
+
+  test("uses a remembered three-second recording delay by default", () => {
+    expect(AREA_RECORDING_DELAY_OPTIONS).toEqual([0, 3, 5])
+    expect(DEFAULT_AREA_RECORDING_DELAY_SECONDS).toBe(3)
+  })
+
+  test.each([
+    [undefined, 3],
+    [null, 3],
+    ["3", 3],
+    [0, 0],
+    [3, 3],
+    [5, 5],
+    [4, 3],
+    [-1, 3]
+  ])("normalizes a stored recording delay of %s", (value, expected) => {
+    expect(normalizeAreaRecordingDelay(value)).toBe(expected)
+  })
+
+  test("cycles recording delay through off, three seconds, and five seconds", () => {
+    expect(getNextAreaRecordingDelay(0)).toBe(3)
+    expect(getNextAreaRecordingDelay(3)).toBe(5)
+    expect(getNextAreaRecordingDelay(5)).toBe(0)
+    expect(getNextAreaRecordingDelay(99)).toBe(5)
+  })
+
+  test("localizes the current recording delay", () => {
+    expect(getAreaRecordingDelayLabel(0, "zh")).toBe("录屏延时：关闭")
+    expect(getAreaRecordingDelayLabel(3, "zh")).toBe("录屏延时：3 秒")
+    expect(getAreaRecordingDelayLabel(0, "en")).toBe("Recording delay: off")
+    expect(getAreaRecordingDelayLabel(5, "en")).toBe("Recording delay: 5 seconds")
   })
 
   test("includes the selected tab audio option in the start message", () => {
