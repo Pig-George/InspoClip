@@ -15,6 +15,7 @@ import {
   getAreaToolbarActionIcon,
   getAreaToolbarActionLabel,
   getAreaRecordingDelayLabel,
+  getAreaRecordingDelayBadge,
   getNextAreaRecordingDelay,
   getPreferredRecordingMimeType,
   getRecordingUploadMimeType,
@@ -95,6 +96,12 @@ describe("area recording helpers", () => {
     expect(getAreaRecordingDelayLabel(3, "zh")).toBe("录屏延时：3 秒")
     expect(getAreaRecordingDelayLabel(0, "en")).toBe("Recording delay: off")
     expect(getAreaRecordingDelayLabel(5, "en")).toBe("Recording delay: 5 seconds")
+  })
+
+  test("formats a compact recording delay badge for the toolbar", () => {
+    expect(getAreaRecordingDelayBadge(0)).toBe("OFF")
+    expect(getAreaRecordingDelayBadge(3)).toBe("3s")
+    expect(getAreaRecordingDelayBadge(5)).toBe("5s")
   })
 
   test("includes the selected tab audio option in the start message", () => {

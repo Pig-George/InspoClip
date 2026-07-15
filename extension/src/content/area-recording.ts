@@ -82,6 +82,11 @@ export function getAreaRecordingDelayLabel(
   return delay === 0 ? "Recording delay: off" : `Recording delay: ${delay} seconds`
 }
 
+export function getAreaRecordingDelayBadge(value: unknown): string {
+  const delay = normalizeAreaRecordingDelay(value)
+  return delay === 0 ? "OFF" : `${delay}s`
+}
+
 export type AreaRecordingTimerState = {
   startedAt: number
   pausedAt: number

@@ -814,6 +814,51 @@
       box-shadow: inset 0 0 0 1px rgba(192, 120, 74, 0.24);
     }
 
+    .inspoclip-area-delay-button {
+      overflow: visible;
+    }
+
+    .inspoclip-area-delay-badge {
+      position: absolute;
+      right: -3px;
+      bottom: -3px;
+      min-width: 16px;
+      height: 14px;
+      box-sizing: border-box;
+      padding: 0 3px;
+      border: 1px solid rgba(255, 250, 242, 0.95);
+      border-radius: 999px;
+      background: #a65f37;
+      color: #fffaf2;
+      font-size: 8px;
+      font-weight: 750;
+      line-height: 12px;
+      letter-spacing: -0.02em;
+      pointer-events: none;
+    }
+
+    .inspoclip-area-recording-countdown {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      z-index: 6;
+      display: grid;
+      width: 72px;
+      height: 72px;
+      place-items: center;
+      border: 1px solid rgba(255, 250, 242, 0.72);
+      border-radius: 999px;
+      background: rgba(74, 48, 40, 0.82);
+      box-shadow: 0 14px 38px rgba(38, 23, 18, 0.24);
+      color: #fffaf2;
+      font-size: 34px;
+      font-weight: 700;
+      line-height: 1;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      animation: inspoclip-recording-countdown-pop 1s cubic-bezier(0.2, 0.85, 0.3, 1) both;
+    }
+
     .inspoclip-area-toolbar-separator {
       width: 1px;
       height: 18px;
@@ -971,6 +1016,13 @@
       100% { transform: scale(1); }
     }
 
+    @keyframes inspoclip-recording-countdown-pop {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.78); }
+      18% { opacity: 1; transform: translate(-50%, -50%) scale(1.04); }
+      78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0.92; transform: translate(-50%, -50%) scale(0.94); }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .inspoclip-area-toolbar,
       .inspoclip-area-toolbar *,
@@ -979,6 +1031,10 @@
         animation-duration: 1ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 1ms !important;
+      }
+
+      .inspoclip-area-recording-countdown {
+        animation: none !important;
       }
     }
 

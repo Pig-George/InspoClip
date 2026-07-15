@@ -3,19 +3,25 @@ import type { PlasmoCSConfig } from "plasmo"
 
 import {
   DEFAULT_AREA_RECORDING_AUDIO_ENABLED,
+  DEFAULT_AREA_RECORDING_DELAY_SECONDS,
   createAreaRecordingStartMessage,
   createAreaRecordingTimerState,
   formatRecordingDuration,
   getAreaCaptureToolbarPosition,
   getAreaRecordingInnerRect,
+  getAreaRecordingDelayBadge,
+  getAreaRecordingDelayLabel,
   getAreaResizeHandlesMarkup,
   getAreaToolbarActionIcon,
   getAreaToolbarActionLabel,
+  getNextAreaRecordingDelay,
   moveAreaRect,
+  normalizeAreaRecordingDelay,
   resizeAreaRect,
 } from "../src/content/area-recording"
 import { createAreaRecordingSource } from "../src/content/area-recording-source"
 import { renderAreaToolbarIcons } from "../src/content/area-toolbar-icons"
+import { createRecordingCountdown } from "../src/content/recording-countdown"
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive, shouldExpandContentRoot } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
@@ -86,6 +92,7 @@ export const config: PlasmoCSConfig = {
   let videoPromptLangMode = 'auto';
   let videoPromptPurpose = 'general';
   let videoPromptTarget = '';
+  let areaRecordingDelaySeconds = DEFAULT_AREA_RECORDING_DELAY_SECONDS;
 
   function syncContentRootInteractivity() {
     setContentRootInteractive(root, shouldExpandContentRoot({
@@ -96,9 +103,10 @@ export const config: PlasmoCSConfig = {
   }
 
   // Load server URL
-  chrome.storage.sync.get(['serverUrl', 'lang'], (result) => {
+  chrome.storage.sync.get(['serverUrl', 'lang', 'areaRecordingDelaySeconds'], (result) => {
     if (result.serverUrl) serverUrl = result.serverUrl;
     if (result.lang) locale = result.lang;
+    areaRecordingDelaySeconds = normalizeAreaRecordingDelay(result.areaRecordingDelaySeconds);
   });
 
   // Listen for messages from background/popup
@@ -158,6 +166,7 @@ export const config: PlasmoCSConfig = {
   let areaOverlay = null;
   let activeAreaRecording = null;
   let preparedAreaRecordingSource = null;
+  let activeAreaRecordingCountdown = null;
 
   function startAreaCapture(mode, recordingSourceId) {
     // Remove any existing overlay
@@ -340,6 +349,20 @@ export const config: PlasmoCSConfig = {
     button.classList.add('inspoclip-area-icon-swap');
   }
 
+  function renderAreaRecordingDelayButton(delaySeconds) {
+    const label = getAreaRecordingDelayLabel(delaySeconds, getAreaToolbarLocale());
+    return `<button type="button" class="inspoclip-area-icon-button inspoclip-area-delay-button" data-action="toggle-delay" data-tooltip="${label}" aria-label="${label}">${getAreaToolbarActionIcon('delay')}<span class="inspoclip-area-delay-badge" aria-hidden="true">${getAreaRecordingDelayBadge(delaySeconds)}</span></button>`;
+  }
+
+  function syncAreaRecordingDelayButton(button, delaySeconds) {
+    if (!button) return;
+    const label = getAreaRecordingDelayLabel(delaySeconds, getAreaToolbarLocale());
+    button.dataset.tooltip = label;
+    button.setAttribute('aria-label', label);
+    const badge = button.querySelector('.inspoclip-area-delay-badge');
+    if (badge) badge.textContent = getAreaRecordingDelayBadge(delaySeconds);
+  }
+
   function showAreaCaptureControls(overlay, selection, hoverHighlight, instructions, rect, mode) {
     hoverHighlight.style.display = 'none';
     instructions.style.display = 'none';
@@ -359,6 +382,7 @@ export const config: PlasmoCSConfig = {
         ${renderAreaToolbarIconButton('screenshot', 'screenshot')}
         ${renderAreaToolbarIconButton('record', 'record', 'inspoclip-area-icon-button-primary')}
         <span class="inspoclip-area-toolbar-separator" aria-hidden="true"></span>
+        ${renderAreaRecordingDelayButton(areaRecordingDelaySeconds)}
         ${renderAreaToolbarIconButton('sound-off', 'toggle-audio', '', includeTabAudio)}
         ${renderAreaToolbarIconButton('cancel', 'cancel', 'inspoclip-area-icon-button-quiet')}
       </div>
@@ -432,7 +456,12 @@ export const config: PlasmoCSConfig = {
       processAreaScreenshot(mode, currentRect, overlay);
     });
     toolbar.querySelector('[data-action="record"]')?.addEventListener('click', () => {
-      startAreaRecording(currentRect, overlay, toolbar, includeTabAudio);
+      startAreaRecording(currentRect, overlay, toolbar, includeTabAudio, areaRecordingDelaySeconds);
+    });
+    toolbar.querySelector('[data-action="toggle-delay"]')?.addEventListener('click', (event) => {
+      areaRecordingDelaySeconds = getNextAreaRecordingDelay(areaRecordingDelaySeconds);
+      syncAreaRecordingDelayButton(event.currentTarget, areaRecordingDelaySeconds);
+      chrome.storage.sync.set({ areaRecordingDelaySeconds });
     });
     toolbar.querySelector('[data-action="toggle-audio"]')?.addEventListener('click', (event) => {
       includeTabAudio = !includeTabAudio;
@@ -454,7 +483,7 @@ export const config: PlasmoCSConfig = {
   }
 
   function positionAreaToolbar(toolbar, rect) {
-    const fallbackWidth = toolbar.classList.contains('inspoclip-area-toolbar-recording') ? 228 : 165;
+    const fallbackWidth = toolbar.classList.contains('inspoclip-area-toolbar-recording') ? 228 : 210;
     const position = getAreaCaptureToolbarPosition(
       rect,
       { width: window.innerWidth, height: window.innerHeight },
@@ -528,7 +557,13 @@ export const config: PlasmoCSConfig = {
     }
   }
 
-  async function startAreaRecording(rect, overlay, toolbar, includeTabAudio = DEFAULT_AREA_RECORDING_AUDIO_ENABLED) {
+  async function startAreaRecording(
+    rect,
+    overlay,
+    toolbar,
+    includeTabAudio = DEFAULT_AREA_RECORDING_AUDIO_ENABLED,
+    delaySeconds = DEFAULT_AREA_RECORDING_DELAY_SECONDS
+  ) {
     const recordBtn = toolbar.querySelector('[data-action="record"]');
     if (recordBtn) {
       recordBtn.disabled = true;
@@ -564,6 +599,30 @@ export const config: PlasmoCSConfig = {
       overlay.classList.add('inspoclip-area-overlay-recording');
       syncContentRootInteractivity();
       await preparedSource.promise;
+      if (areaOverlay !== overlay) return;
+
+      const countdownElement = document.createElement('div');
+      countdownElement.className = 'inspoclip-area-recording-countdown';
+      countdownElement.setAttribute('role', 'status');
+      countdownElement.setAttribute('aria-live', 'polite');
+      const countdown = createRecordingCountdown(delaySeconds, {
+        onTick: (remainingSeconds) => {
+          countdownElement.textContent = String(remainingSeconds);
+          countdownElement.dataset.value = String(remainingSeconds);
+          if (!countdownElement.isConnected) {
+            overlay.querySelector('.inspoclip-area-selection')?.appendChild(countdownElement);
+          }
+          countdownElement.style.animation = 'none';
+          void countdownElement.offsetWidth;
+          countdownElement.style.animation = '';
+        },
+      });
+      activeAreaRecordingCountdown = countdown;
+      const countdownResult = await countdown.promise;
+      if (activeAreaRecordingCountdown === countdown) activeAreaRecordingCountdown = null;
+      countdownElement.remove();
+      if (countdownResult === 'cancelled' || areaOverlay !== overlay) return;
+
       preparedAreaRecordingSource = null;
       const startResponse = await sendRuntimeMessage(createAreaRecordingStartMessage({
         recordingId,
@@ -573,6 +632,10 @@ export const config: PlasmoCSConfig = {
         includeTabAudio,
       }));
       if (!startResponse?.success) throw new Error(startResponse?.error || 'Failed to start recording');
+      if (areaOverlay !== overlay) {
+        await sendRuntimeMessage({ type: 'CANCEL_AREA_RECORDING', recordingId }).catch(() => {});
+        return;
+      }
 
       toolbar.classList.add('inspoclip-area-toolbar-recording');
       toolbar.innerHTML = `
@@ -788,6 +851,8 @@ export const config: PlasmoCSConfig = {
   }
 
   function removeAreaOverlay() {
+    activeAreaRecordingCountdown?.cancel();
+    activeAreaRecordingCountdown = null;
     cancelActiveAreaRecording();
     const preparedSource = preparedAreaRecordingSource;
     preparedAreaRecordingSource = null;
