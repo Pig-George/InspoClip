@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { motion, useAnimationControls, useReducedMotion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Settings, LayoutGrid, Columns, Search, Clock, Download } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { SettingsDialog } from './SettingsDialog';
@@ -14,18 +15,22 @@ interface WeekHeaderProps {
   onViewModeChange: (mode: ViewMode) => void;
   onPrevWeek?: () => void;
   onNextWeek?: () => void;
+  canGoNext?: boolean;
+  nextWeekBlockedAttempt?: number;
   searchOpen?: boolean;
   onSearchOpenChange?: (open: boolean) => void;
   onOpenVideo?: (videoId: string, jobId?: string) => void;
 }
 
-export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onNextWeek, searchOpen: searchOpenProp, onSearchOpenChange, onOpenVideo }: WeekHeaderProps) {
+export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onNextWeek, canGoNext: canGoNextProp, nextWeekBlockedAttempt = 0, searchOpen: searchOpenProp, onSearchOpenChange, onOpenVideo }: WeekHeaderProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [searchOpenLocal, setSearchOpenLocal] = useState(false);
   const searchOpen = searchOpenProp ?? searchOpenLocal;
   const setSearchOpen = onSearchOpenChange ?? setSearchOpenLocal;
   const { locale, toggle: toggleLocale } = useLanguage();
+  const nextWeekControls = useAnimationControls();
+  const prefersReducedMotion = useReducedMotion();
 
   const formatRange = (monday: Date): string => {
     const sunday = new Date(monday);
@@ -43,7 +48,15 @@ export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onN
   const showWeekNav = viewMode === 'week';
   const todayMonday = formatISODate(getMonday(new Date()));
   const currentMondayStr = formatISODate(monday);
-  const canGoNext = currentMondayStr < todayMonday;
+  const canGoNext = canGoNextProp ?? currentMondayStr < todayMonday;
+
+  useEffect(() => {
+    if (nextWeekBlockedAttempt <= 0 || prefersReducedMotion) return;
+    void nextWeekControls.start({
+      x: [0, -4, 4, -3, 3, 0],
+      transition: { duration: 0.25, ease: 'easeInOut' },
+    });
+  }, [nextWeekBlockedAttempt, nextWeekControls, prefersReducedMotion]);
 
   return (
     <>
@@ -143,14 +156,17 @@ export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onN
           </button>
           <ThemeToggle />
           {showWeekNav && (
-            <button
+            <motion.button
               onClick={onNextWeek}
-              disabled={!canGoNext}
-              className="p-2 rounded-full hover:bg-[var(--muted)] transition-colors disabled:opacity-30"
+              animate={nextWeekControls}
+              aria-disabled={!canGoNext}
+              className={`p-2 rounded-full transition-colors ${
+                canGoNext ? 'hover:bg-[var(--muted)]' : 'opacity-30 cursor-not-allowed'
+              }`}
               aria-label="Next week"
             >
               <ChevronRight className="w-6 h-6 text-[var(--accent)]" />
-            </button>
+            </motion.button>
           )}
         </div>
       </div>
