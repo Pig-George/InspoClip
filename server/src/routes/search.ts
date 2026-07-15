@@ -1,8 +1,9 @@
 import { Router, Request, Response, type Router as ExpressRouter } from 'express';
 import { db } from '../db/index.js';
 import { images as imagesTable, terms as termsTable, tags as tagsTable, imageTags, imageColors as imageColorsTable, videos as videosTable, videoAnalyses, videoTags, videoAnalysisJobs } from '../db/schema.js';
-import { ilike, inArray, eq, desc, or, sql } from 'drizzle-orm';
+import { and, ilike, inArray, eq, desc, or, sql } from 'drizzle-orm';
 import { cardSummaryFromAnalysis } from '../video/summary.js';
+import { visibleSavedVideos } from '../video/visibility.js';
 
 const router: ExpressRouter = Router();
 
@@ -103,7 +104,7 @@ router.get('/', async (req: Request, res: Response) => {
       matchingVideos = await db
         .select()
         .from(videosTable)
-        .where(inArray(videosTable.id, videoIds))
+        .where(and(inArray(videosTable.id, videoIds), eq(videosTable.isSaved, true)))
         .limit(20);
 
       allVideoJobs = await db
@@ -130,7 +131,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     const analysisByVideo = new Map(matchingAnalyses.map((a) => [a.videoId, a]));
 
-    const videoResults = matchingVideos.map((video) => ({
+    const videoResults = visibleSavedVideos(matchingVideos).map((video) => ({
       ...video,
       job: latestJobByVideo.get(video.id) ?? null,
       summary: cardSummaryFromAnalysis(analysisByVideo.get(video.id)),
