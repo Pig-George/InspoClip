@@ -21,7 +21,10 @@ import {
 } from "../src/content/area-recording"
 import { createAreaRecordingSource } from "../src/content/area-recording-source"
 import { renderAreaToolbarIcons } from "../src/content/area-toolbar-icons"
-import { createRecordingCountdown } from "../src/content/recording-countdown"
+import {
+  createRecordingCountdown,
+  waitForRecordingUiToClear
+} from "../src/content/recording-countdown"
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive, shouldExpandContentRoot } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
@@ -368,12 +371,14 @@ export const config: PlasmoCSConfig = {
     countdownElement.className = 'inspoclip-area-recording-countdown';
     countdownElement.setAttribute('role', 'status');
     countdownElement.setAttribute('aria-live', 'polite');
+    let countdownWasRendered = false;
     const countdown = createRecordingCountdown(delaySeconds, {
       onTick: (remainingSeconds) => {
         countdownElement.textContent = String(remainingSeconds);
         countdownElement.dataset.value = String(remainingSeconds);
         if (!countdownElement.isConnected) {
           overlay.querySelector('.inspoclip-area-selection')?.appendChild(countdownElement);
+          countdownWasRendered = countdownElement.isConnected;
         }
         countdownElement.style.animation = 'none';
         void countdownElement.offsetWidth;
@@ -385,7 +390,9 @@ export const config: PlasmoCSConfig = {
     const result = await countdown.promise;
     if (activeAreaRecordingCountdown === countdown) activeAreaRecordingCountdown = null;
     countdownElement.remove();
-    return result === 'completed' && areaOverlay === overlay;
+    if (result !== 'completed' || areaOverlay !== overlay) return false;
+    if (countdownWasRendered) await waitForRecordingUiToClear();
+    return areaOverlay === overlay;
   }
 
   function showAreaCaptureControls(overlay, selection, hoverHighlight, instructions, rect, mode) {

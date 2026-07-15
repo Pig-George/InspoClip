@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
 
-import { createRecordingCountdown } from "./recording-countdown"
+import {
+  createRecordingCountdown,
+  waitForRecordingUiToClear
+} from "./recording-countdown"
 
 describe("recording countdown", () => {
   beforeEach(() => {
@@ -57,5 +60,27 @@ describe("recording countdown", () => {
 
     await expect(countdown.promise).resolves.toBe("cancelled")
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  test("waits for two painted frames and a capture settling window before recording", async () => {
+    const frameCallbacks: FrameRequestCallback[] = []
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      frameCallbacks.push(callback)
+      return frameCallbacks.length
+    })
+    const wait = vi.fn().mockResolvedValue(undefined)
+    const cleared = waitForRecordingUiToClear({ requestFrame, wait })
+
+    expect(requestFrame).toHaveBeenCalledTimes(1)
+    expect(wait).not.toHaveBeenCalled()
+
+    frameCallbacks.shift()?.(16)
+    await Promise.resolve()
+    expect(requestFrame).toHaveBeenCalledTimes(2)
+
+    frameCallbacks.shift()?.(32)
+    await cleared
+
+    expect(wait).toHaveBeenCalledWith(80)
   })
 })

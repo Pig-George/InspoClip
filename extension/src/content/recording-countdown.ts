@@ -5,6 +5,27 @@ export type RecordingCountdown = {
   cancel: () => void
 }
 
+type RecordingUiClearOptions = {
+  requestFrame?: (callback: FrameRequestCallback) => number
+  wait?: (milliseconds: number) => Promise<void>
+}
+
+export async function waitForRecordingUiToClear(
+  options: RecordingUiClearOptions = {}
+): Promise<void> {
+  const requestFrame = options.requestFrame ?? ((callback: FrameRequestCallback) => requestAnimationFrame(callback))
+  const wait = options.wait ?? ((milliseconds: number) => new Promise<void>((resolve) => {
+    setTimeout(resolve, milliseconds)
+  }))
+  const waitForFrame = () => new Promise<void>((resolve) => {
+    requestFrame(() => resolve())
+  })
+
+  await waitForFrame()
+  await waitForFrame()
+  await wait(80)
+}
+
 export function createRecordingCountdown(
   seconds: number,
   options: { onTick?: (remainingSeconds: number) => void } = {}
