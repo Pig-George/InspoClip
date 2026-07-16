@@ -51,7 +51,7 @@
     .popup {
       position: relative;
       width: 388px;
-      height: 488px;
+      height: 548px;
       overflow: hidden;
       border: 1px solid rgba(218, 196, 167, 0.9);
       border-radius: 22px;
@@ -138,64 +138,33 @@
     .main-shell {
       height: calc(100% - 72px);
       display: grid;
-      grid-template-rows: auto 1fr auto;
+      grid-template-rows: 1fr auto;
     }
-
-    .tabs {
-      margin: 13px 16px 0;
-      padding: 3px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 3px;
-      border-radius: 12px;
-      background: #eee2d3;
-    }
-
-    .tab {
-      min-height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-      border: 0;
-      border-radius: 9px;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 750;
-      transition: 180ms ease;
-    }
-
-    .tab svg { width: 15px; height: 15px; stroke-width: 1.9; }
-    .tab.is-active { background: var(--paper-strong); color: var(--brand-deep); box-shadow: 0 2px 8px rgba(77, 49, 39, 0.08); }
 
     .content {
-      position: relative;
       min-height: 0;
       overflow: hidden;
     }
 
     .view {
-      position: absolute;
-      inset: 0;
+      height: 100%;
       padding: 16px;
       overflow-y: auto;
-      opacity: 0;
-      pointer-events: none;
-      transform: translateX(12px);
-      transition: opacity 180ms ease, transform 220ms ease;
       scrollbar-width: thin;
       scrollbar-color: #d8c2a8 transparent;
     }
-
-    .view.is-active { opacity: 1; pointer-events: auto; transform: translateX(0); }
 
     .context-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 13px;
+    }
+
+    .page-action-section {
+      margin-top: 14px;
+      padding-top: 13px;
+      border-top: 1px solid var(--line);
     }
 
     .eyebrow { color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
@@ -270,7 +239,7 @@
       position: absolute;
       z-index: 10;
       right: 0;
-      top: calc(100% + 8px);
+      bottom: calc(100% + 8px);
       width: 208px;
       padding: 5px;
       border: 1px solid var(--line-strong);
@@ -279,8 +248,8 @@
       box-shadow: 0 15px 35px rgba(63, 43, 37, .16);
       opacity: 0;
       pointer-events: none;
-      transform: translateY(-5px) scale(.97);
-      transform-origin: top right;
+      transform: translateY(5px) scale(.97);
+      transform-origin: bottom right;
       transition: opacity 150ms ease, transform 180ms ease;
     }
 
@@ -335,8 +304,8 @@
     .asset-heading p { margin: 4px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.5; }
 
     .dropzone {
-      min-height: 150px;
-      padding: 18px;
+      min-height: 112px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -356,7 +325,7 @@
       height: 44px;
       display: grid;
       place-items: center;
-      margin-bottom: 10px;
+      margin-bottom: 7px;
       border-radius: 14px;
       background: var(--brand-soft);
       color: var(--brand-deep);
@@ -513,7 +482,7 @@
   </style>
 </head>
 <body>
-  <div class="prototype-label">Interactive prototype · 390 × 488</div>
+  <div class="prototype-label">Interactive prototype · 390 × 548</div>
 
   <main class="popup" aria-label="InspoClip popup prototype">
     <header class="topbar">
@@ -536,43 +505,8 @@
     </header>
 
     <div class="main-shell">
-      <nav class="tabs" aria-label="主要功能">
-        <button class="tab is-active" type="button" data-tab="page"><i data-lucide="scan-line"></i>页面操作</button>
-        <button class="tab" type="button" data-tab="asset"><i data-lucide="image-play"></i>素材分析</button>
-      </nav>
-
       <div class="content">
-        <section class="view is-active" data-view="page">
-          <div class="context-row">
-            <span class="eyebrow">当前页面</span>
-            <span class="site-chip">dribbble.com/shots/interaction</span>
-          </div>
-
-          <div class="analysis-control">
-            <button class="primary-action" id="analyze-button" type="button">
-              <i data-lucide="wand-sparkles"></i>
-              <span><strong data-action-label>分析当前区域</strong><span data-action-hint>框选后选择截图或录屏</span></span>
-            </button>
-            <button class="analysis-menu-trigger" id="analysis-menu-trigger" type="button" aria-label="选择分析范围" aria-expanded="false">
-              <i data-lucide="chevron-down"></i>
-            </button>
-            <div class="analysis-menu" id="analysis-menu" role="menu">
-              <button class="analysis-option is-selected" type="button" data-scope="area" role="menuitemradio" aria-checked="true">
-                <span class="option-icon"><i data-lucide="scan"></i></span>
-                <span><strong>区域框选</strong><span>截图或录屏</span></span>
-                <i class="option-check" data-lucide="check"></i>
-              </button>
-              <button class="analysis-option" type="button" data-scope="page" role="menuitemradio" aria-checked="false">
-                <span class="option-icon"><i data-lucide="panels-top-left"></i></span>
-                <span><strong>完整页面</strong><span>分析整页内容</span></span>
-                <i class="option-check" data-lucide="check"></i>
-              </button>
-            </div>
-          </div>
-          <div class="shortcut-hint"><kbd>Ctrl</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>A</kbd><span>快速启动区域分析</span></div>
-        </section>
-
-        <section class="view" data-view="asset">
+        <section class="view">
           <div class="asset-heading">
             <h2>分析图片或视频</h2>
             <p>粘贴、拖拽或选择素材，结果会在当前网页右侧打开。</p>
@@ -595,6 +529,36 @@
                 <button type="button" id="url-analyze">分析</button>
               </div>
             </div>
+          </div>
+
+          <div class="page-action-section">
+            <div class="context-row">
+              <span class="eyebrow">当前页面</span>
+              <span class="site-chip">dribbble.com/shots/interaction</span>
+            </div>
+
+            <div class="analysis-control">
+              <button class="primary-action" id="analyze-button" type="button">
+                <i data-lucide="wand-sparkles"></i>
+                <span><strong data-action-label>分析当前区域</strong><span data-action-hint>框选后选择截图或录屏</span></span>
+              </button>
+              <button class="analysis-menu-trigger" id="analysis-menu-trigger" type="button" aria-label="选择分析范围" aria-expanded="false">
+                <i data-lucide="chevron-down"></i>
+              </button>
+              <div class="analysis-menu" id="analysis-menu" role="menu">
+                <button class="analysis-option is-selected" type="button" data-scope="area" role="menuitemradio" aria-checked="true">
+                  <span class="option-icon"><i data-lucide="scan"></i></span>
+                  <span><strong>区域框选</strong><span>截图或录屏</span></span>
+                  <i class="option-check" data-lucide="check"></i>
+                </button>
+                <button class="analysis-option" type="button" data-scope="page" role="menuitemradio" aria-checked="false">
+                  <span class="option-icon"><i data-lucide="panels-top-left"></i></span>
+                  <span><strong>完整页面</strong><span>分析整页内容</span></span>
+                  <i class="option-check" data-lucide="check"></i>
+                </button>
+              </div>
+            </div>
+            <div class="shortcut-hint"><kbd>Ctrl</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>A</kbd><span>快速启动区域分析</span></div>
           </div>
         </section>
       </div>
@@ -630,13 +594,6 @@
   <script src="../../extension/node_modules/lucide/dist/umd/lucide.min.js"></script>
   <script>
     lucide.createIcons();
-
-    const tabs = document.querySelectorAll('[data-tab]');
-    const views = document.querySelectorAll('[data-view]');
-    tabs.forEach((tab) => tab.addEventListener('click', () => {
-      tabs.forEach((item) => item.classList.toggle('is-active', item === tab));
-      views.forEach((view) => view.classList.toggle('is-active', view.dataset.view === tab.dataset.tab));
-    }));
 
     const analysisMenuTrigger = document.getElementById('analysis-menu-trigger');
     const analysisMenu = document.getElementById('analysis-menu');
