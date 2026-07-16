@@ -67,13 +67,80 @@ button { color: inherit; }
   gap: 10px;
 }
 
-.logo {
+.brand-logo-button {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.brand-logo-motion {
+  position: relative;
+  display: grid;
+  place-items: center;
   width: 38px;
   height: 38px;
-  flex: 0 0 auto;
-  border-radius: 12px;
-  box-shadow: 0 7px 15px rgba(184, 111, 69, .2);
-  transform: rotate(-2deg);
+  transform-origin: 50% 72%;
+  transition: transform 160ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.brand-logo-button:hover .brand-logo-motion:not(.is-playing) { transform: translateY(-1px) rotate(-3deg); }
+.brand-logo-button:active .brand-logo-motion:not(.is-playing) { transform: translateY(1px) scale(.94); }
+
+.brand-logo-motion.is-playing { animation: brand-logo-pop 650ms cubic-bezier(.22, .82, .28, 1) both; }
+
+.logo {
+  display: block;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.brand-logo-spark {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  opacity: 0;
+  pointer-events: none;
+  background: var(--brand);
+  clip-path: polygon(50% 0, 61% 38%, 100% 50%, 61% 62%, 50% 100%, 39% 62%, 0 50%, 39% 38%);
+}
+
+.brand-logo-spark-one { top: -2px; right: -3px; }
+.brand-logo-spark-two { left: -3px; bottom: 0; width: 6px; height: 6px; background: #d79a59; }
+.brand-logo-motion.is-playing .brand-logo-spark-one { animation: brand-spark-one 560ms 70ms ease-out both; }
+.brand-logo-motion.is-playing .brand-logo-spark-two { animation: brand-spark-two 520ms 120ms ease-out both; }
+
+@keyframes brand-logo-pop {
+  0% { transform: scale(1) rotate(0); }
+  18% { transform: scale(.82, .9) rotate(-8deg); }
+  43% { transform: scale(1.13, 1.08) rotate(10deg); }
+  65% { transform: scale(.97, 1.03) rotate(-4deg); }
+  82% { transform: scale(1.035, .99) rotate(2deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+@keyframes brand-spark-one {
+  0% { opacity: 0; transform: translate(-4px, 4px) scale(.2) rotate(0); }
+  35% { opacity: 1; }
+  75% { opacity: .9; transform: translate(3px, -4px) scale(1.15) rotate(55deg); }
+  100% { opacity: 0; transform: translate(5px, -6px) scale(.45) rotate(90deg); }
+}
+
+@keyframes brand-spark-two {
+  0% { opacity: 0; transform: translate(4px, -3px) scale(.2) rotate(0); }
+  35% { opacity: .9; }
+  75% { opacity: .85; transform: translate(-3px, 3px) scale(1.1) rotate(-55deg); }
+  100% { opacity: 0; transform: translate(-5px, 5px) scale(.4) rotate(-90deg); }
 }
 
 .popup-brand-copy { min-width: 0; }
@@ -415,4 +482,5 @@ kbd { padding: 2px 5px; border: 1px solid #ddcdbb; border-bottom-width: 2px; bor
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+  .brand-logo-spark { display: none; }
 }

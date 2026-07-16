@@ -1,5 +1,6 @@
 import type { ConnectionState, Locale, I18nMessages } from "../types"
 import { getExtensionIconUrl } from "../services/assets"
+import { BrandLogoButton } from "./BrandLogoButton"
 import { PopupIcon } from "./PopupIcon"
 
 type HeaderProps = {
@@ -16,7 +17,7 @@ export function Header({ connectionLabel, connectionState, locale, t, onTestConn
   return (
     <header className="popup-header">
       <div className="popup-brand">
-        <img src={getExtensionIconUrl(48)} alt="Logo" className="logo" />
+        <BrandLogoButton iconUrl={getExtensionIconUrl(48)} />
         <div className="popup-brand-copy">
           <strong>InspoClip</strong>
           <span>{t.subtitle}</span>
