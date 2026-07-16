@@ -25,6 +25,7 @@ describe("PageAnalysisSection", () => {
       analyzing: false,
       captureMode: "area",
       currentPageLabel: "dribbble.com/shots/interaction",
+      shortcutAnalyze: "Ctrl+Shift+A",
       t: I18N.zh,
       onAnalyze: vi.fn(),
       onChangeMode: vi.fn()
@@ -34,5 +35,21 @@ describe("PageAnalysisSection", () => {
     expect(markup).toContain("区域框选")
     expect(markup).toContain("完整页面")
     expect(markup).not.toContain("快速保存")
+  })
+
+  test("renders the current analysis shortcut instead of a fixed key combination", () => {
+    const markup = renderToStaticMarkup(createElement(PageAnalysisSection, {
+      analyzing: false,
+      captureMode: "area",
+      currentPageLabel: "example.com",
+      shortcutAnalyze: "Alt+P",
+      t: I18N.en,
+      onAnalyze: vi.fn(),
+      onChangeMode: vi.fn()
+    }))
+
+    expect(markup).toContain("<kbd>Alt</kbd>")
+    expect(markup).toContain("<kbd>P</kbd>")
+    expect(markup).not.toContain("<kbd>Ctrl</kbd>")
   })
 })

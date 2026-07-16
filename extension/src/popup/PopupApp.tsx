@@ -38,6 +38,7 @@ export function PopupApp() {
               analyzing={popup.analyzing}
               captureMode={popup.captureMode}
               currentPageLabel={popup.currentPageLabel || popup.t.pageUnavailable}
+              shortcutAnalyze={popup.shortcutAnalyze}
               t={popup.t}
               onAnalyze={popup.triggerAnalyze}
               onChangeMode={popup.setCaptureMode}

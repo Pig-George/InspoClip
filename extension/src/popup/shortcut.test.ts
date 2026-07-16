@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest"
 
-import { formatShortcut, normalizeShortcutKey } from "./shortcut"
+import { formatShortcut, normalizeShortcutKey, splitShortcut } from "./shortcut"
 
 describe("popup shortcut helpers", () => {
   test("formats modifier combinations with normalized key names", () => {
@@ -15,5 +15,10 @@ describe("popup shortcut helpers", () => {
   test("normalizes space and single letter keys", () => {
     expect(normalizeShortcutKey(" ")).toBe("Space")
     expect(normalizeShortcutKey("x")).toBe("X")
+  })
+
+  test("splits a saved shortcut into display tokens", () => {
+    expect(splitShortcut(" Alt + Shift + P ")).toEqual(["Alt", "Shift", "P"])
+    expect(splitShortcut("  ")).toEqual([])
   })
 })

@@ -33,3 +33,10 @@ export function formatShortcut(event: ShortcutKeyboardEvent): string | null {
   parts.push(normalizeShortcutKey(event.key))
   return parts.join("+")
 }
+
+export function splitShortcut(shortcut: string): string[] {
+  return shortcut
+    .split("+")
+    .map((part) => part.trim())
+    .filter(Boolean)
+}

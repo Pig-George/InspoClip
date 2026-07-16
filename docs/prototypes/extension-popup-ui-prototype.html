@@ -508,6 +508,8 @@
     .shortcut-field + .shortcut-field { margin-top: 8px; }
     .shortcut-field span { color: #6f594d; font-size: 10px; }
     .shortcut-field kbd { min-width: 91px; padding: 5px 8px; text-align: center; }
+    .shortcut-field kbd[contenteditable="true"] { cursor: text; outline: none; }
+    .shortcut-field kbd[contenteditable="true"]:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(184, 111, 69, .1); }
     .settings-footer { padding: 11px 16px 14px; border-top: 1px solid var(--line); }
     .save-settings { min-height: 40px; border-radius: 11px; background: var(--brand); color: #fff; font-size: 11px; font-weight: 800; }
     .save-settings:hover { background: var(--brand-deep); }
@@ -622,7 +624,7 @@
                 </button>
               </div>
             </div>
-            <div class="shortcut-hint"><kbd>Ctrl</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>A</kbd><span>快速启动区域分析</span></div>
+            <div class="shortcut-hint" id="shortcut-hint"><kbd>Ctrl</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>A</kbd><span>快速启动区域分析</span></div>
           </div>
         </section>
       </div>
@@ -664,6 +666,40 @@
     const scopes = document.querySelectorAll('.analysis-option[data-scope]');
     const actionLabel = document.querySelector('[data-action-label]');
     const actionHint = document.querySelector('[data-action-hint]');
+    const shortcutHint = document.getElementById('shortcut-hint');
+    const shortcutHintLabel = shortcutHint.querySelector('span:last-child').textContent;
+    const analyzeShortcutSetting = document.querySelector('.shortcut-field kbd');
+    analyzeShortcutSetting.contentEditable = 'true';
+    analyzeShortcutSetting.tabIndex = 0;
+    analyzeShortcutSetting.setAttribute('role', 'textbox');
+    analyzeShortcutSetting.setAttribute('aria-label', '区域分析快捷键');
+    analyzeShortcutSetting.title = '点击后按下新的快捷键组合';
+
+    const renderAnalyzeShortcutHint = () => {
+      const parts = analyzeShortcutSetting.textContent.split('+').map((part) => part.trim()).filter(Boolean);
+      shortcutHint.replaceChildren();
+      parts.forEach((part, index) => {
+        if (index > 0) shortcutHint.append(Object.assign(document.createElement('span'), { textContent: '+' }));
+        shortcutHint.append(Object.assign(document.createElement('kbd'), { textContent: part }));
+      });
+      if (parts.length === 0) shortcutHint.append(Object.assign(document.createElement('span'), { textContent: '—' }));
+      shortcutHint.append(Object.assign(document.createElement('span'), { textContent: shortcutHintLabel }));
+    };
+
+    analyzeShortcutSetting.addEventListener('keydown', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (['Control', 'Shift', 'Alt', 'Meta'].includes(event.key)) return;
+      const parts = [];
+      if (event.ctrlKey) parts.push('Ctrl');
+      if (event.altKey) parts.push('Alt');
+      if (event.shiftKey) parts.push('Shift');
+      if (event.metaKey) parts.push('Meta');
+      const key = event.key === ' ' ? 'Space' : event.key.length === 1 ? event.key.toUpperCase() : event.key.replace('Arrow', '');
+      parts.push(key);
+      analyzeShortcutSetting.textContent = parts.join(' + ');
+      renderAnalyzeShortcutHint();
+    });
     let selectedScope = 'area';
     const setAnalysisMenuOpen = (open) => {
       analysisMenu.classList.toggle('is-open', open);

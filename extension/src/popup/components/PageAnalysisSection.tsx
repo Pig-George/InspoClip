@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"
 
+import { splitShortcut } from "../shortcut"
 import type { CaptureMode, I18nMessages } from "../types"
 import { PopupIcon } from "./PopupIcon"
 
@@ -13,6 +14,7 @@ type PageAnalysisSectionProps = {
   analyzing: boolean
   captureMode: CaptureMode
   currentPageLabel: string
+  shortcutAnalyze: string
   t: I18nMessages
   onAnalyze: () => void
   onChangeMode: (mode: CaptureMode) => void
@@ -22,6 +24,7 @@ export function PageAnalysisSection({
   analyzing,
   captureMode,
   currentPageLabel,
+  shortcutAnalyze,
   t,
   onAnalyze,
   onChangeMode
@@ -32,6 +35,7 @@ export function PageAnalysisSection({
     () => getPageAnalysisPresentation(captureMode, t),
     [captureMode, t]
   )
+  const shortcutParts = useMemo(() => splitShortcut(shortcutAnalyze), [shortcutAnalyze])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -95,7 +99,12 @@ export function PageAnalysisSection({
       </div>
 
       <div className="shortcut-hint">
-        <kbd>Ctrl</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>A</kbd>
+        {shortcutParts.length > 0 ? shortcutParts.map((part, index) => (
+          <React.Fragment key={`${part}-${index}`}>
+            {index > 0 ? <span aria-hidden="true">+</span> : null}
+            <kbd>{part}</kbd>
+          </React.Fragment>
+        )) : <span className="shortcut-empty" aria-hidden="true">—</span>}
         <span>{t.quickAreaAnalyze}</span>
       </div>
     </section>
