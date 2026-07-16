@@ -190,6 +190,50 @@
       transition: transform 150ms ease, box-shadow 180ms ease;
     }
 
+    .analysis-control::before {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(
+        112deg,
+        transparent 28%,
+        rgba(255, 244, 222, 0.08) 39%,
+        rgba(255, 250, 235, 0.62) 49%,
+        rgba(255, 244, 222, 0.14) 59%,
+        transparent 70%
+      );
+      background-size: 250% 100%;
+      background-position: 165% 0;
+      pointer-events: none;
+      animation: analysis-sheen 3.4s cubic-bezier(.4, 0, .2, 1) infinite;
+    }
+
+    .analysis-control::after {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      inset: -1px;
+      border: 1px solid rgba(255, 236, 206, 0);
+      border-radius: 15px;
+      pointer-events: none;
+      animation: analysis-glow 3.4s ease-in-out infinite;
+    }
+
+    @keyframes analysis-sheen {
+      0%, 42% { opacity: 0; background-position: 165% 0; }
+      47% { opacity: .45; }
+      66% { opacity: 1; background-position: -75% 0; }
+      72%, 100% { opacity: 0; background-position: -75% 0; }
+    }
+
+    @keyframes analysis-glow {
+      0%, 40%, 78%, 100% { border-color: rgba(255, 236, 206, 0); box-shadow: 0 0 0 rgba(255, 218, 169, 0); }
+      54% { border-color: rgba(255, 236, 206, .35); box-shadow: 0 0 18px rgba(239, 182, 116, .2); }
+      68% { border-color: rgba(255, 236, 206, .16); box-shadow: 0 0 10px rgba(239, 182, 116, .1); }
+    }
+
     .analysis-control:hover {
       transform: translateY(-1px);
       box-shadow: 0 13px 25px rgba(184, 111, 69, 0.27);
@@ -198,6 +242,8 @@
     .analysis-control:focus-within { box-shadow: 0 0 0 3px rgba(184, 111, 69, .16), 0 13px 25px rgba(184, 111, 69, 0.27); }
 
     .primary-action {
+      position: relative;
+      z-index: 1;
       min-height: 55px;
       padding: 0 15px;
       display: flex;
@@ -217,6 +263,7 @@
     .primary-action span { display: block; margin-top: 2px; color: rgba(255,255,255,.76); font-size: 9.5px; }
     .analysis-menu-trigger {
       position: relative;
+      z-index: 1;
       min-width: 48px;
       padding: 0;
       display: grid;
