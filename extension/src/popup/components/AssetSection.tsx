@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 
 import type { I18nMessages } from "../types"
+import { PopupIcon } from "./PopupIcon"
 
 type AssetSectionProps = {
   assetUrl: string
@@ -8,17 +9,6 @@ type AssetSectionProps = {
   onFileSelect: (file?: File) => void
   onUrlChange: (value: string) => void
   onUrlSubmit: () => void
-}
-
-function AssetIcon() {
-  return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" className="asset-drop-icon">
-      <rect x="4" y="7" width="24" height="18" rx="5" fill="currentColor" opacity="0.14" />
-      <path d="M9 21l4.4-5.2 3.3 3.8 2.4-2.8L24 21H9z" fill="currentColor" opacity="0.72" />
-      <path d="M21 10.5l5 3-5 3v-6z" fill="currentColor" />
-      <circle cx="11" cy="12" r="2" fill="currentColor" opacity="0.55" />
-    </svg>
-  )
 }
 
 export function AssetSection({
@@ -29,6 +19,7 @@ export function AssetSection({
   onUrlSubmit
 }: AssetSectionProps) {
   const [dragging, setDragging] = useState(false)
+  const [urlOpen, setUrlOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -48,10 +39,10 @@ export function AssetSection({
   }
 
   return (
-    <div className="asset-section">
-      <div className="asset-title">
-        <AssetIcon />
-        <span>{t.assetAnalysis}</span>
+    <section className="asset-section" data-section="asset-analysis">
+      <div className="asset-heading">
+        <h2>{t.assetAnalysis}</h2>
+        <p>{t.assetAnalysisDescription}</p>
       </div>
 
       <button
@@ -73,7 +64,7 @@ export function AssetSection({
           selectFirstFile(event.dataTransfer.files)
         }}
       >
-        <AssetIcon />
+        <span className="asset-drop-icon"><PopupIcon name="images" /></span>
         <span className="asset-drop-main">{t.assetDropTitle}</span>
         <span className="asset-drop-sub">{t.assetDropHint}</span>
         <span className="asset-choose-pill">{t.chooseAsset}</span>
@@ -90,14 +81,21 @@ export function AssetSection({
         }}
       />
 
-      <div className="asset-url-panel">
-        <div className="asset-url-label">{t.assetUrlHint}</div>
-        <div className="input-row asset-url-row">
-          <input type="url" placeholder="https://example.com/demo.mp4" value={assetUrl} onChange={(e) => onUrlChange(e.target.value)} />
-          <button className="btn btn-small" onClick={onUrlSubmit}>{t.analyzeAssetUrl}</button>
+      <p className="asset-paste-hint">{t.pasteAssetHint}</p>
+
+      <button className={`asset-url-toggle ${urlOpen ? "open" : ""}`} type="button" aria-expanded={urlOpen} onClick={() => setUrlOpen((open) => !open)}>
+        <PopupIcon name="link-2" />
+        <span>{t.publicVideoUrl}</span>
+        <PopupIcon name="chevron-down" className="asset-url-chevron" />
+      </button>
+      <div className={`asset-url-panel ${urlOpen ? "open" : ""}`}>
+        <div className="asset-url-panel-inner">
+          <div className="asset-url-row">
+            <input type="url" placeholder="https://example.com/demo.mp4" value={assetUrl} onChange={(e) => onUrlChange(e.target.value)} />
+            <button type="button" onClick={onUrlSubmit}>{t.analyzeAssetUrl}</button>
+          </div>
         </div>
       </div>
-
-    </div>
+    </section>
   )
 }

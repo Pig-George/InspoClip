@@ -25,8 +25,6 @@ export type PopupSettings = {
 
 export type I18nMessages = {
   subtitle: string
-  analyzePage: string
-  quickSave: string
   fullPage: string
   areaSelect: string
   settings: string
@@ -37,25 +35,30 @@ export type I18nMessages = {
   test: string
   saveSettings: string
   openInspoClip: string
-  saving: string
   connected: string
   offline: string
   error: string
   assetAnalysis: string
   assetDropTitle: string
   assetDropHint: string
-  assetUrlHint: string
   chooseAsset: string
   analyzeAssetUrl: string
-  viewAnalysis: string
-  uploading: string
-  analyzingAsset: string
-  imageAnalysisCompleted: string
   unsupportedAsset: string
-  fetchingVideo: string
-  waitingAnalysis: string
-  analysisCompleted: string
   starting: string
   inaccessiblePage: string
   inaccessibleFilePage: string
+  currentPage: string
+  analyzeCurrentArea: string
+  analyzeFullPage: string
+  areaAnalysisHint: string
+  fullPageAnalysisHint: string
+  fullPageOptionHint: string
+  selectAnalysisScope: string
+  quickAreaAnalyze: string
+  assetAnalysisDescription: string
+  pasteAssetHint: string
+  publicVideoUrl: string
+  settingsDescription: string
+  serviceConnection: string
+  pageUnavailable: string
 }

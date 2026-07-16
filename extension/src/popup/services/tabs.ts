@@ -30,6 +30,15 @@ export function isInjectableTabUrl(url?: string): boolean {
   }
 }
 
+export function getTabDisplayLabel(url?: string): string {
+  if (!url) return ""
+  try {
+    return new URL(url).host
+  } catch {
+    return ""
+  }
+}
+
 export function getTabAccessErrorMessage(url?: string, messages: TabAccessMessages = DEFAULT_TAB_ACCESS_MESSAGES): string {
   if (!url) return messages.inaccessiblePage
   let protocol = ""

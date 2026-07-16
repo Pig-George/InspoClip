@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest"
 
-import { getManifestContentScriptFiles, getTabAccessErrorMessage, isInjectableTabUrl, requestAreaCaptureSession } from "./tabs"
+import { getManifestContentScriptFiles, getTabAccessErrorMessage, getTabDisplayLabel, isInjectableTabUrl, requestAreaCaptureSession } from "./tabs"
 
 describe("popup tab messaging helpers", () => {
   afterEach(() => {
@@ -22,6 +22,12 @@ describe("popup tab messaging helpers", () => {
   test("allows normal web pages for content script messaging", () => {
     expect(isInjectableTabUrl("https://example.com/demo")).toBe(true)
     expect(isInjectableTabUrl("http://localhost:5173")).toBe(true)
+  })
+
+  test("formats the active page as a compact host label", () => {
+    expect(getTabDisplayLabel("https://dribbble.com/shots/interaction?id=1")).toBe("dribbble.com")
+    expect(getTabDisplayLabel("http://localhost:5173/demo")).toBe("localhost:5173")
+    expect(getTabDisplayLabel(undefined)).toBe("")
   })
 
   test("rejects browser-managed pages before trying to inject content scripts", () => {

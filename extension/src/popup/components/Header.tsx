@@ -1,5 +1,6 @@
 import type { ConnectionState, Locale, I18nMessages } from "../types"
 import { getExtensionIconUrl } from "../services/assets"
+import { PopupIcon } from "./PopupIcon"
 
 type HeaderProps = {
   connectionLabel: string
@@ -8,27 +9,29 @@ type HeaderProps = {
   t: I18nMessages
   onTestConnection: () => void
   onToggleLanguage: () => void
+  onOpenSettings: () => void
 }
 
-export function Header({ connectionLabel, connectionState, locale, t, onTestConnection, onToggleLanguage }: HeaderProps) {
+export function Header({ connectionLabel, connectionState, locale, t, onTestConnection, onToggleLanguage, onOpenSettings }: HeaderProps) {
   return (
-    <div className="header">
-      <div className="logo-row">
+    <header className="popup-header">
+      <div className="popup-brand">
         <img src={getExtensionIconUrl(48)} alt="Logo" className="logo" />
-        <div>
-          <h1>InspoClip</h1>
-          <p className="subtitle">{t.subtitle}</p>
+        <div className="popup-brand-copy">
+          <strong>InspoClip</strong>
+          <span>{t.subtitle}</span>
         </div>
       </div>
-      <div className="header-actions">
-        <div className={`connection-status ${connectionState}`} title="Click to test" onClick={onTestConnection}>
-          <span className="dot" />
-          <span className="label">{connectionLabel}</span>
-        </div>
-        <button className="icon-btn" title="Switch language" onClick={onToggleLanguage}>
-          <span>{locale === "en" ? "中" : "EN"}</span>
+      <div className="popup-header-actions">
+        <button className={`header-icon-button connection-button ${connectionState}`} type="button" title={connectionLabel || t.connected} aria-label={connectionLabel || t.connected} onClick={onTestConnection}>
+          <PopupIcon name="radio-tower" />
+          <span className="connection-dot" />
         </button>
+        <button className="header-language-button" type="button" title="Switch language" aria-label="Switch language" onClick={onToggleLanguage}>
+          {locale === "en" ? "中" : "EN"}
+        </button>
+        <button className="header-icon-button" type="button" title={t.settings} aria-label={t.settings} onClick={onOpenSettings}><PopupIcon name="settings-2" /></button>
       </div>
-    </div>
+    </header>
   )
 }

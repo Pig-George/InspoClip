@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { DEFAULT_APP_URL, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS, I18N, MAX_VIDEO_SIZE_BYTES, detectBrowserLocale } from "../constants"
 import { buildAssetAnalysisMessage, detectAssetKind } from "../services/assets"
 import { loadPopupSettings, normalizeAppUrl, normalizeServerUrl, savePopupSettings } from "../services/settings"
-import { openOrFocusApp, requestAreaCaptureSession, sendCurrentTabMessage } from "../services/tabs"
+import { getTabDisplayLabel, openOrFocusApp, requestAreaCaptureSession, sendCurrentTabMessage } from "../services/tabs"
 import type { CaptureMode, ConnectionState, Locale, ShortcutTarget, StatusMessage } from "../types"
 
 export function usePopupController() {
@@ -16,11 +16,11 @@ export function usePopupController() {
   const [connectionLabel, setConnectionLabel] = useState("")
   const [status, setStatus] = useState<StatusMessage | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [shortcutAnalyze, setShortcutAnalyze] = useState(DEFAULT_SHORTCUTS.analyze)
   const [shortcutSave, setShortcutSave] = useState(DEFAULT_SHORTCUTS.save)
   const [recordingShortcut, setRecordingShortcut] = useState<ShortcutTarget | null>(null)
   const [assetUrl, setAssetUrl] = useState("")
+  const [currentPageLabel, setCurrentPageLabel] = useState("")
 
   const t = useMemo(() => I18N[locale], [locale])
 
@@ -32,6 +32,12 @@ export function usePopupController() {
       setShortcutSave(settings.shortcuts.save)
       if (settings.lang) setLocale(settings.lang)
     })
+  }, [])
+
+  useEffect(() => {
+    chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+      setCurrentPageLabel(getTabDisplayLabel(tab?.url))
+    }).catch(() => setCurrentPageLabel(""))
   }, [])
 
   useEffect(() => {
@@ -96,21 +102,6 @@ export function usePopupController() {
     }
   }
 
-  async function triggerSave() {
-    setSaving(true)
-    try {
-      if (captureMode === "area") {
-        await requestAreaCaptureSession("save")
-      } else {
-        await sendCurrentTabMessage({ type: "SAVE_IMAGE", imageUrl: null, isImage: false }, t)
-      }
-      setTimeout(() => window.close(), 200)
-    } catch (err) {
-      showStatus(err instanceof Error ? err.message : "Failed to start save", "error")
-      setSaving(false)
-    }
-  }
-
   async function openApp(event: React.MouseEvent<HTMLAnchorElement>) {
     event.preventDefault()
     await openOrFocusApp(appUrl)
@@ -158,9 +149,9 @@ export function usePopupController() {
     captureMode,
     connectionLabel,
     connectionState,
+    currentPageLabel,
     locale,
     recordingShortcut,
-    saving,
     serverUrl,
     settingsOpen,
     shortcutAnalyze,
@@ -182,7 +173,6 @@ export function usePopupController() {
     setAssetUrl,
     testServerConnection,
     toggleLanguage,
-    triggerAnalyze,
-    triggerSave
+    triggerAnalyze
   }
 }

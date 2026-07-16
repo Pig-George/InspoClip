@@ -1,4 +1,5 @@
 import type { I18nMessages } from "../types"
+import { PopupIcon } from "./PopupIcon"
 
 type FooterProps = {
   t: I18nMessages
@@ -8,7 +9,7 @@ type FooterProps = {
 export function Footer({ t, onOpenApp }: FooterProps) {
   return (
     <div className="footer">
-      <a href="#" onClick={onOpenApp}>{t.openInspoClip}</a>
+      <a href="#" onClick={onOpenApp}><PopupIcon name="external-link" />{t.openInspoClip}</a>
     </div>
   )
 }
