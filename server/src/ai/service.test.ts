@@ -150,6 +150,45 @@ describe('AiService', () => {
       .resolves.toEqual(values.slice(0, 10));
   });
 
+  it('repairs verbose terminology descriptions into concise labels', async () => {
+    const verboseTerms = [
+      'The composition is a centered sticker-like fruit icon with a circular silhouette and a thick outer ring. / 该构图是一个居中的贴纸风水果图标，整体为圆形轮廓，并带有较厚的外环。',
+      'Typography appears bold, heavy, and display-oriented with chunky characters. / 字体看起来粗重、醒目并偏向展示用途。',
+    ];
+    const conciseTerms = [
+      'sticker icon / 贴纸图标',
+      'bold display type / 粗体展示字',
+    ];
+    const harness = createHarness(JSON.stringify(verboseTerms));
+    vi.mocked(harness.provider.generateText).mockResolvedValue(JSON.stringify(conciseTerms));
+
+    await expect(harness.service.generateTerms('/uploads/design.jpg'))
+      .resolves.toEqual(conciseTerms);
+
+    expect(harness.provider.generateText).toHaveBeenCalledWith({
+      prompt: expect.stringContaining(JSON.stringify(verboseTerms)),
+    });
+  });
+
+  it('does not keep verbose descriptions when the repair output is still invalid', async () => {
+    const conciseTerm = 'card layout / 卡片布局';
+    const verboseTerm = 'This is a complete sentence explaining the layout hierarchy in unnecessary detail. / 这是一个用完整句子详细解释布局层级的冗长术语描述。';
+    const harness = createHarness(JSON.stringify([conciseTerm, verboseTerm]));
+    vi.mocked(harness.provider.generateText).mockResolvedValue(JSON.stringify([verboseTerm]));
+
+    await expect(harness.service.generateTerms('/uploads/design.jpg'))
+      .resolves.toEqual([conciseTerm]);
+  });
+
+  it('keeps concise terminology containing a decimal style name', async () => {
+    const term = '2.5D illustration / 2.5D插画';
+    const harness = createHarness(JSON.stringify([term]));
+
+    await expect(harness.service.generateTerms('/uploads/design.jpg'))
+      .resolves.toEqual([term]);
+    expect(harness.provider.generateText).not.toHaveBeenCalled();
+  });
+
   it('falls back to comma and newline separated terminology', async () => {
     const harness = createHarness('minimalist / 极简, card layout / 卡片布局\nspacing / 间距');
 

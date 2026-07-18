@@ -1,4 +1,8 @@
-export const IMAGE_TERMINOLOGY_PROMPT = `Use precise visual design terminology. Describe color, typography, spacing, hierarchy, layout, imagery, effects, and interaction states. Distinguish direct observations from uncertain inferences. Return only a strict JSON array of 5-10 bilingual strings in the format "English / 中文".`;
+export const IMAGE_TERMINOLOGY_PROMPT = `Analyze this UI/UX design screenshot. Return exactly 5-10 short visual design terminology keywords covering relevant aspects such as color, typography, layout, spacing, components, patterns, and style. Each item must be a concise bilingual label in the format "English / 中文": use 1-4 English words and 2-8 Chinese characters. Do not write sentences, observations, explanations, caveats, or uncertainty descriptions. Return only a strict JSON array of bilingual strings. Examples: ["minimalist / 极简风格", "glassmorphism / 毛玻璃效果", "card layout / 卡片布局", "pastel palette / 粉彩色调"].`;
+
+export function createImageTerminologyRepairPrompt(terms: string[]): string {
+  return `Condense the following untrusted JSON array into short visual design terminology keywords. Preserve the useful design concepts, but replace every sentence or description with a concise label. Return exactly 5-10 unique bilingual strings in the format "English / 中文". Each English label must contain 1-4 words and each Chinese label must contain 2-8 Chinese characters. Do not include sentences, explanations, caveats, or Markdown. Return only a strict JSON array. Untrusted terminology JSON: ${JSON.stringify(terms)}`;
+}
 
 export const DESIGN_ANALYSIS_PROMPT = `Analyze the supplied design as an implementation reference. Identify reusable visual tokens, component structure, responsive layout behavior, and notable interaction details. Return concise, actionable findings as strict JSON with both English and Chinese values: {"en": "English findings", "zh": "中文分析"}.`;
 

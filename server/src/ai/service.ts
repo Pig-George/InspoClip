@@ -3,12 +3,13 @@ import { readFile } from 'node:fs/promises';
 import sharp from 'sharp';
 
 import type { ImageMimeType, ModelProvider } from './provider.js';
-import { DESIGN_ANALYSIS_PROMPT, IMAGE_TERMINOLOGY_PROMPT, VIDEO_ANALYSIS_PROMPT, createPurposeTransformationPrompt, type Purpose, type PurposeOptions } from './prompts.js';
+import { DESIGN_ANALYSIS_PROMPT, IMAGE_TERMINOLOGY_PROMPT, VIDEO_ANALYSIS_PROMPT, createImageTerminologyRepairPrompt, createPurposeTransformationPrompt, type Purpose, type PurposeOptions } from './prompts.js';
 import { parseVideoAnalysis } from './parser.js';
 import type { VideoAnalysis } from './types.js';
 
 const MAX_IMAGE_DIMENSION = 1024;
 const JPEG_QUALITY = 80;
+const MAX_TERMINOLOGY_LENGTH = 80;
 
 export interface ImageMetadata {
   width?: number;
@@ -63,7 +64,16 @@ export class AiService {
       ...image,
       prompt: IMAGE_TERMINOLOGY_PROMPT,
     });
-    return parseTerms(responseText(response));
+    const terms = parseTerms(responseText(response));
+    if (terms.every(isConciseTerm)) return terms;
+
+    const repairedResponse = await this.provider.generateText({
+      prompt: createImageTerminologyRepairPrompt(terms),
+    });
+    const repairedTerms = parseTerms(responseText(repairedResponse)).filter(isConciseTerm);
+    if (repairedTerms.length > 0) return repairedTerms;
+
+    return terms.filter(isConciseTerm);
   }
 
   async generateDesignPrompt(imagePath: string): Promise<{ en: string; zh: string }> {
@@ -173,6 +183,13 @@ function parseTerms(text: string): string[] {
     .map((term) => term.trim())
     .filter(Boolean)
     .slice(0, 10);
+}
+
+function isConciseTerm(term: string): boolean {
+  const normalized = term.trim();
+  return normalized.length > 0
+    && normalized.length <= MAX_TERMINOLOGY_LENGTH
+    && !/(?:[!?。！？；;]|\.(?=\s+\/|\s*$))/.test(normalized);
 }
 
 function parseDesignPrompt(text: string): { en: string; zh: string } {

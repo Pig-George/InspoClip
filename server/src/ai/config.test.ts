@@ -99,9 +99,12 @@ describe('maskApiKey', () => {
 });
 
 describe('video prompts', () => {
-  it('requires image terminology as a strict bilingual JSON array', () => {
+  it('requires image terminology as short bilingual keywords', () => {
     expect(IMAGE_TERMINOLOGY_PROMPT).toContain('strict JSON array');
     expect(IMAGE_TERMINOLOGY_PROMPT).toContain('bilingual');
+    expect(IMAGE_TERMINOLOGY_PROMPT).toContain('1-4 English words');
+    expect(IMAGE_TERMINOLOGY_PROMPT).toContain('Do not write sentences');
+    expect(IMAGE_TERMINOLOGY_PROMPT).toContain('card layout / 卡片布局');
   });
 
   it('requires the design prompt as English and Chinese JSON', () => {
