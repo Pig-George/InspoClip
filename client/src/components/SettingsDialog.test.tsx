@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { SettingsDialog } from './SettingsDialog';
 import { fetchConfig, updateConfig } from '@/lib/api';
+import { APP_VERSION } from '@/version';
 
 vi.mock('@/lib/api', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api')>('@/lib/api');
@@ -41,5 +42,16 @@ describe('SettingsDialog', () => {
     expect(screen.getByRole('tab', { name: 'Video understanding' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('Video model')).toBeInTheDocument();
     expect(screen.queryByLabelText('Provider')).not.toBeInTheDocument();
+  });
+
+  it('shows the client version in the settings footer', async () => {
+    render(
+      <LanguageProvider>
+        <SettingsDialog open onClose={() => undefined} />
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => expect(fetchConfig).toHaveBeenCalled());
+    expect(screen.getByText(`Version ${APP_VERSION}`)).toBeInTheDocument();
   });
 });

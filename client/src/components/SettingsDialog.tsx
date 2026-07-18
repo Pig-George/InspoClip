@@ -4,6 +4,7 @@ import { Cpu, Globe, Image, Key, Link, Video, X } from 'lucide-react';
 import { fetchConfig, updateConfig, type AIConfig } from '@/lib/api';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { useLanguage } from '@/context/LanguageContext';
+import { APP_VERSION } from '@/version';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -291,10 +292,15 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               )}
             </div>
 
-            <div className="flex shrink-0 items-center justify-between border-t border-[var(--card-border)] px-6 py-4">
-              <span className={`text-xs font-handwriting ${message === t('Saved') ? 'text-green-500' : 'text-red-400'}`}>
-                {message}
-              </span>
+            <div className="flex shrink-0 items-center justify-between gap-4 border-t border-[var(--card-border)] px-6 py-4">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className={`min-h-4 text-xs font-handwriting ${message === t('Saved') ? 'text-green-500' : 'text-red-400'}`}>
+                  {message}
+                </span>
+                <span className="text-[11px] font-heading tracking-wide text-[var(--text-muted)]/75">
+                  {locale === 'zh' ? '版本' : 'Version'} {APP_VERSION}
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={handleSave}

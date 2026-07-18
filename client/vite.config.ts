@@ -2,8 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+import { appVersionDefine } from './version.config'
+
 export default defineConfig({
   plugins: [react()],
+  define: appVersionDefine,
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

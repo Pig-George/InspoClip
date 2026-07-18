@@ -9,6 +9,7 @@ import { usePopupController } from "./hooks/usePopupController"
 
 export function PopupApp() {
   const popup = usePopupController()
+  const version = chrome.runtime.getManifest().version
 
   return (
     <div className="popup-root">
@@ -47,7 +48,7 @@ export function PopupApp() {
         />
       </main>
 
-      <Footer t={popup.t} onOpenApp={popup.openApp} />
+      <Footer t={popup.t} version={version} onOpenApp={popup.openApp} />
       <StatusBanner status={popup.status} />
 
       <SettingsSection
