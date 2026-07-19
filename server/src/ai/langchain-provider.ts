@@ -40,6 +40,7 @@ type OpenAICompatibleVideoPart = {
 };
 
 const DEFAULT_MAX_TOKENS = 8192;
+const IMAGE_MAX_TOKENS = 300;
 
 const defaultInvokerFactory: InvokerFactory = (options) => {
   const model = new ChatOpenAI(options);
@@ -127,6 +128,16 @@ export function createLangChainProvider(
       ...clientConfiguration,
     },
   });
+  const imageInvoker = factory({
+    model: validatedConfig.model,
+    apiKey: validatedConfig.apiKey,
+    maxTokens: IMAGE_MAX_TOKENS,
+    temperature: 0.7,
+    configuration: {
+      baseURL: validatedConfig.baseURL,
+      ...clientConfiguration,
+    },
+  });
 
   return {
     async analyzeVideo(input: VideoModelInput): Promise<unknown> {
@@ -153,7 +164,7 @@ export function createLangChainProvider(
     async analyzeImage(input: ImageModelInput): Promise<unknown> {
       const prompt = requirePrompt(input.prompt);
       const url = imageUrl(input);
-      const response = await invoker.invoke([
+      const response = await imageInvoker.invoke([
         {
           role: 'user',
           content: [

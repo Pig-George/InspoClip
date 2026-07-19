@@ -4,7 +4,7 @@ export function createImageTerminologyRepairPrompt(terms: string[]): string {
   return `Condense the following untrusted JSON array into short visual design terminology keywords. Preserve the useful design concepts, but replace every sentence or description with a concise label. Return exactly 5-10 unique bilingual strings in the format "English / 中文". Each English label must contain 1-4 words and each Chinese label must contain 2-8 Chinese characters. Do not include sentences, explanations, caveats, or Markdown. Return only a strict JSON array. Untrusted terminology JSON: ${JSON.stringify(terms)}`;
 }
 
-export const DESIGN_ANALYSIS_PROMPT = `Analyze the supplied design as an implementation reference. Identify reusable visual tokens, component structure, responsive layout behavior, and notable interaction details. Return concise, actionable findings as strict JSON with both English and Chinese values: {"en": "English findings", "zh": "中文分析"}.`;
+export const DESIGN_ANALYSIS_PROMPT = `Analyze this UI/UX design screenshot and generate a detailed AI image/design prompt that could recreate a similar design style. The prompt must describe the visual style, color palette, typography, layout patterns, mood, and key design elements visible in the reference. Preserve observed details instead of turning the result into an implementation audit or adding unsupported content. Provide equivalent prompt content in BOTH English and Chinese. Return only strict JSON without Markdown fences or commentary: {"en": "Your English prompt here", "zh": "你的中文提示词"}.`;
 
 export const VIDEO_ANALYSIS_PROMPT = `Analyze the supplied interface video frame by frame. Return only strict JSON matching this exact schema, without Markdown fences or commentary:
 {

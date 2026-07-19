@@ -111,6 +111,15 @@ describe('video prompts', () => {
     expect(DESIGN_ANALYSIS_PROMPT).toContain('JSON');
     expect(DESIGN_ANALYSIS_PROMPT).toContain('English');
     expect(DESIGN_ANALYSIS_PROMPT).toContain('Chinese');
+    expect(DESIGN_ANALYSIS_PROMPT).toContain('recreate a similar design style');
+    expect(DESIGN_ANALYSIS_PROMPT).toContain('visual style');
+    expect(DESIGN_ANALYSIS_PROMPT).toContain('color palette');
+    expect(DESIGN_ANALYSIS_PROMPT).toContain('typography');
+    expect(DESIGN_ANALYSIS_PROMPT).toContain('layout patterns');
+    expect(DESIGN_ANALYSIS_PROMPT).toContain('mood');
+    expect(DESIGN_ANALYSIS_PROMPT).toContain('key design elements');
+    expect(DESIGN_ANALYSIS_PROMPT).not.toContain('implementation reference');
+    expect(DESIGN_ANALYSIS_PROMPT).not.toContain('responsive layout behavior');
   });
 
   it('requires strict JSON and a complete stage transition sequence', () => {

@@ -32,6 +32,30 @@ describe('createLangChainProvider', () => {
     });
   });
 
+  it('keeps the legacy 300-token limit for image analysis', async () => {
+    const defaultInvoke = vi.fn().mockResolvedValue({ content: 'default' });
+    const imageInvoke = vi.fn().mockResolvedValue({ content: 'image' });
+    const factory = vi.fn((options: Parameters<InvokerFactory>[0]) => ({
+      invoke: options.maxTokens === 300 ? imageInvoke : defaultInvoke,
+    })) as InvokerFactory;
+    const provider = createLangChainProvider(config, factory);
+
+    await provider.analyzeImage({
+      imageUrl: 'https://cdn.test/image.png',
+      prompt: 'Describe the visual style',
+    });
+
+    expect(factory).toHaveBeenCalledWith({
+      model: 'qwen3.7-plus',
+      apiKey: 'test-key',
+      maxTokens: 300,
+      temperature: 0.7,
+      configuration: { baseURL: 'https://example.test/v1' },
+    });
+    expect(imageInvoke).toHaveBeenCalledOnce();
+    expect(defaultInvoke).not.toHaveBeenCalled();
+  });
+
   it('lets an explicit video fps override the configured default', async () => {
     const { invoke, provider } = createHarness();
 

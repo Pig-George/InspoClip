@@ -164,6 +164,21 @@ function fallbackMimeFromPath(imagePath: string): ImageMimeType {
 
 function responseText(response: unknown): string {
   if (typeof response === 'string') return response;
+  if (Array.isArray(response)) {
+    return response
+      .map((block) => {
+        if (
+          typeof block === 'object'
+          && block !== null
+          && 'text' in block
+          && typeof block.text === 'string'
+        ) {
+          return block.text;
+        }
+        return typeof block === 'string' ? block : '';
+      })
+      .join('');
+  }
   return response === null || response === undefined ? '' : String(response);
 }
 
@@ -194,8 +209,11 @@ function isConciseTerm(term: string): boolean {
 
 function parseDesignPrompt(text: string): { en: string; zh: string } {
   const trimmed = text.trim();
+  const jsonText = trimmed
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '');
   try {
-    const parsed: unknown = JSON.parse(trimmed);
+    const parsed: unknown = JSON.parse(jsonText);
     if (typeof parsed === 'object' && parsed !== null) {
       const values = parsed as Record<string, unknown>;
       return {

@@ -228,6 +228,26 @@ describe('AiService', () => {
     });
   });
 
+  it('parses a bilingual design prompt wrapped in a Markdown JSON fence', async () => {
+    const harness = createHarness('```json\n{"en":"Soft gradients","zh":"柔和渐变"}\n```');
+
+    await expect(harness.service.generateDesignPrompt('/uploads/design.jpg')).resolves.toEqual({
+      en: 'Soft gradients',
+      zh: '柔和渐变',
+    });
+  });
+
+  it('parses LangChain text content blocks for a bilingual design prompt', async () => {
+    const harness = createHarness([
+      { type: 'text', text: '{"en":"Editorial layout","zh":"杂志式布局"}' },
+    ]);
+
+    await expect(harness.service.generateDesignPrompt('/uploads/design.jpg')).resolves.toEqual({
+      en: 'Editorial layout',
+      zh: '杂志式布局',
+    });
+  });
+
   it('propagates provider failures', async () => {
     const harness = createHarness();
     vi.mocked(harness.provider.analyzeImage).mockRejectedValue(new Error('provider failed'));
