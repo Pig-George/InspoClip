@@ -71,16 +71,8 @@
       height: 18px;
       flex: 0 0 18px;
       border-radius: 50%;
-      box-shadow: 0 0 0 1px rgba(192, 120, 74, 0.08);
-    }
-
-    .inspoclip-progress-ring::after {
-      content: "";
-      position: absolute;
-      inset: 3px;
-      border-radius: 50%;
-      background: #fff;
-      box-shadow: inset 0 0 0 1px rgba(192, 120, 74, 0.05);
+      -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 5.75px, #000 6.25px);
+      mask: radial-gradient(circle at 50% 50%, transparent 0 5.75px, #000 6.25px);
     }
 
     .inspoclip-progress-ring-indeterminate {
