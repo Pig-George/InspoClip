@@ -52,6 +52,7 @@ import {
   setVideoPromptInflight,
   videoPromptRequestKey
 } from "../src/content/video-prompt-state"
+import { pollVideoJob as pollVideoJobWithRetry } from "../src/video"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -1400,15 +1401,7 @@ export const config: PlasmoCSConfig = {
   }
 
   async function pollVideoJob(jobId, onUpdate) {
-    for (let attempt = 0; attempt < 240; attempt += 1) {
-      const res = await fetch(`${serverUrl}/api/video-jobs/${jobId}`);
-      if (!res.ok) throw new Error(await readableError(res, 'Failed to poll video job'));
-      const job = await res.json();
-      onUpdate?.(job);
-      if (job.status === 'completed' || job.status === 'failed') return job;
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-    }
-    throw new Error('Video analysis timed out');
+    return pollVideoJobWithRetry(fetch, serverUrl, jobId, { onUpdate });
   }
 
   async function readableError(response, fallback) {

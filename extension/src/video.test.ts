@@ -60,4 +60,42 @@ describe("video helpers", () => {
     expect(result.status).toBe("completed")
     expect(updates).toEqual(["processing", "completed"])
   })
+
+  test("polling recovers from a transient browser network change", async () => {
+    let calls = 0
+    const waits: number[] = []
+    const fetchFn = (async () => {
+      calls += 1
+      if (calls === 1) throw new TypeError("Failed to fetch")
+      return {
+        ok: true,
+        json: async () => ({ status: "completed", progress: 100 })
+      }
+    }) as unknown as typeof fetch
+
+    const result = await pollVideoJob(fetchFn, "http://localhost:3001", "j", {
+      retryBaseMs: 25,
+      wait: async (ms) => { waits.push(ms) }
+    })
+
+    expect(result.status).toBe("completed")
+    expect(calls).toBe(2)
+    expect(waits).toEqual([25])
+  })
+
+  test("polling stops after the transient network retry budget is exhausted", async () => {
+    let calls = 0
+    const fetchFn = (async () => {
+      calls += 1
+      throw new TypeError("Failed to fetch")
+    }) as unknown as typeof fetch
+
+    await expect(pollVideoJob(fetchFn, "http://localhost:3001", "j", {
+      maxNetworkRetries: 2,
+      retryBaseMs: 0,
+      wait: async () => {}
+    })).rejects.toThrow("Failed to fetch")
+
+    expect(calls).toBe(3)
+  })
 })
