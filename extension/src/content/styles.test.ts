@@ -13,16 +13,18 @@ describe("content styles", () => {
     expect(recordingRule).toContain("overflow: visible")
   })
 
-  test("styles area toolbar actions as compact icon buttons with accessible tooltips", () => {
+  test("reveals compact labels inside stable toolbar buttons", () => {
     const styles = getContentStyles()
     const iconRule = styles.match(/\.inspoclip-area-icon-button,\s*\.inspoclip-area-icon-status\s*\{([^}]*)\}/s)?.[1] || ""
 
-    expect(iconRule).toMatch(/width:\s*32px;/)
-    expect(iconRule).toMatch(/height:\s*32px;/)
-    expect(styles).toContain('.inspoclip-area-icon-button svg')
-    expect(styles).toContain('[data-tooltip]::after')
-    expect(styles).toContain('[data-tooltip]:hover::after')
-    expect(styles).toContain('[data-tooltip]:focus-visible::after')
+    expect(iconRule).toMatch(/width:\s*38px;/)
+    expect(iconRule).toMatch(/height:\s*38px;/)
+    expect(styles).toContain('.inspoclip-area-button-icon')
+    expect(styles).toContain('.inspoclip-area-button-label')
+    expect(styles).toContain('.inspoclip-area-icon-button:hover .inspoclip-area-button-icon')
+    expect(styles).toContain('.inspoclip-area-icon-button:focus-visible .inspoclip-area-button-label')
+    expect(styles).toMatch(/translateY\(-6px\)\s*scale\(0\.76\)/)
+    expect(styles).not.toContain('[data-tooltip]::after')
   })
 
   test("anchors the toolbar pointer near the right-aligned selection edge", () => {

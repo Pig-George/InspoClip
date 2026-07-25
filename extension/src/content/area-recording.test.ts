@@ -14,6 +14,7 @@ import {
   getAreaCaptureToolbarPosition,
   getAreaToolbarActionIcon,
   getAreaToolbarActionLabel,
+  getAreaToolbarActionShortLabel,
   getAreaRecordingDelayLabel,
   getAreaRecordingDelayBadge,
   getNextAreaRecordingDelay,
@@ -36,6 +37,33 @@ describe("area recording helpers", () => {
     expect(getAreaToolbarActionLabel("retake", "en")).toBe("Retake")
     expect(getAreaToolbarActionLabel("confirm-retake", "zh")).toBe("再次点击确认重录")
     expect(getAreaToolbarActionLabel("finish", "en")).toBe("Finish and analyze")
+  })
+
+  test("uses two-character Chinese labels inside toolbar buttons", () => {
+    const labels = {
+      delay: "延时",
+      screenshot: "截图",
+      record: "录屏",
+      "sound-on": "声音",
+      "sound-off": "声音",
+      cancel: "取消",
+      pause: "暂停",
+      resume: "继续",
+      retake: "重录",
+      "confirm-retake": "确认",
+      finish: "完成"
+    } as const
+
+    Object.entries(labels).forEach(([action, label]) => {
+      expect(getAreaToolbarActionShortLabel(action as keyof typeof labels, "zh")).toBe(label)
+      expect(label).toHaveLength(2)
+    })
+  })
+
+  test("uses compact readable English labels inside toolbar buttons", () => {
+    expect(getAreaToolbarActionShortLabel("screenshot", "en")).toBe("Shot")
+    expect(getAreaToolbarActionShortLabel("record", "en")).toBe("Record")
+    expect(getAreaToolbarActionShortLabel("finish", "en")).toBe("Done")
   })
 
   test("renders every toolbar action as a Lucide placeholder without hand-written svg", () => {

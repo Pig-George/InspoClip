@@ -744,36 +744,78 @@
       appearance: none;
       position: relative;
       display: inline-grid;
-      width: 32px;
-      height: 32px;
+      width: 38px;
+      height: 38px;
       box-sizing: border-box;
       place-items: center;
-      flex: 0 0 32px;
+      flex: 0 0 38px;
       border: none;
-      border-radius: 9px;
+      border-radius: 10px;
       background: #e8d5b0;
       color: #4a3028;
       padding: 0;
       line-height: 1;
-      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
     }
 
     .inspoclip-area-icon-button {
       cursor: pointer;
     }
 
-    .inspoclip-area-icon-button svg,
+    .inspoclip-area-button-icon {
+      display: grid;
+      place-items: center;
+      transform: translateY(0) scale(1);
+      transform-origin: center;
+      transition: transform 0.24s cubic-bezier(0.2, 0.82, 0.25, 1);
+      pointer-events: none;
+    }
+
+    .inspoclip-area-button-icon svg,
     .inspoclip-area-icon-status svg {
       display: block;
       width: 16px;
       height: 16px;
     }
 
+    .inspoclip-area-button-label {
+      position: absolute;
+      right: 3px;
+      bottom: 4px;
+      left: 3px;
+      overflow: hidden;
+      color: currentColor;
+      font-size: 9px;
+      font-weight: 750;
+      line-height: 1;
+      text-align: center;
+      text-overflow: clip;
+      white-space: nowrap;
+      opacity: 0;
+      transform: translateY(5px) scale(0.92);
+      transform-origin: center bottom;
+      transition: opacity 0.18s ease, transform 0.24s cubic-bezier(0.2, 0.82, 0.25, 1);
+      pointer-events: none;
+    }
+
+    .inspoclip-area-icon-button:hover .inspoclip-area-button-icon,
+    .inspoclip-area-icon-button:focus-visible .inspoclip-area-button-icon,
+    .inspoclip-area-action-confirm .inspoclip-area-button-icon {
+      transform: translateY(-6px) scale(0.76);
+    }
+
+    .inspoclip-area-icon-button:hover .inspoclip-area-button-label,
+    .inspoclip-area-icon-button:focus-visible .inspoclip-area-button-label,
+    .inspoclip-area-action-confirm .inspoclip-area-button-label {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
     .inspoclip-area-icon-button:hover {
       z-index: 2;
       background: #f0dfc4;
       box-shadow: 0 4px 10px rgba(74, 48, 40, 0.13);
-      transform: translateY(-2px);
+      transform: translateY(-1px);
     }
 
     .inspoclip-area-icon-button:active {
@@ -821,7 +863,7 @@
     .inspoclip-area-delay-badge {
       position: absolute;
       right: -3px;
-      bottom: -3px;
+      top: -3px;
       min-width: 16px;
       height: 14px;
       box-sizing: border-box;
@@ -889,49 +931,6 @@
       box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.13);
       animation: inspoclip-record-breathe 1.4s ease-in-out infinite;
       flex-shrink: 0;
-    }
-
-    .inspoclip-area-toolbar [data-tooltip] {
-      position: relative;
-    }
-
-    .inspoclip-area-toolbar [data-tooltip]::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      right: 0;
-      bottom: calc(100% + 10px);
-      z-index: 8;
-      width: max-content;
-      max-width: 190px;
-      padding: 6px 9px;
-      border-radius: 8px;
-      background: #4a3028;
-      color: #fffaf2;
-      box-shadow: 0 6px 18px rgba(74, 48, 40, 0.2);
-      font-size: 11px;
-      font-weight: 600;
-      line-height: 1.35;
-      white-space: nowrap;
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      transform: translateY(4px) scale(0.96);
-      transform-origin: bottom right;
-      transition: opacity 0.15s ease, visibility 0.15s ease, transform 0.15s ease;
-    }
-
-    .inspoclip-area-toolbar[data-placement="top"] [data-tooltip]::after {
-      top: calc(100% + 10px);
-      bottom: auto;
-      transform-origin: top right;
-    }
-
-    .inspoclip-area-toolbar [data-tooltip]:hover::after,
-    .inspoclip-area-toolbar [data-tooltip]:focus-visible::after,
-    .inspoclip-area-action-confirm::after {
-      opacity: 1;
-      visibility: visible;
-      transform: translateY(0) scale(1);
     }
 
     .inspoclip-area-action-confirm {

@@ -14,6 +14,7 @@ import {
   getAreaResizeHandlesMarkup,
   getAreaToolbarActionIcon,
   getAreaToolbarActionLabel,
+  getAreaToolbarActionShortLabel,
   getNextAreaRecordingDelay,
   moveAreaRect,
   normalizeAreaRecordingDelay,
@@ -336,16 +337,17 @@ export const config: PlasmoCSConfig = {
 
   function renderAreaToolbarIconButton(action, dataAction, className = '', pressed) {
     const label = getAreaToolbarActionLabel(action, getAreaToolbarLocale());
+    const shortLabel = getAreaToolbarActionShortLabel(action, getAreaToolbarLocale());
     const pressedAttribute = typeof pressed === 'boolean' ? ` aria-pressed="${pressed}"` : '';
-    return `<button type="button" class="inspoclip-area-icon-button ${className}" data-action="${dataAction}" data-tooltip="${label}" aria-label="${label}"${pressedAttribute}>${getAreaToolbarActionIcon(action)}</button>`;
+    return `<button type="button" class="inspoclip-area-icon-button ${className}" data-action="${dataAction}" aria-label="${label}"${pressedAttribute}><span class="inspoclip-area-button-icon" aria-hidden="true">${getAreaToolbarActionIcon(action)}</span><span class="inspoclip-area-button-label" aria-hidden="true">${shortLabel}</span></button>`;
   }
 
   function setAreaToolbarButtonAction(button, action) {
     if (!button) return;
     const label = getAreaToolbarActionLabel(action, getAreaToolbarLocale());
-    button.innerHTML = getAreaToolbarActionIcon(action);
+    const shortLabel = getAreaToolbarActionShortLabel(action, getAreaToolbarLocale());
+    button.innerHTML = `<span class="inspoclip-area-button-icon" aria-hidden="true">${getAreaToolbarActionIcon(action)}</span><span class="inspoclip-area-button-label" aria-hidden="true">${shortLabel}</span>`;
     renderAreaToolbarIcons(button);
-    button.dataset.tooltip = label;
     button.setAttribute('aria-label', label);
     button.classList.remove('inspoclip-area-icon-swap');
     void button.offsetWidth;
@@ -354,13 +356,13 @@ export const config: PlasmoCSConfig = {
 
   function renderAreaRecordingDelayButton(delaySeconds) {
     const label = getAreaRecordingDelayLabel(delaySeconds, getAreaToolbarLocale());
-    return `<button type="button" class="inspoclip-area-icon-button inspoclip-area-delay-button" data-action="toggle-delay" data-tooltip="${label}" aria-label="${label}">${getAreaToolbarActionIcon('delay')}<span class="inspoclip-area-delay-badge" aria-hidden="true">${getAreaRecordingDelayBadge(delaySeconds)}</span></button>`;
+    const shortLabel = getAreaToolbarActionShortLabel('delay', getAreaToolbarLocale());
+    return `<button type="button" class="inspoclip-area-icon-button inspoclip-area-delay-button" data-action="toggle-delay" aria-label="${label}"><span class="inspoclip-area-button-icon" aria-hidden="true">${getAreaToolbarActionIcon('delay')}</span><span class="inspoclip-area-button-label" aria-hidden="true">${shortLabel}</span><span class="inspoclip-area-delay-badge" aria-hidden="true">${getAreaRecordingDelayBadge(delaySeconds)}</span></button>`;
   }
 
   function syncAreaRecordingDelayButton(button, delaySeconds) {
     if (!button) return;
     const label = getAreaRecordingDelayLabel(delaySeconds, getAreaToolbarLocale());
-    button.dataset.tooltip = label;
     button.setAttribute('aria-label', label);
     const badge = button.querySelector('.inspoclip-area-delay-badge');
     if (badge) badge.textContent = getAreaRecordingDelayBadge(delaySeconds);
@@ -515,11 +517,11 @@ export const config: PlasmoCSConfig = {
   }
 
   function positionAreaToolbar(toolbar, rect) {
-    const fallbackWidth = toolbar.classList.contains('inspoclip-area-toolbar-recording') ? 228 : 210;
+    const fallbackWidth = toolbar.classList.contains('inspoclip-area-toolbar-recording') ? 268 : 228;
     const position = getAreaCaptureToolbarPosition(
       rect,
       { width: window.innerWidth, height: window.innerHeight },
-      { width: toolbar.offsetWidth || fallbackWidth, height: toolbar.offsetHeight || 44 }
+      { width: toolbar.offsetWidth || fallbackWidth, height: toolbar.offsetHeight || 50 }
     );
     toolbar.style.left = position.left + 'px';
     toolbar.style.top = position.top + 'px';
@@ -600,8 +602,9 @@ export const config: PlasmoCSConfig = {
     if (recordBtn) {
       recordBtn.disabled = true;
       recordBtn.classList.add('inspoclip-area-action-processing');
-      recordBtn.dataset.tooltip = locale === 'zh' ? '正在准备录屏' : 'Preparing recording';
-      recordBtn.setAttribute('aria-label', recordBtn.dataset.tooltip);
+      recordBtn.setAttribute('aria-label', locale === 'zh' ? '正在准备录屏' : 'Preparing recording');
+      const recordLabel = recordBtn.querySelector('.inspoclip-area-button-label');
+      if (recordLabel) recordLabel.textContent = locale === 'zh' ? '准备' : 'Wait';
     }
 
     const recordingId = crypto.randomUUID?.() || `area-recording-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -652,7 +655,7 @@ export const config: PlasmoCSConfig = {
       toolbar.classList.add('inspoclip-area-toolbar-recording');
       toolbar.innerHTML = `
         <span class="inspoclip-area-record-time"><span class="inspoclip-area-record-dot"></span><span data-record-time>00:00</span></span>
-        <span class="inspoclip-area-icon-status ${includeTabAudio ? 'inspoclip-area-icon-button-active' : ''}" data-tooltip="${getAreaToolbarActionLabel(includeTabAudio ? 'sound-on' : 'sound-off', getAreaToolbarLocale())}" aria-label="${getAreaToolbarActionLabel(includeTabAudio ? 'sound-on' : 'sound-off', getAreaToolbarLocale())}">${getAreaToolbarActionIcon(includeTabAudio ? 'sound-on' : 'sound-off')}</span>
+        <span class="inspoclip-area-icon-status ${includeTabAudio ? 'inspoclip-area-icon-button-active' : ''}" aria-label="${getAreaToolbarActionLabel(includeTabAudio ? 'sound-on' : 'sound-off', getAreaToolbarLocale())}">${getAreaToolbarActionIcon(includeTabAudio ? 'sound-on' : 'sound-off')}</span>
         <span class="inspoclip-area-toolbar-separator" aria-hidden="true"></span>
         ${renderAreaToolbarIconButton('pause', 'pause')}
         ${renderAreaToolbarIconButton('retake', 'retake')}
@@ -736,8 +739,9 @@ export const config: PlasmoCSConfig = {
         const recordingButtons = Array.from(toolbar.querySelectorAll('button'));
         recordingButtons.forEach((button) => { button.disabled = true; });
         retakeBtn.classList.add('inspoclip-area-action-processing');
-        retakeBtn.dataset.tooltip = locale === 'zh' ? '正在准备重录' : 'Preparing retake';
-        retakeBtn.setAttribute('aria-label', retakeBtn.dataset.tooltip);
+        retakeBtn.setAttribute('aria-label', locale === 'zh' ? '正在准备重录' : 'Preparing retake');
+        const retakeLabel = retakeBtn.querySelector('.inspoclip-area-button-label');
+        if (retakeLabel) retakeLabel.textContent = locale === 'zh' ? '准备' : 'Wait';
 
         let retakePrepared = false;
         try {
@@ -783,8 +787,9 @@ export const config: PlasmoCSConfig = {
         if (finishBtn) {
           finishBtn.disabled = true;
           finishBtn.classList.add('inspoclip-area-action-completing', 'inspoclip-area-action-processing');
-          finishBtn.dataset.tooltip = locale === 'zh' ? '正在完成并分析' : 'Finishing and analyzing';
-          finishBtn.setAttribute('aria-label', finishBtn.dataset.tooltip);
+          finishBtn.setAttribute('aria-label', locale === 'zh' ? '正在完成并分析' : 'Finishing and analyzing');
+          const finishLabel = finishBtn.querySelector('.inspoclip-area-button-label');
+          if (finishLabel) finishLabel.textContent = locale === 'zh' ? '完成' : 'Done';
         }
 
         try {

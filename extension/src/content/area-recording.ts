@@ -45,8 +45,26 @@ const AREA_TOOLBAR_LABELS: Record<AreaToolbarAction, Record<AreaToolbarLocale, s
   finish: { zh: "完成并分析", en: "Finish and analyze" }
 }
 
+const AREA_TOOLBAR_SHORT_LABELS: Record<AreaToolbarAction, Record<AreaToolbarLocale, string>> = {
+  delay: { zh: "延时", en: "Delay" },
+  screenshot: { zh: "截图", en: "Shot" },
+  record: { zh: "录屏", en: "Record" },
+  "sound-on": { zh: "声音", en: "Sound" },
+  "sound-off": { zh: "声音", en: "Sound" },
+  cancel: { zh: "取消", en: "Close" },
+  pause: { zh: "暂停", en: "Pause" },
+  resume: { zh: "继续", en: "Play" },
+  retake: { zh: "重录", en: "Redo" },
+  "confirm-retake": { zh: "确认", en: "Sure" },
+  finish: { zh: "完成", en: "Done" }
+}
+
 export function getAreaToolbarActionLabel(action: AreaToolbarAction, locale: AreaToolbarLocale): string {
   return AREA_TOOLBAR_LABELS[action][locale]
+}
+
+export function getAreaToolbarActionShortLabel(action: AreaToolbarAction, locale: AreaToolbarLocale): string {
+  return AREA_TOOLBAR_SHORT_LABELS[action][locale]
 }
 
 export function getAreaToolbarActionIcon(action: AreaToolbarAction): string {
