@@ -595,9 +595,9 @@ export const config: PlasmoCSConfig = {
       // Process based on mode
       if (mode === 'analyze') {
         // Run analysis on the cropped image
-        analysisProgress = createAnalysisToastProgress((progress) => (
-          locale === 'zh' ? `正在分析选区... ${progress}%` : `Analyzing selection... ${progress}%`
-        ));
+        analysisProgress = createAnalysisToastProgress(
+          locale === 'zh' ? '正在分析选区...' : 'Analyzing selection...'
+        );
 
         const ext = croppedBlob.type === 'image/png' ? '.png' : '.jpg';
         const formData = new FormData();
@@ -940,12 +940,12 @@ export const config: PlasmoCSConfig = {
     setTimeout(removeToast, 5000);
   }
 
-  function createAnalysisToastProgress(formatMessage) {
+  function createAnalysisToastProgress(message) {
     let progress = 4;
     let completed = false;
     let cancelled = false;
 
-    const publish = () => showToast(formatMessage(progress), 'loading');
+    const publish = () => showToast(message, 'loading', progress);
     const advance = () => {
       const nextProgress = getNextAnalysisProgress(progress);
       if (nextProgress === progress) return;
@@ -992,9 +992,9 @@ export const config: PlasmoCSConfig = {
     if (!uploadRes.ok) throw new Error(await readableError(uploadRes, 'Video upload failed'));
     const uploadResult = await uploadRes.json();
 
-    const analysisProgress = createAnalysisToastProgress((progress) => (
-      locale === 'zh' ? `正在理解录屏... ${progress}%` : `Understanding recording... ${progress}%`
-    ));
+    const analysisProgress = createAnalysisToastProgress(
+      locale === 'zh' ? '正在理解录屏...' : 'Understanding recording...'
+    );
     try {
       const job = await pollVideoJob(uploadResult.jobId, (value) => {
         analysisProgress.report(value.progress);
@@ -1240,9 +1240,9 @@ export const config: PlasmoCSConfig = {
     capturedBlob = null;
     currentAssetResult = null;
 
-    const analysisProgress = createAnalysisToastProgress((progress) => (
-      locale === 'zh' ? `正在分析... ${progress}%` : `Analyzing... ${progress}%`
-    ));
+    const analysisProgress = createAnalysisToastProgress(
+      locale === 'zh' ? '正在分析...' : 'Analyzing...'
+    );
 
     try {
       // Get image blob
@@ -1323,9 +1323,9 @@ export const config: PlasmoCSConfig = {
   }
 
   async function analyzeAssetImage(asset) {
-    const analysisProgress = createAnalysisToastProgress((progress) => (
-      locale === 'zh' ? `正在分析素材... ${progress}%` : `Analyzing asset... ${progress}%`
-    ));
+    const analysisProgress = createAnalysisToastProgress(
+      locale === 'zh' ? '正在分析素材...' : 'Analyzing asset...'
+    );
     try {
       capturedBlob = dataUrlToBlob(asset.dataUrl);
       const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
@@ -1373,9 +1373,9 @@ export const config: PlasmoCSConfig = {
       uploadResult = await res.json();
     }
 
-    const analysisProgress = createAnalysisToastProgress((progress) => (
-      locale === 'zh' ? `正在理解视频... ${progress}%` : `Understanding video... ${progress}%`
-    ));
+    const analysisProgress = createAnalysisToastProgress(
+      locale === 'zh' ? '正在理解视频...' : 'Understanding video...'
+    );
     try {
       const job = await pollVideoJob(uploadResult.jobId, (value) => {
         analysisProgress.report(value.progress);
@@ -1434,12 +1434,12 @@ export const config: PlasmoCSConfig = {
 
   // ---- Toast ----
 
-  function showToast(message, type = 'loading') {
+  function showToast(message, type = 'loading', progress = null) {
     // Clear any pending removal timer
     if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
 
     if (currentToast) {
-      syncToastElement(currentToast, message, type);
+      syncToastElement(currentToast, message, type, progress);
       currentToast.classList.add('inspoclip-toast-visible');
       return;
     }
@@ -1449,7 +1449,7 @@ export const config: PlasmoCSConfig = {
       <div class="inspoclip-toast-icon"></div>
       <span class="inspoclip-toast-text"></span>
     `;
-    syncToastElement(toast, message, type);
+    syncToastElement(toast, message, type, progress);
     container.appendChild(toast);
     currentToast = toast;
 

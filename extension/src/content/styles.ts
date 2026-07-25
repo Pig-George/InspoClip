@@ -65,24 +65,43 @@
     }
 
     .inspoclip-progress-ring {
-      position: relative;
       display: block;
       width: 18px;
       height: 18px;
       flex: 0 0 18px;
-      border-radius: 50%;
-      -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 5.75px, #000 6.25px);
-      mask: radial-gradient(circle at 50% 50%, transparent 0 5.75px, #000 6.25px);
+      overflow: visible;
+    }
+
+    .inspoclip-progress-ring-track,
+    .inspoclip-progress-ring-value {
+      fill: none;
+      stroke-width: 2.5;
+    }
+
+    .inspoclip-progress-ring-track {
+      stroke: #eadfd3;
+    }
+
+    .inspoclip-progress-ring-value {
+      stroke: #c0784a;
+      stroke-linecap: round;
+      stroke-dasharray: 100;
+      transition: stroke-dashoffset 0.38s cubic-bezier(0.22, 0.72, 0.24, 1);
+      transform: rotate(-90deg);
+      transform-origin: 10px 10px;
+    }
+
+    .inspoclip-progress-ring-determinate .inspoclip-progress-ring-value {
+      stroke-dasharray: 100;
     }
 
     .inspoclip-progress-ring-indeterminate {
-      background: conic-gradient(from 20deg, rgba(192, 120, 74, 0.08) 0deg, rgba(192, 120, 74, 0.35) 190deg, #c0784a 350deg, rgba(192, 120, 74, 0.08) 360deg);
-      animation: inspoclip-progress-ring-spin 0.9s linear infinite;
+      animation: inspoclip-progress-ring-spin 1s linear infinite;
     }
 
-    .inspoclip-progress-ring-determinate {
-      background: conic-gradient(#c0784a calc(var(--inspoclip-toast-progress) * 1%), #eadfd3 0);
-      transform: rotate(-90deg);
+    .inspoclip-progress-ring-indeterminate .inspoclip-progress-ring-value {
+      stroke-dasharray: 24 76;
+      stroke-dashoffset: 0;
     }
 
     @keyframes inspoclip-progress-ring-spin {
@@ -93,6 +112,14 @@
       .inspoclip-progress-ring-indeterminate {
         animation: none;
       }
+
+      .inspoclip-progress-ring-value {
+        transition-duration: 1ms;
+      }
+
+      .inspoclip-toast-text-char {
+        animation: none;
+      }
     }
 
     .inspoclip-toast-text {
@@ -100,6 +127,18 @@
       font-weight: 500;
       color: #4a3028;
       white-space: nowrap;
+    }
+
+    .inspoclip-toast-text-char {
+      display: inline-block;
+      animation: inspoclip-toast-char-jump 1.5s ease-in-out infinite;
+      animation-delay: calc(var(--inspoclip-toast-char-index) * 50ms);
+      transform-origin: center bottom;
+    }
+
+    @keyframes inspoclip-toast-char-jump {
+      0%, 18%, 100% { transform: translateY(0); }
+      9% { transform: translateY(-2.5px); }
     }
 
     /* Modal Overlay */

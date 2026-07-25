@@ -86,15 +86,15 @@ describe("content styles", () => {
 
   test("renders loading messages with circular progress rings", () => {
     const styles = getContentStyles()
-    const ringRule = styles.match(/\.inspoclip-progress-ring\s*\{([^}]*)\}/s)?.[1] || ""
 
     expect(styles).toContain(".inspoclip-progress-ring")
     expect(styles).toContain(".inspoclip-progress-ring-determinate")
-    expect(styles).toContain("conic-gradient")
-    expect(styles).toContain("--inspoclip-toast-progress")
-    expect(ringRule).toContain("radial-gradient")
-    expect(ringRule).toContain("-webkit-mask")
-    expect(styles).not.toContain(".inspoclip-progress-ring::after")
+    expect(styles).toContain(".inspoclip-progress-ring-track")
+    expect(styles).toContain(".inspoclip-progress-ring-value")
+    expect(styles).toMatch(/stroke-dashoffset\s+0\.38s/)
+    expect(styles).toContain("@keyframes inspoclip-toast-char-jump")
+    expect(styles).toContain("--inspoclip-toast-char-index")
+    expect(styles).not.toContain("conic-gradient")
     expect(styles).not.toContain(".inspoclip-spinner")
   })
 })
