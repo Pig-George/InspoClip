@@ -16,6 +16,7 @@ vi.mock('@/lib/api', async () => {
 
 describe('SettingsDialog', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     localStorage.setItem('inspoclip-locale', 'en');
     vi.mocked(fetchConfig).mockResolvedValue({
       AI_PROVIDER: 'gemini',
@@ -53,5 +54,90 @@ describe('SettingsDialog', () => {
 
     await waitFor(() => expect(fetchConfig).toHaveBeenCalled());
     expect(screen.getByText(`Version ${APP_VERSION}`)).toBeInTheDocument();
+  });
+
+  it('only saves image settings from the image tab and preserves the video key', async () => {
+    vi.mocked(fetchConfig).mockResolvedValue({
+      AI_PROVIDER: 'openai',
+      AI_API_KEY: 'img-************************************************-tail',
+      AI_API_BASE: 'https://images.example.test/v1',
+      AI_MODEL: 'image-model',
+      VIDEO_AI_API_KEY: 'vid-****************-tail',
+      VIDEO_AI_API_BASE: 'https://videos.example.test/v1',
+      VIDEO_AI_MODEL: 'video-model',
+      VIDEO_AI_FPS: '4',
+    });
+
+    render(
+      <LanguageProvider>
+        <SettingsDialog open onClose={() => undefined} />
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => expect(fetchConfig).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'new-image-key' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledWith({
+      AI_PROVIDER: 'openai',
+      AI_API_KEY: 'new-image-key',
+      AI_API_BASE: 'https://images.example.test/v1',
+      AI_MODEL: 'image-model',
+    }));
+  });
+
+  it('does not submit a masked image key when image settings are unchanged', async () => {
+    vi.mocked(fetchConfig).mockResolvedValue({
+      AI_PROVIDER: 'openai',
+      AI_API_KEY: 'sk-i****************************mage',
+      AI_API_BASE: 'https://images.example.test/v1',
+      AI_MODEL: 'image-model',
+    });
+
+    render(
+      <LanguageProvider>
+        <SettingsDialog open onClose={() => undefined} />
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => expect(fetchConfig).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledWith({
+      AI_PROVIDER: 'openai',
+      AI_API_BASE: 'https://images.example.test/v1',
+      AI_MODEL: 'image-model',
+    }));
+  });
+
+  it('only saves video settings from the video tab and preserves the image key', async () => {
+    vi.mocked(fetchConfig).mockResolvedValue({
+      AI_PROVIDER: 'openai',
+      AI_API_KEY: 'img-************************************************-tail',
+      AI_API_BASE: 'https://images.example.test/v1',
+      AI_MODEL: 'image-model',
+      VIDEO_AI_API_KEY: 'vid-****************-tail',
+      VIDEO_AI_API_BASE: 'https://videos.example.test/v1',
+      VIDEO_AI_MODEL: 'video-model',
+      VIDEO_AI_FPS: '4',
+    });
+
+    render(
+      <LanguageProvider>
+        <SettingsDialog open onClose={() => undefined} />
+      </LanguageProvider>,
+    );
+
+    await waitFor(() => expect(fetchConfig).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('tab', { name: 'Video understanding' }));
+    fireEvent.change(screen.getByLabelText('Video API key'), { target: { value: 'new-video-key' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledWith({
+      VIDEO_AI_API_KEY: 'new-video-key',
+      VIDEO_AI_API_BASE: 'https://videos.example.test/v1',
+      VIDEO_AI_MODEL: 'video-model',
+      VIDEO_AI_FPS: '4',
+    }));
   });
 });

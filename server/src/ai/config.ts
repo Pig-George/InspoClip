@@ -74,3 +74,7 @@ export function maskApiKey(apiKey: string): string {
   const visibleLength = 4;
   return `${apiKey.slice(0, visibleLength)}${'*'.repeat(apiKey.length - visibleLength * 2)}${apiKey.slice(-visibleLength)}`;
 }
+
+export function isMaskedApiKey(apiKey: string): boolean {
+  return /[*•]/.test(apiKey);
+}

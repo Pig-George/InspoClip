@@ -14,7 +14,7 @@ interface SettingsDialogProps {
 type SettingsTab = 'image' | 'video';
 
 function isMaskedKey(value: string | undefined): boolean {
-  return !!value && /^[*•]+$/.test(value);
+  return !!value && /[*•]/.test(value);
 }
 
 const inputClass = `w-full rounded-lg border border-[var(--card-border)] bg-[var(--muted)] px-3 py-2
@@ -42,15 +42,18 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     setMessage('');
     try {
       const updates: AIConfig = {};
-      if (config.AI_PROVIDER) updates.AI_PROVIDER = config.AI_PROVIDER;
-      if (config.AI_API_KEY && !isMaskedKey(config.AI_API_KEY)) updates.AI_API_KEY = config.AI_API_KEY;
-      if (config.AI_API_BASE) updates.AI_API_BASE = config.AI_API_BASE;
-      if (config.AI_MODEL) updates.AI_MODEL = config.AI_MODEL;
-      if (config.VIDEO_AI_PROVIDER) updates.VIDEO_AI_PROVIDER = config.VIDEO_AI_PROVIDER;
-      if (config.VIDEO_AI_API_KEY && !isMaskedKey(config.VIDEO_AI_API_KEY)) updates.VIDEO_AI_API_KEY = config.VIDEO_AI_API_KEY;
-      if (config.VIDEO_AI_API_BASE) updates.VIDEO_AI_API_BASE = config.VIDEO_AI_API_BASE;
-      if (config.VIDEO_AI_MODEL) updates.VIDEO_AI_MODEL = config.VIDEO_AI_MODEL;
-      if (config.VIDEO_AI_FPS && Number(config.VIDEO_AI_FPS) >= 1 && Number(config.VIDEO_AI_FPS) <= 5) updates.VIDEO_AI_FPS = config.VIDEO_AI_FPS;
+      if (activeTab === 'image') {
+        if (config.AI_PROVIDER) updates.AI_PROVIDER = config.AI_PROVIDER;
+        if (config.AI_API_KEY && !isMaskedKey(config.AI_API_KEY)) updates.AI_API_KEY = config.AI_API_KEY;
+        if (config.AI_API_BASE) updates.AI_API_BASE = config.AI_API_BASE;
+        if (config.AI_MODEL) updates.AI_MODEL = config.AI_MODEL;
+      } else {
+        if (config.VIDEO_AI_PROVIDER) updates.VIDEO_AI_PROVIDER = config.VIDEO_AI_PROVIDER;
+        if (config.VIDEO_AI_API_KEY && !isMaskedKey(config.VIDEO_AI_API_KEY)) updates.VIDEO_AI_API_KEY = config.VIDEO_AI_API_KEY;
+        if (config.VIDEO_AI_API_BASE) updates.VIDEO_AI_API_BASE = config.VIDEO_AI_API_BASE;
+        if (config.VIDEO_AI_MODEL) updates.VIDEO_AI_MODEL = config.VIDEO_AI_MODEL;
+        if (config.VIDEO_AI_FPS && Number(config.VIDEO_AI_FPS) >= 1 && Number(config.VIDEO_AI_FPS) <= 5) updates.VIDEO_AI_FPS = config.VIDEO_AI_FPS;
+      }
       await updateConfig(updates);
       setMessage(t('Saved'));
     } catch {
@@ -159,7 +162,9 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     </label>
                     <input
                       id="image-ai-key"
+                      name="image-ai-api-key"
                       type="password"
+                      autoComplete="off"
                       value={config.AI_API_KEY || ''}
                       onChange={(e) => setConfig({ ...config, AI_API_KEY: e.target.value })}
                       placeholder={config.AI_PROVIDER === 'gemini' ? 'AIza...' : 'sk-...'}
@@ -260,7 +265,9 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     </label>
                     <input
                       id="video-ai-key"
+                      name="video-ai-api-key"
                       type="password"
+                      autoComplete="off"
                       value={config.VIDEO_AI_API_KEY || ''}
                       onChange={(e) => setConfig({ ...config, VIDEO_AI_API_KEY: e.target.value })}
                       placeholder="sk-..."

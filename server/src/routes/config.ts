@@ -2,7 +2,7 @@ import { Router, Request, Response, type Router as ExpressRouter } from 'express
 import { db } from '../db/index.js';
 import { config as configTable } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
-import { maskApiKey } from '../ai/config.js';
+import { isMaskedApiKey, maskApiKey } from '../ai/config.js';
 
 const router: ExpressRouter = Router();
 
@@ -31,6 +31,7 @@ router.patch('/', async (req: Request, res: Response) => {
     for (const [key, value] of Object.entries(updates)) {
       if (!['AI_PROVIDER', 'AI_API_KEY', 'AI_API_BASE', 'AI_MODEL', 'VIDEO_AI_PROVIDER', 'VIDEO_AI_API_KEY', 'VIDEO_AI_API_BASE', 'VIDEO_AI_MODEL', 'VIDEO_AI_FPS'].includes(key)) continue;
       if (typeof value !== 'string') continue;
+      if ((key === 'AI_API_KEY' || key === 'VIDEO_AI_API_KEY') && isMaskedApiKey(value)) continue;
       const [existing] = await db.select().from(configTable).where(eq(configTable.key, key)).limit(1);
       if (existing) {
         await db.update(configTable).set({ value }).where(eq(configTable.key, key));

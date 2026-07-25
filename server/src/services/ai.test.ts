@@ -63,6 +63,24 @@ describe('legacy AI facade wiring', () => {
       .toBe('https://api.anthropic.com/v1');
   });
 
+  it('uses only image settings and ignores all VIDEO_AI settings', () => {
+    expect(resolveLegacyAiConfig({
+      AI_PROVIDER: 'openai',
+      AI_API_KEY: 'image-key',
+      AI_API_BASE: 'https://images.example.test/v1',
+      AI_MODEL: 'image-model',
+      VIDEO_AI_PROVIDER: 'openai-compatible',
+      VIDEO_AI_API_KEY: 'video-key',
+      VIDEO_AI_API_BASE: 'https://videos.example.test/v1',
+      VIDEO_AI_MODEL: 'video-model',
+    }, {})).toEqual({
+      provider: 'openai',
+      apiKey: 'image-key',
+      baseURL: 'https://images.example.test/v1',
+      model: 'image-model',
+    });
+  });
+
   it('allows module import without a key but fails when constructing a real provider', async () => {
     await expect(import('./ai.js')).resolves.toBeDefined();
     const config = resolveLegacyAiConfig({}, {});

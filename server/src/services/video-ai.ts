@@ -7,12 +7,19 @@ import { AiService } from '../ai/service.js';
 export async function getVideoModelConfig(): Promise<ModelConfig> {
   const rows = await db.select().from(configTable);
   const values = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+  return resolveVideoModelConfig(values, process.env);
+}
+
+export function resolveVideoModelConfig(
+  values: Record<string, string | undefined>,
+  env: Record<string, string | undefined>,
+): ModelConfig {
   return loadModelConfig({
-    AI_PROVIDER: values.VIDEO_AI_PROVIDER || process.env.VIDEO_AI_PROVIDER,
-    AI_API_KEY: values.VIDEO_AI_API_KEY || process.env.VIDEO_AI_API_KEY,
-    AI_API_BASE: values.VIDEO_AI_API_BASE || process.env.VIDEO_AI_API_BASE,
-    AI_MODEL: values.VIDEO_AI_MODEL || process.env.VIDEO_AI_MODEL,
-    AI_VIDEO_FPS: values.VIDEO_AI_FPS || process.env.VIDEO_AI_FPS,
+    AI_PROVIDER: values.VIDEO_AI_PROVIDER || env.VIDEO_AI_PROVIDER,
+    AI_API_KEY: values.VIDEO_AI_API_KEY || env.VIDEO_AI_API_KEY,
+    AI_API_BASE: values.VIDEO_AI_API_BASE || env.VIDEO_AI_API_BASE,
+    AI_MODEL: values.VIDEO_AI_MODEL || env.VIDEO_AI_MODEL,
+    AI_VIDEO_FPS: values.VIDEO_AI_FPS || env.VIDEO_AI_FPS,
   });
 }
 

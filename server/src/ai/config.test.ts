@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { loadModelConfig, maskApiKey, validateModelConfig } from './config.js';
+import {
+  isMaskedApiKey,
+  loadModelConfig,
+  maskApiKey,
+  validateModelConfig,
+} from './config.js';
 import {
   createPurposeTransformationPrompt,
   DESIGN_ANALYSIS_PROMPT,
@@ -96,6 +101,23 @@ describe('maskApiKey', () => {
   it('only reveals a small prefix and suffix of a normal key', () => {
     expect(maskApiKey('sk-1234567890abcdef')).toBe('sk-1***********cdef');
   });
+});
+
+describe('isMaskedApiKey', () => {
+  it.each([
+    '***',
+    'sk-i****************************mage',
+    'sk-i••••••••••••••••••••••••••••mage',
+  ])('recognizes a masked key %s', (value) => {
+    expect(isMaskedApiKey(value)).toBe(true);
+  });
+
+  it.each(['', 'sk-image-key', 'AIza-real-key'])(
+    'does not treat a real key as masked: %s',
+    (value) => {
+      expect(isMaskedApiKey(value)).toBe(false);
+    },
+  );
 });
 
 describe('video prompts', () => {
