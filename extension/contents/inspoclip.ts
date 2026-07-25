@@ -655,7 +655,7 @@ export const config: PlasmoCSConfig = {
       toolbar.classList.add('inspoclip-area-toolbar-recording');
       toolbar.innerHTML = `
         <span class="inspoclip-area-record-time"><span class="inspoclip-area-record-dot"></span><span data-record-time>00:00</span></span>
-        <span class="inspoclip-area-icon-status ${includeTabAudio ? 'inspoclip-area-icon-button-active' : ''}" aria-label="${getAreaToolbarActionLabel(includeTabAudio ? 'sound-on' : 'sound-off', getAreaToolbarLocale())}">${getAreaToolbarActionIcon(includeTabAudio ? 'sound-on' : 'sound-off')}</span>
+        <button type="button" class="inspoclip-area-icon-status inspoclip-area-icon-status-disabled ${includeTabAudio ? 'inspoclip-area-icon-button-active' : ''}" aria-label="${getAreaToolbarActionLabel(includeTabAudio ? 'sound-on' : 'sound-off', getAreaToolbarLocale())}" aria-pressed="${includeTabAudio}" disabled>${getAreaToolbarActionIcon(includeTabAudio ? 'sound-on' : 'sound-off')}</button>
         <span class="inspoclip-area-toolbar-separator" aria-hidden="true"></span>
         ${renderAreaToolbarIconButton('pause', 'pause')}
         ${renderAreaToolbarIconButton('retake', 'retake')}

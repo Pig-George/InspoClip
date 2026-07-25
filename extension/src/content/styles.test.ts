@@ -62,4 +62,14 @@ describe("content styles", () => {
     expect(pausedDotRule).toMatch(/background:\s*#9b938d;/)
     expect(pausedDotRule).toMatch(/animation:\s*none;/)
   })
+
+  test("renders the recording audio status as visibly disabled", () => {
+    const styles = getContentStyles()
+    const disabledRule = styles.match(/\.inspoclip-area-icon-status-disabled\s*\{([^}]*)\}/s)?.[1] || ""
+
+    expect(disabledRule).toMatch(/background:\s*#f0ece8;/)
+    expect(disabledRule).toMatch(/color:\s*#9b938d;/)
+    expect(disabledRule).toMatch(/cursor:\s*not-allowed;/)
+    expect(disabledRule).toMatch(/opacity:\s*0\.72;/)
+  })
 })

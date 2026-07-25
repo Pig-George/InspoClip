@@ -856,6 +856,15 @@
       box-shadow: inset 0 0 0 1px rgba(192, 120, 74, 0.24);
     }
 
+    .inspoclip-area-icon-status-disabled {
+      background: #f0ece8;
+      color: #9b938d;
+      box-shadow: inset 0 0 0 1px rgba(155, 147, 141, 0.2);
+      opacity: 0.72;
+      cursor: not-allowed;
+      filter: saturate(0.45);
+    }
+
     .inspoclip-area-delay-button {
       overflow: visible;
     }
