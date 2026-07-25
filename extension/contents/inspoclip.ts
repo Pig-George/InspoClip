@@ -16,6 +16,7 @@ import {
   getAreaToolbarActionIcon,
   getAreaToolbarActionLabel,
   getAreaToolbarActionShortLabel,
+  getAreaToolbarButtonEntranceDelay,
   getNextAreaRecordingDelay,
   moveAreaRect,
   normalizeAreaRecordingDelay,
@@ -355,6 +356,27 @@ export const config: PlasmoCSConfig = {
     button.classList.add('inspoclip-area-icon-swap');
   }
 
+  function playAreaToolbarButtonEntrance(toolbar) {
+    toolbar.querySelectorAll('button').forEach((button, index) => {
+      const delay = getAreaToolbarButtonEntranceDelay(index);
+      button.style.setProperty('--inspoclip-area-control-enter-delay', `${delay}ms`);
+      button.classList.add('inspoclip-area-control-enter');
+
+      const cleanup = () => {
+        button.classList.remove('inspoclip-area-control-enter');
+        button.style.removeProperty('--inspoclip-area-control-enter-delay');
+        button.removeEventListener('animationend', handleAnimationEnd);
+      };
+      const handleAnimationEnd = (event) => {
+        if (event.target !== button || event.animationName !== 'inspoclip-area-control-enter') return;
+        cleanup();
+      };
+
+      button.addEventListener('animationend', handleAnimationEnd);
+      window.setTimeout(cleanup, delay + 500);
+    });
+  }
+
   function renderAreaRecordingDelayButton(delaySeconds) {
     const label = getAreaRecordingDelayLabel(delaySeconds, getAreaToolbarLocale());
     const shortLabel = getAreaToolbarActionShortLabel('delay', getAreaToolbarLocale());
@@ -515,6 +537,7 @@ export const config: PlasmoCSConfig = {
       removeAreaOverlay();
     });
     overlay.appendChild(toolbar);
+    playAreaToolbarButtonEntrance(toolbar);
   }
 
   function positionAreaToolbar(toolbar, rect) {
@@ -669,6 +692,7 @@ export const config: PlasmoCSConfig = {
         )).join('')}
       `;
       renderAreaToolbarIcons(toolbar);
+      playAreaToolbarButtonEntrance(toolbar);
       toolbar.style.animation = 'none';
       void toolbar.offsetWidth;
       toolbar.style.animation = '';

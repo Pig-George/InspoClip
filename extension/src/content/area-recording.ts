@@ -60,9 +60,15 @@ const AREA_TOOLBAR_SHORT_LABELS: Record<AreaToolbarAction, Record<AreaToolbarLoc
 }
 
 const AREA_RECORDING_CONTROL_ACTIONS = ["pause", "retake", "finish", "cancel"] as const
+const AREA_TOOLBAR_BUTTON_ENTRANCE_STAGGER_MS = 55
 
 export function getAreaRecordingControlActions(): Array<typeof AREA_RECORDING_CONTROL_ACTIONS[number]> {
   return [...AREA_RECORDING_CONTROL_ACTIONS]
+}
+
+export function getAreaToolbarButtonEntranceDelay(index: number): number {
+  const normalizedIndex = Number.isFinite(index) ? Math.max(0, Math.floor(index)) : 0
+  return normalizedIndex * AREA_TOOLBAR_BUTTON_ENTRANCE_STAGGER_MS
 }
 
 export function getAreaToolbarActionLabel(action: AreaToolbarAction, locale: AreaToolbarLocale): string {

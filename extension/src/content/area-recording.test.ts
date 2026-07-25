@@ -13,6 +13,7 @@ import {
   getAreaRecordingSourceRect,
   getAreaCaptureToolbarPosition,
   getAreaRecordingControlActions,
+  getAreaToolbarButtonEntranceDelay,
   getAreaToolbarActionIcon,
   getAreaToolbarActionLabel,
   getAreaToolbarActionShortLabel,
@@ -29,6 +30,10 @@ import {
 describe("area recording helpers", () => {
   test("includes cancel in the active recording controls", () => {
     expect(getAreaRecordingControlActions()).toEqual(["pause", "retake", "finish", "cancel"])
+  })
+
+  test("staggers toolbar button entrances from left to right", () => {
+    expect([0, 1, 2, 3, 4].map(getAreaToolbarButtonEntranceDelay)).toEqual([0, 55, 110, 165, 220])
   })
 
   test("localizes every area toolbar action", () => {

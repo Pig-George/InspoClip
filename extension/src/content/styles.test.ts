@@ -72,4 +72,15 @@ describe("content styles", () => {
     expect(disabledRule).toMatch(/cursor:\s*not-allowed;/)
     expect(disabledRule).toMatch(/opacity:\s*0\.72;/)
   })
+
+  test("scales toolbar buttons in with a staggered entrance animation", () => {
+    const styles = getContentStyles()
+    const entranceRule = styles.match(/\.inspoclip-area-control-enter\s*\{([^}]*)\}/s)?.[1] || ""
+
+    expect(entranceRule).toContain("inspoclip-area-control-enter")
+    expect(entranceRule).toContain("var(--inspoclip-area-control-enter-delay, 0ms)")
+    expect(styles).toContain("@keyframes inspoclip-area-control-enter")
+    expect(styles).toMatch(/from\s*\{[^}]*scale\(0\.64\)/s)
+    expect(styles).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*animation-delay:\s*0ms !important;/)
+  })
 })

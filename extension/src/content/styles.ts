@@ -762,6 +762,11 @@
       cursor: pointer;
     }
 
+    .inspoclip-area-control-enter {
+      transform-origin: center;
+      animation: inspoclip-area-control-enter 0.36s cubic-bezier(0.2, 0.86, 0.28, 1.24) var(--inspoclip-area-control-enter-delay, 0ms) backwards;
+    }
+
     .inspoclip-area-button-icon {
       display: grid;
       place-items: center;
@@ -997,6 +1002,12 @@
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
 
+    @keyframes inspoclip-area-control-enter {
+      from { opacity: 0; transform: translateX(-5px) scale(0.64); }
+      68% { opacity: 1; transform: translateX(0) scale(1.08); }
+      to { opacity: 1; transform: translateX(0) scale(1); }
+    }
+
     @keyframes inspoclip-area-sound-pop {
       0% { transform: scale(0.82); }
       65% { transform: scale(1.08); }
@@ -1051,6 +1062,7 @@
       .inspoclip-area-toolbar *::before,
       .inspoclip-area-toolbar *::after {
         animation-duration: 1ms !important;
+        animation-delay: 0ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 1ms !important;
       }
