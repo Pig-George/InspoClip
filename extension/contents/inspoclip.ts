@@ -2,6 +2,11 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 import {
+  getAnalysisCompletionSteps,
+  getNextAnalysisProgress,
+  normalizeAnalysisProgress
+} from "../src/content/analysis-progress"
+import {
   DEFAULT_AREA_RECORDING_AUDIO_ENABLED,
   DEFAULT_AREA_RECORDING_DELAY_SECONDS,
   createAreaRecordingStartMessage,
@@ -569,6 +574,7 @@ export const config: PlasmoCSConfig = {
   }
 
   async function processAreaScreenshot(mode, rect, overlay) {
+    let analysisProgress = null;
     try {
       // Hide overlay before capturing to avoid capturing the UI
       overlay.style.display = 'none';
@@ -589,7 +595,9 @@ export const config: PlasmoCSConfig = {
       // Process based on mode
       if (mode === 'analyze') {
         // Run analysis on the cropped image
-        showToast(locale === 'zh' ? '正在分析选区...' : 'Analyzing selection...', 'loading');
+        analysisProgress = createAnalysisToastProgress((progress) => (
+          locale === 'zh' ? `正在分析选区... ${progress}%` : `Analyzing selection... ${progress}%`
+        ));
 
         const ext = croppedBlob.type === 'image/png' ? '.png' : '.jpg';
         const formData = new FormData();
@@ -615,6 +623,7 @@ export const config: PlasmoCSConfig = {
         analyzedData = data;
         pushImageHistory(data, lastPreviewUrl, croppedBlob);
 
+        await analysisProgress.complete();
         transitionToModal(data, lastPreviewUrl);
       } else {
         // Save mode — check similarity then upload
@@ -622,6 +631,7 @@ export const config: PlasmoCSConfig = {
         await doUpload(croppedBlob);
       }
     } catch (err) {
+      analysisProgress?.cancel();
       removeAreaOverlay();
       if (isExtensionContextInvalidatedError(err)) {
         showExtensionContextRecovery();
@@ -930,6 +940,45 @@ export const config: PlasmoCSConfig = {
     setTimeout(removeToast, 5000);
   }
 
+  function createAnalysisToastProgress(formatMessage) {
+    let progress = 4;
+    let completed = false;
+    let cancelled = false;
+
+    const publish = () => showToast(formatMessage(progress), 'loading');
+    const advance = () => {
+      const nextProgress = getNextAnalysisProgress(progress);
+      if (nextProgress === progress) return;
+      progress = nextProgress;
+      publish();
+    };
+    const timerId = window.setInterval(advance, 450);
+    publish();
+
+    return {
+      report(value) {
+        if (completed || cancelled) return;
+        if (normalizeAnalysisProgress(value) > progress) advance();
+      },
+      async complete() {
+        if (completed || cancelled) return;
+        completed = true;
+        window.clearInterval(timerId);
+
+        for (const step of getAnalysisCompletionSteps(progress)) {
+          if (cancelled) return;
+          progress = step;
+          publish();
+          await new Promise((resolve) => window.setTimeout(resolve, 140));
+        }
+      },
+      cancel() {
+        cancelled = true;
+        window.clearInterval(timerId);
+      }
+    };
+  }
+
   async function analyzeRecordedAreaVideo(videoBlob, durationMs) {
     showToast(locale === 'zh' ? '正在上传录屏...' : 'Uploading recording...', 'loading');
     const formData = new FormData();
@@ -943,18 +992,24 @@ export const config: PlasmoCSConfig = {
     if (!uploadRes.ok) throw new Error(await readableError(uploadRes, 'Video upload failed'));
     const uploadResult = await uploadRes.json();
 
-    showToast(locale === 'zh' ? '正在理解录屏... 0%' : 'Understanding recording... 0%', 'loading');
-    const job = await pollVideoJob(uploadResult.jobId, (value) => {
-      const progress = value.progress || 0;
-      showToast(locale === 'zh' ? `正在理解录屏... ${progress}%` : `Understanding recording... ${progress}%`, 'loading');
-    });
-    if (job.status === 'failed') throw new Error(job.errorMessage || 'Video analysis failed');
+    const analysisProgress = createAnalysisToastProgress((progress) => (
+      locale === 'zh' ? `正在理解录屏... ${progress}%` : `Understanding recording... ${progress}%`
+    ));
+    try {
+      const job = await pollVideoJob(uploadResult.jobId, (value) => {
+        analysisProgress.report(value.progress);
+      });
+      if (job.status === 'failed') throw new Error(job.errorMessage || 'Video analysis failed');
 
-    const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
-    if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
-    const detail = await detailRes.json();
-    pushVideoHistory(detail);
-    transitionToVideoModal(detail, window.innerWidth - 20, 20);
+      const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
+      if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
+      const detail = await detailRes.json();
+      await analysisProgress.complete();
+      pushVideoHistory(detail);
+      transitionToVideoModal(detail, window.innerWidth - 20, 20);
+    } finally {
+      analysisProgress.cancel();
+    }
   }
 
   function removeAreaOverlay() {
@@ -1185,8 +1240,9 @@ export const config: PlasmoCSConfig = {
     capturedBlob = null;
     currentAssetResult = null;
 
-    // Phase 1: Show toast
-    showToast(locale === 'zh' ? '正在分析...' : 'Analyzing...');
+    const analysisProgress = createAnalysisToastProgress((progress) => (
+      locale === 'zh' ? `正在分析... ${progress}%` : `Analyzing... ${progress}%`
+    ));
 
     try {
       // Get image blob
@@ -1233,8 +1289,10 @@ export const config: PlasmoCSConfig = {
       // Phase 2: Save to history and transition toast → modal
       lastPreviewUrl = imageUrl ? URL.createObjectURL(capturedBlob) : null;
       pushImageHistory(analyzedData, lastPreviewUrl, capturedBlob);
+      await analysisProgress.complete();
       transitionToModal(analyzedData, lastPreviewUrl);
     } catch (err) {
+      analysisProgress.cancel();
       showToast(locale === 'zh' ? `分析失败: ${err.message}` : `Analysis failed: ${err.message}`, 'error');
       setTimeout(() => removeToast(), 3000);
     }
@@ -1265,32 +1323,38 @@ export const config: PlasmoCSConfig = {
   }
 
   async function analyzeAssetImage(asset) {
-    showToast(locale === 'zh' ? '正在分析素材...' : 'Analyzing asset...');
-
-    capturedBlob = dataUrlToBlob(asset.dataUrl);
-    const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
-    const formData = new FormData();
-    formData.append('image', capturedBlob, asset.fileName || 'asset' + ext);
-
-    const res = await fetch(`${serverUrl}/api/images/analyze`, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error(await readableError(res, 'Analysis failed'));
-    analyzedData = await res.json();
-
+    const analysisProgress = createAnalysisToastProgress((progress) => (
+      locale === 'zh' ? `正在分析素材... ${progress}%` : `Analyzing asset... ${progress}%`
+    ));
     try {
-      const simForm = new FormData();
-      simForm.append('image', capturedBlob, 'check' + ext);
-      const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, { method: 'POST', body: simForm });
-      if (simRes.ok) {
-        const simData = await simRes.json();
-        analyzedData.similarImages = simData.similar || [];
-      }
-    } catch {
-      analyzedData.similarImages = [];
-    }
+      capturedBlob = dataUrlToBlob(asset.dataUrl);
+      const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
+      const formData = new FormData();
+      formData.append('image', capturedBlob, asset.fileName || 'asset' + ext);
 
-    lastPreviewUrl = URL.createObjectURL(capturedBlob);
-    pushImageHistory(analyzedData, lastPreviewUrl, capturedBlob);
-    transitionToModal(analyzedData, lastPreviewUrl);
+      const res = await fetch(`${serverUrl}/api/images/analyze`, { method: 'POST', body: formData });
+      if (!res.ok) throw new Error(await readableError(res, 'Analysis failed'));
+      analyzedData = await res.json();
+
+      try {
+        const simForm = new FormData();
+        simForm.append('image', capturedBlob, 'check' + ext);
+        const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, { method: 'POST', body: simForm });
+        if (simRes.ok) {
+          const simData = await simRes.json();
+          analyzedData.similarImages = simData.similar || [];
+        }
+      } catch {
+        analyzedData.similarImages = [];
+      }
+
+      lastPreviewUrl = URL.createObjectURL(capturedBlob);
+      pushImageHistory(analyzedData, lastPreviewUrl, capturedBlob);
+      await analysisProgress.complete();
+      transitionToModal(analyzedData, lastPreviewUrl);
+    } finally {
+      analysisProgress.cancel();
+    }
   }
 
   async function analyzeAssetVideo(asset) {
@@ -1309,18 +1373,24 @@ export const config: PlasmoCSConfig = {
       uploadResult = await res.json();
     }
 
-    showToast(locale === 'zh' ? '正在理解视频... 0%' : 'Understanding video... 0%');
-    const job = await pollVideoJob(uploadResult.jobId, (value) => {
-      const progress = value.progress || 0;
-      showToast(locale === 'zh' ? `正在理解视频... ${progress}%` : `Understanding video... ${progress}%`);
-    });
-    if (job.status === 'failed') throw new Error(job.errorMessage || 'Video analysis failed');
+    const analysisProgress = createAnalysisToastProgress((progress) => (
+      locale === 'zh' ? `正在理解视频... ${progress}%` : `Understanding video... ${progress}%`
+    ));
+    try {
+      const job = await pollVideoJob(uploadResult.jobId, (value) => {
+        analysisProgress.report(value.progress);
+      });
+      if (job.status === 'failed') throw new Error(job.errorMessage || 'Video analysis failed');
 
-    const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
-    if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
-    const detail = await detailRes.json();
-    pushVideoHistory(detail);
-    transitionToVideoModal(detail, window.innerWidth - 20, 20);
+      const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
+      if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
+      const detail = await detailRes.json();
+      await analysisProgress.complete();
+      pushVideoHistory(detail);
+      transitionToVideoModal(detail, window.innerWidth - 20, 20);
+    } finally {
+      analysisProgress.cancel();
+    }
   }
 
   async function uploadVideoUrlFromBackground(videoUrl) {
