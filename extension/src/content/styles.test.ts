@@ -46,4 +46,20 @@ describe("content styles", () => {
     expect(styles).toContain('@keyframes inspoclip-retake-turn')
     expect(styles).toContain('@media (prefers-reduced-motion: reduce)')
   })
+
+  test("uses red foreground for the retake confirmation state", () => {
+    const styles = getContentStyles()
+    const confirmRule = styles.match(/\.inspoclip-area-action-confirm\s*\{([^}]*)\}/s)?.[1] || ""
+
+    expect(confirmRule).toMatch(/color:\s*#c43d32;/)
+    expect(confirmRule).not.toMatch(/color:\s*#fff;/)
+  })
+
+  test("turns the recording indicator gray and stops breathing while paused", () => {
+    const styles = getContentStyles()
+    const pausedDotRule = styles.match(/\.inspoclip-area-overlay-paused\s+\.inspoclip-area-record-dot\s*\{([^}]*)\}/s)?.[1] || ""
+
+    expect(pausedDotRule).toMatch(/background:\s*#9b938d;/)
+    expect(pausedDotRule).toMatch(/animation:\s*none;/)
+  })
 })

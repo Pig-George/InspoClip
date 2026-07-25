@@ -931,12 +931,26 @@
       box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.13);
       animation: inspoclip-record-breathe 1.4s ease-in-out infinite;
       flex-shrink: 0;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .inspoclip-area-overlay-paused .inspoclip-area-record-dot {
+      background: #9b938d;
+      box-shadow: 0 0 0 3px rgba(155, 147, 141, 0.14);
+      animation: none;
     }
 
     .inspoclip-area-action-confirm {
-      background: #d75b4a;
-      color: #fff;
+      background: #fbe7e3;
+      color: #c43d32;
+      box-shadow: inset 0 0 0 1px rgba(196, 61, 50, 0.18);
       animation: inspoclip-retake-confirm 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    }
+
+    .inspoclip-area-action-confirm:hover,
+    .inspoclip-area-action-confirm:focus-visible {
+      background: #f8d8d2;
+      color: #b83229;
     }
 
     .inspoclip-area-action-processing[data-action="retake"] svg {
