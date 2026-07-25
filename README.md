@@ -16,6 +16,7 @@
 **把截图丢进去，AI 帮你整理。** 粘贴一张设计截图，AI 会自动分析出这张图的设计关键词（比如「极简风格」「卡片布局」「大地色系」），帮你建立可搜索的灵感库。下次做设计时，搜一下就能找到之前收藏的相关灵感。
 
 **它能帮你做什么：**
+
 - 📋 **收集** — 粘贴/拖放截图，AI 自动生成设计术语标签
 - 🔍 **搜索** — 按关键词找灵感，比如搜「极简」找到所有相关设计
 - 🎨 **提取配色** — 自动提取图片主色，一键复制色值
@@ -68,27 +69,23 @@
 ## 页面展示
 
 - 主页：![主页](docs/images/home.png)
-
-- 图片详情：![详情](docs/images/detail.png)
-
+- 图片详情：![详情](docs/images/detail-i.png)
+- 视频详情：![详情](docs/images/detail-v.png)
 - 周视图：![周视图](docs/images/week.png)
-
 - 时间轴视图：![时间轴](docs/images/timeline.png)
-
 - 插件演示：![插件演示](docs/images/extension-demo.gif)
-
 - 自定义选区：![自定义选区](docs/images/extension-area.gif)
 
 ## 技术栈
 
-| 层级 | 技术 |
-|------|------|
-| 前端 | React 18, TypeScript, Vite, Tailwind CSS, Framer Motion, @dnd-kit |
-| 后端 | Node.js, Express, TypeScript, Drizzle ORM, Sharp |
-| 数据库 | PostgreSQL 16 |
-| AI | OpenAI SDK (多模型), Sharp (图片处理/色提取/pHash) |
-| 部署 | Docker Compose, Nginx |
-| 扩展 | Chrome Extension Manifest V3 |
+| 层级  | 技术                                                                |
+| --- | ----------------------------------------------------------------- |
+| 前端  | React 18, TypeScript, Vite, Tailwind CSS, Framer Motion, @dnd-kit |
+| 后端  | Node.js, Express, TypeScript, Drizzle ORM, Sharp, LangChain       |
+| 数据库 | PostgreSQL 16                                                     |
+| AI  | OpenAI SDK (多模型), Sharp (图片处理/色提取/pHash)                          |
+| 部署  | Docker Compose, Nginx                                             |
+| 扩展  | Chrome Extension Manifest V3                                      |
 
 ## 快速开始
 
@@ -111,7 +108,7 @@ pnpm install
 pnpm dev
 ```
 
-访问 http://localhost:5173
+访问 <http://localhost:5173>
 
 ### Docker 一键部署
 
@@ -122,7 +119,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-访问 http://localhost:8080
+访问 <http://localhost:8080>
 
 ### 浏览器扩展安装
 
@@ -133,17 +130,17 @@ docker compose up -d --build
 
 ## 环境变量
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `AI_PROVIDER` | 模型服务商 | `openai` |
-| `AI_API_KEY` | API 密钥 | `sk-placeholder` |
-| `AI_API_BASE` | API 地址 | `https://api.openai.com/v1` |
-| `AI_MODEL` | 模型名称 | `gpt-5.4` |
-| `MODEL_VIDEO_PUBLIC_BASE_URL` | 云端视频模型实际访问的视频公网地址；用于 `/api/model-videos/:id/content` 临时授权链接 | `PUBLIC_BASE_URL` |
-| `MODEL_VIDEO_VERIFY_BASE_URL` | 可选：视频公网地址预检覆盖值；默认留空并跟随 `MODEL_VIDEO_PUBLIC_BASE_URL`，避免只验证内网代理 | 空 |
-| `TUNNEL_MANAGER_URL` | Docker 内部 tunnel-manager 地址；视频分析预检失败时会调用它刷新 trycloudflare 公网地址 | `http://tunnel-manager:3002` |
-| `TUNNEL_TARGET_URL` | cloudflared 暴露到公网的容器内目标地址 | `http://client:80` |
-| `PORT` | 前端端口 | `8080` |
+| 变量                            | 说明                                                             | 默认值                          |
+| ----------------------------- | -------------------------------------------------------------- | ---------------------------- |
+| `AI_PROVIDER`                 | 模型服务商                                                          | `openai`                     |
+| `AI_API_KEY`                  | API 密钥                                                         | `sk-placeholder`             |
+| `AI_API_BASE`                 | API 地址                                                         | `https://api.openai.com/v1`  |
+| `AI_MODEL`                    | 模型名称                                                           | `gpt-5.4`                    |
+| `MODEL_VIDEO_PUBLIC_BASE_URL` | 云端视频模型实际访问的视频公网地址；用于 `/api/model-videos/:id/content` 临时授权链接    | `PUBLIC_BASE_URL`            |
+| `MODEL_VIDEO_VERIFY_BASE_URL` | 可选：视频公网地址预检覆盖值；默认留空并跟随 `MODEL_VIDEO_PUBLIC_BASE_URL`，避免只验证内网代理 | 空                            |
+| `TUNNEL_MANAGER_URL`          | Docker 内部 tunnel-manager 地址；视频分析预检失败时会调用它刷新 trycloudflare 公网地址 | `http://tunnel-manager:3002` |
+| `TUNNEL_TARGET_URL`           | cloudflared 暴露到公网的容器内目标地址                                      | `http://client:80`           |
+| `PORT`                        | 前端端口                                                           | `8080`                       |
 
 ## 项目结构
 
@@ -206,29 +203,29 @@ InspoClip/
 
 ## API 接口
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` | `/api/weeks/:date` | 获取指定日期所在周的数据 |
-| `GET` | `/api/weeks/month/:YYYY-MM` | 获取月度时间轴数据 |
-| `POST` | `/api/images` | 上传图片 (multipart) |
-| `POST` | `/api/images/analyze` | 分析图片 (不保存) |
-| `POST` | `/api/images/check-similarity` | 检查相似图片 |
-| `POST` | `/api/images/:id/prompt` | 生成/获取 AI Prompt |
-| `POST` | `/api/images/:id/critique` | 生成/获取 AI 点评 |
-| `PATCH` | `/api/images/reorder` | 更新图片排序 |
-| `DELETE` | `/api/images/:id` | 删除图片及术语 |
-| `DELETE` | `/api/terms/:id` | 删除单个术语 |
-| `PATCH` | `/api/weeks/:id/notes` | 保存笔记 |
-| `GET` | `/api/tags` | 获取所有标签 |
-| `POST` | `/api/tags` | 创建标签 |
-| `DELETE` | `/api/tags/:id` | 删除标签 |
-| `POST` | `/api/tags/image/:id` | 给图片添加标签 |
-| `DELETE` | `/api/tags/image/:id/:tagId` | 移除图片标签 |
-| `GET` | `/api/search?q=keyword` | 搜索术语 |
-| `GET` | `/api/export/week/:date?format=` | 导出 (zip/markdown/json) |
-| `GET` | `/api/config` | 获取 AI 配置 |
-| `PATCH` | `/api/config` | 更新 AI 配置 |
-| `GET` | `/api/health` | 健康检查 |
+| 方法       | 路径                               | 说明                     |
+| -------- | -------------------------------- | ---------------------- |
+| `GET`    | `/api/weeks/:date`               | 获取指定日期所在周的数据           |
+| `GET`    | `/api/weeks/month/:YYYY-MM`      | 获取月度时间轴数据              |
+| `POST`   | `/api/images`                    | 上传图片 (multipart)       |
+| `POST`   | `/api/images/analyze`            | 分析图片 (不保存)             |
+| `POST`   | `/api/images/check-similarity`   | 检查相似图片                 |
+| `POST`   | `/api/images/:id/prompt`         | 生成/获取 AI Prompt        |
+| `POST`   | `/api/images/:id/critique`       | 生成/获取 AI 点评            |
+| `PATCH`  | `/api/images/reorder`            | 更新图片排序                 |
+| `DELETE` | `/api/images/:id`                | 删除图片及术语                |
+| `DELETE` | `/api/terms/:id`                 | 删除单个术语                 |
+| `PATCH`  | `/api/weeks/:id/notes`           | 保存笔记                   |
+| `GET`    | `/api/tags`                      | 获取所有标签                 |
+| `POST`   | `/api/tags`                      | 创建标签                   |
+| `DELETE` | `/api/tags/:id`                  | 删除标签                   |
+| `POST`   | `/api/tags/image/:id`            | 给图片添加标签                |
+| `DELETE` | `/api/tags/image/:id/:tagId`     | 移除图片标签                 |
+| `GET`    | `/api/search?q=keyword`          | 搜索术语                   |
+| `GET`    | `/api/export/week/:date?format=` | 导出 (zip/markdown/json) |
+| `GET`    | `/api/config`                    | 获取 AI 配置               |
+| `PATCH`  | `/api/config`                    | 更新 AI 配置               |
+| `GET`    | `/api/health`                    | 健康检查                   |
 
 ## TODO：插件独立运行模式
 
