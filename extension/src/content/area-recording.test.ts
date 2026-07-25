@@ -14,6 +14,7 @@ import {
   getAreaCaptureToolbarPosition,
   getAreaRecordingControlActions,
   getAreaToolbarButtonEntranceDelay,
+  getExtensionContextRecoveryMessage,
   getAreaToolbarActionIcon,
   getAreaToolbarActionLabel,
   getAreaToolbarActionShortLabel,
@@ -22,6 +23,8 @@ import {
   getNextAreaRecordingDelay,
   getPreferredRecordingMimeType,
   getRecordingUploadMimeType,
+  isExtensionContextInvalidatedError,
+  isExtensionRuntimeAvailable,
   moveAreaRect,
   normalizeAreaRecordingDelay,
   resizeAreaRect
@@ -34,6 +37,16 @@ describe("area recording helpers", () => {
 
   test("staggers toolbar button entrances from left to right", () => {
     expect([0, 1, 2, 3, 4].map(getAreaToolbarButtonEntranceDelay)).toEqual([0, 55, 110, 165, 220])
+  })
+
+  test("detects an invalidated extension runtime and provides localized recovery copy", () => {
+    expect(isExtensionRuntimeAvailable({ id: "extension-id" })).toBe(true)
+    expect(isExtensionRuntimeAvailable({})).toBe(false)
+    expect(isExtensionRuntimeAvailable(undefined)).toBe(false)
+    expect(isExtensionContextInvalidatedError(new Error("Extension context invalidated."))).toBe(true)
+    expect(isExtensionContextInvalidatedError(new Error("Permission denied"))).toBe(false)
+    expect(getExtensionContextRecoveryMessage("zh")).toBe("扩展已更新，请刷新当前页面后重试")
+    expect(getExtensionContextRecoveryMessage("en")).toBe("The extension was updated. Refresh this page and try again.")
   })
 
   test("localizes every area toolbar action", () => {

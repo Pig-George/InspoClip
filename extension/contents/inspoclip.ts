@@ -17,10 +17,13 @@ import {
   getAreaToolbarActionLabel,
   getAreaToolbarActionShortLabel,
   getAreaToolbarButtonEntranceDelay,
+  getExtensionContextRecoveryMessage,
   getNextAreaRecordingDelay,
   moveAreaRect,
   normalizeAreaRecordingDelay,
   resizeAreaRect,
+  isExtensionContextInvalidatedError,
+  isExtensionRuntimeAvailable,
 } from "../src/content/area-recording"
 import { createAreaRecordingSource } from "../src/content/area-recording-source"
 import { renderAreaToolbarIcons } from "../src/content/area-toolbar-icons"
@@ -175,6 +178,12 @@ export const config: PlasmoCSConfig = {
   let activeAreaRecordingCountdown = null;
 
   function startAreaCapture(mode, recordingSourceId) {
+    if (!isExtensionRuntimeAvailable(globalThis.chrome?.runtime)) {
+      removeAreaOverlay();
+      showExtensionContextRecovery();
+      return;
+    }
+
     // Remove any existing overlay
     removeAreaOverlay();
 
@@ -199,11 +208,18 @@ export const config: PlasmoCSConfig = {
     overlay.appendChild(selection);
     container.appendChild(overlay);
     areaOverlay = overlay;
-    preparedAreaRecordingSource = createAreaRecordingSource(
+    const recordingSource = createAreaRecordingSource(
       recordingSourceId,
       () => crypto.randomUUID?.() || `area-source-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       (sourceId) => sendRuntimeMessage({ type: 'PREPARE_AREA_RECORDING', sourceId })
     );
+    preparedAreaRecordingSource = recordingSource;
+    recordingSource.promise.catch((error) => {
+      if (!isExtensionContextInvalidatedError(error)) return;
+      if (areaOverlay !== overlay || preparedAreaRecordingSource !== recordingSource) return;
+      removeAreaOverlay();
+      showExtensionContextRecovery();
+    });
     syncContentRootInteractivity();
 
     let startX = 0, startY = 0;
@@ -561,12 +577,9 @@ export const config: PlasmoCSConfig = {
       await new Promise((r) => setTimeout(r, 50));
 
       // Capture the visible tab
-      const dataUrl = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' }, (response) => {
-          if (response?.dataUrl) resolve(response.dataUrl);
-          else reject(new Error('Capture failed'));
-        });
-      });
+      const captureResponse = await sendRuntimeMessage({ type: 'CAPTURE_TAB' });
+      if (!captureResponse?.dataUrl) throw new Error('Capture failed');
+      const dataUrl = captureResponse.dataUrl;
 
       // Crop the image to the selected area
       const croppedBlob = await cropImage(dataUrl, rect);
@@ -610,6 +623,10 @@ export const config: PlasmoCSConfig = {
       }
     } catch (err) {
       removeAreaOverlay();
+      if (isExtensionContextInvalidatedError(err)) {
+        showExtensionContextRecovery();
+        return;
+      }
       showToast(locale === 'zh' ? `截图失败: ${err.message}` : `Capture failed: ${err.message}`, 'error');
       setTimeout(removeToast, 3000);
     }
@@ -852,6 +869,11 @@ export const config: PlasmoCSConfig = {
       updateTimer();
     } catch (err) {
       await sendRuntimeMessage({ type: 'CANCEL_AREA_RECORDING', recordingId }).catch(() => {});
+      if (isExtensionContextInvalidatedError(err)) {
+        removeAreaOverlay();
+        showExtensionContextRecovery();
+        return;
+      }
       overlay.classList.remove('inspoclip-area-overlay-recording');
       syncContentRootInteractivity();
       if (recordBtn) {
@@ -883,15 +905,29 @@ export const config: PlasmoCSConfig = {
 
   function sendRuntimeMessage(message) {
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(message, (response) => {
-        const error = chrome.runtime.lastError;
-        if (error) {
-          reject(new Error(error.message));
-          return;
-        }
-        resolve(response);
-      });
+      if (!isExtensionRuntimeAvailable(globalThis.chrome?.runtime)) {
+        reject(new Error('Extension context invalidated.'));
+        return;
+      }
+
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          const error = chrome.runtime.lastError;
+          if (error) {
+            reject(new Error(error.message));
+            return;
+          }
+          resolve(response);
+        });
+      } catch (error) {
+        reject(error);
+      }
     });
+  }
+
+  function showExtensionContextRecovery() {
+    showToast(getExtensionContextRecoveryMessage(getAreaToolbarLocale()), 'error');
+    setTimeout(removeToast, 5000);
   }
 
   async function analyzeRecordedAreaVideo(videoBlob, durationMs) {

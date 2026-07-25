@@ -22,4 +22,16 @@ describe("area recording source", () => {
     expect(source.sourceId).toBe("new-source")
     expect(requestPrepare).toHaveBeenCalledWith("new-source")
   })
+
+  test("keeps a failed eager preparation observable for the later record action", async () => {
+    const source = createAreaRecordingSource(
+      undefined,
+      () => "new-source",
+      async () => {
+        throw new Error("Extension context invalidated.")
+      }
+    )
+
+    await expect(source.promise).rejects.toThrow("Extension context invalidated")
+  })
 })

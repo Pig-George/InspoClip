@@ -71,6 +71,21 @@ export function getAreaToolbarButtonEntranceDelay(index: number): number {
   return normalizedIndex * AREA_TOOLBAR_BUTTON_ENTRANCE_STAGGER_MS
 }
 
+export function isExtensionRuntimeAvailable(runtime: { id?: string } | null | undefined): boolean {
+  return Boolean(runtime?.id)
+}
+
+export function isExtensionContextInvalidatedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "")
+  return /extension context invalidated/i.test(message)
+}
+
+export function getExtensionContextRecoveryMessage(locale: AreaToolbarLocale): string {
+  return locale === "zh"
+    ? "扩展已更新，请刷新当前页面后重试"
+    : "The extension was updated. Refresh this page and try again."
+}
+
 export function getAreaToolbarActionLabel(action: AreaToolbarAction, locale: AreaToolbarLocale): string {
   return AREA_TOOLBAR_LABELS[action][locale]
 }

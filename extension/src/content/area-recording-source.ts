@@ -21,11 +21,17 @@ export function createAreaRecordingSource(
   }
 
   const sourceId = createSourceId()
+  const promise = requestPrepare(sourceId).then((response) => {
+    if (!response?.success) throw new Error(response?.error || "Failed to prepare recording")
+    return response
+  })
+
+  // Preparation starts eagerly, while the user may remain in screenshot mode.
+  // Mark early failures as handled without changing what later awaiters receive.
+  void promise.catch(() => undefined)
+
   return {
     sourceId,
-    promise: requestPrepare(sourceId).then((response) => {
-      if (!response?.success) throw new Error(response?.error || "Failed to prepare recording")
-      return response
-    })
+    promise
   }
 }
