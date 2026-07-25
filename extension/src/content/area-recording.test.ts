@@ -12,6 +12,7 @@ import {
   getAreaRecordingInnerRect,
   getAreaRecordingSourceRect,
   getAreaCaptureToolbarPosition,
+  getAreaRecordingControlActions,
   getAreaToolbarActionIcon,
   getAreaToolbarActionLabel,
   getAreaToolbarActionShortLabel,
@@ -26,6 +27,10 @@ import {
 } from "./area-recording"
 
 describe("area recording helpers", () => {
+  test("includes cancel in the active recording controls", () => {
+    expect(getAreaRecordingControlActions()).toEqual(["pause", "retake", "finish", "cancel"])
+  })
+
   test("localizes every area toolbar action", () => {
     expect(getAreaToolbarActionLabel("screenshot", "zh")).toBe("截图")
     expect(getAreaToolbarActionLabel("record", "en")).toBe("Start recording")

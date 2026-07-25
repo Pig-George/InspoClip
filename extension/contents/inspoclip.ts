@@ -9,6 +9,7 @@ import {
   formatRecordingDuration,
   getAreaCaptureToolbarPosition,
   getAreaRecordingInnerRect,
+  getAreaRecordingControlActions,
   getAreaRecordingDelayBadge,
   getAreaRecordingDelayLabel,
   getAreaResizeHandlesMarkup,
@@ -517,7 +518,7 @@ export const config: PlasmoCSConfig = {
   }
 
   function positionAreaToolbar(toolbar, rect) {
-    const fallbackWidth = toolbar.classList.contains('inspoclip-area-toolbar-recording') ? 268 : 228;
+    const fallbackWidth = toolbar.classList.contains('inspoclip-area-toolbar-recording') ? 311 : 228;
     const position = getAreaCaptureToolbarPosition(
       rect,
       { width: window.innerWidth, height: window.innerHeight },
@@ -657,9 +658,15 @@ export const config: PlasmoCSConfig = {
         <span class="inspoclip-area-record-time"><span class="inspoclip-area-record-dot"></span><span data-record-time>00:00</span></span>
         <button type="button" class="inspoclip-area-icon-status inspoclip-area-icon-status-disabled ${includeTabAudio ? 'inspoclip-area-icon-button-active' : ''}" aria-label="${getAreaToolbarActionLabel(includeTabAudio ? 'sound-on' : 'sound-off', getAreaToolbarLocale())}" aria-pressed="${includeTabAudio}" disabled>${getAreaToolbarActionIcon(includeTabAudio ? 'sound-on' : 'sound-off')}</button>
         <span class="inspoclip-area-toolbar-separator" aria-hidden="true"></span>
-        ${renderAreaToolbarIconButton('pause', 'pause')}
-        ${renderAreaToolbarIconButton('retake', 'retake')}
-        ${renderAreaToolbarIconButton('finish', 'finish', 'inspoclip-area-icon-button-primary')}
+        ${getAreaRecordingControlActions().map((action) => renderAreaToolbarIconButton(
+          action,
+          action,
+          action === 'finish'
+            ? 'inspoclip-area-icon-button-primary'
+            : action === 'cancel'
+              ? 'inspoclip-area-icon-button-quiet'
+              : ''
+        )).join('')}
       `;
       renderAreaToolbarIcons(toolbar);
       toolbar.style.animation = 'none';
@@ -736,7 +743,7 @@ export const config: PlasmoCSConfig = {
         if (recording.retakeConfirmTimer) clearTimeout(recording.retakeConfirmTimer);
         recording.retakeConfirmTimer = 0;
         recording.commandPending = true;
-        const recordingButtons = Array.from(toolbar.querySelectorAll('button'));
+        const recordingButtons = Array.from(toolbar.querySelectorAll('.inspoclip-area-icon-button'));
         recordingButtons.forEach((button) => { button.disabled = true; });
         retakeBtn.classList.add('inspoclip-area-action-processing');
         retakeBtn.setAttribute('aria-label', locale === 'zh' ? '正在准备重录' : 'Preparing retake');
@@ -778,11 +785,19 @@ export const config: PlasmoCSConfig = {
         }
       });
 
+      toolbar.querySelector('[data-action="cancel"]')?.addEventListener('click', () => {
+        if (recording.stopping || recording.commandPending) return;
+        recording.stopping = true;
+        toolbar.querySelectorAll('button').forEach((button) => { button.disabled = true; });
+        removeAreaOverlay();
+      });
+
       toolbar.querySelector('[data-action="finish"]')?.addEventListener('click', async () => {
         if (recording.stopping || recording.commandPending) return;
         recording.stopping = true;
         recording.shouldAnalyze = true;
         const elapsedMs = Math.max(1, (timerState.pausedAt || Date.now()) - timerState.startedAt - timerState.pausedTotal);
+        toolbar.querySelectorAll('.inspoclip-area-icon-button').forEach((button) => { button.disabled = true; });
         const finishBtn = toolbar.querySelector('[data-action="finish"]');
         if (finishBtn) {
           finishBtn.disabled = true;

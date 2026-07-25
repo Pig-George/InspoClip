@@ -59,6 +59,12 @@ const AREA_TOOLBAR_SHORT_LABELS: Record<AreaToolbarAction, Record<AreaToolbarLoc
   finish: { zh: "完成", en: "Done" }
 }
 
+const AREA_RECORDING_CONTROL_ACTIONS = ["pause", "retake", "finish", "cancel"] as const
+
+export function getAreaRecordingControlActions(): Array<typeof AREA_RECORDING_CONTROL_ACTIONS[number]> {
+  return [...AREA_RECORDING_CONTROL_ACTIONS]
+}
+
 export function getAreaToolbarActionLabel(action: AreaToolbarAction, locale: AreaToolbarLocale): string {
   return AREA_TOOLBAR_LABELS[action][locale]
 }
