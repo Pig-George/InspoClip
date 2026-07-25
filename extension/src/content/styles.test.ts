@@ -83,4 +83,14 @@ describe("content styles", () => {
     expect(styles).toMatch(/from\s*\{[^}]*scale\(0\.64\)/s)
     expect(styles).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*animation-delay:\s*0ms !important;/)
   })
+
+  test("renders loading messages with circular progress rings", () => {
+    const styles = getContentStyles()
+
+    expect(styles).toContain(".inspoclip-progress-ring")
+    expect(styles).toContain(".inspoclip-progress-ring-determinate")
+    expect(styles).toContain("conic-gradient")
+    expect(styles).toContain("--inspoclip-toast-progress")
+    expect(styles).not.toContain(".inspoclip-spinner")
+  })
 })

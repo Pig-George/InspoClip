@@ -64,16 +64,44 @@
       justify-content: center;
     }
 
-    .inspoclip-spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid #e0d0c0;
-      border-top-color: #c0784a;
+    .inspoclip-progress-ring {
+      position: relative;
+      display: block;
+      width: 18px;
+      height: 18px;
+      flex: 0 0 18px;
       border-radius: 50%;
-      animation: inspoclip-spin 0.7s linear infinite;
+      box-shadow: 0 0 0 1px rgba(192, 120, 74, 0.08);
     }
 
-    @keyframes inspoclip-spin { to { transform: rotate(360deg); } }
+    .inspoclip-progress-ring::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: inset 0 0 0 1px rgba(192, 120, 74, 0.05);
+    }
+
+    .inspoclip-progress-ring-indeterminate {
+      background: conic-gradient(from 20deg, rgba(192, 120, 74, 0.08) 0deg, rgba(192, 120, 74, 0.35) 190deg, #c0784a 350deg, rgba(192, 120, 74, 0.08) 360deg);
+      animation: inspoclip-progress-ring-spin 0.9s linear infinite;
+    }
+
+    .inspoclip-progress-ring-determinate {
+      background: conic-gradient(#c0784a calc(var(--inspoclip-toast-progress) * 1%), #eadfd3 0);
+      transform: rotate(-90deg);
+    }
+
+    @keyframes inspoclip-progress-ring-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .inspoclip-progress-ring-indeterminate {
+        animation: none;
+      }
+    }
 
     .inspoclip-toast-text {
       font-size: 13px;

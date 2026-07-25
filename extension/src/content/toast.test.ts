@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest"
 
-import { getToastIconMarkup, syncToastElement } from "./toast"
+import { getToastIconMarkup, getToastProgress, syncToastElement } from "./toast"
 
 describe("content toast helpers", () => {
   test("updates an existing toast element without replacing the element", () => {
@@ -29,7 +29,19 @@ describe("content toast helpers", () => {
     expect(icon.innerHTML).toBe("✓")
   })
 
-  test("renders spinner markup for loading toasts", () => {
-    expect(getToastIconMarkup("loading")).toContain("inspoclip-spinner")
+  test("extracts and clamps percentage progress from loading messages", () => {
+    expect(getToastProgress("Understanding video... 42%")).toBe(42)
+    expect(getToastProgress("正在理解视频... 125%")).toBe(100)
+    expect(getToastProgress("Analyzing...")).toBeNull()
+  })
+
+  test("renders circular progress markup for loading toasts", () => {
+    const indeterminate = getToastIconMarkup("loading", "Analyzing...")
+    const determinate = getToastIconMarkup("loading", "Understanding video... 42%")
+
+    expect(indeterminate).toContain("inspoclip-progress-ring-indeterminate")
+    expect(determinate).toContain("inspoclip-progress-ring-determinate")
+    expect(determinate).toContain("--inspoclip-toast-progress: 42")
+    expect(indeterminate).not.toContain("inspoclip-spinner")
   })
 })
