@@ -18,5 +18,6 @@ server/test_image.png
 extension/.plasmo/
 extension/build/
 .agents/
+.claude/
 cloudflared.exe
 cloudflared.log
