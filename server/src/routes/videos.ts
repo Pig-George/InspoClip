@@ -151,8 +151,11 @@ export function createVideosRouter(overrides: Partial<VideosRouterDependencies> 
       }
       const purpose = purposeValue as Purpose;
       const target = optionalString(req.body?.target, 'target');
-      const cached = await deps.repository.getPromptOutput(videoId, purpose, target);
-      if (cached) { res.json(cached); return; }
+      const force = req.body?.force === true;
+      if (!force) {
+        const cached = await deps.repository.getPromptOutput(videoId, purpose, target);
+        if (cached) { res.json(cached); return; }
+      }
       const analysis = await deps.repository.getAnalysis(videoId);
       if (!analysis) { res.status(409).json({ error: 'Video analysis is not completed' }); return; }
       const key = generationKey(videoId, purpose, target);

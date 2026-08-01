@@ -50,6 +50,44 @@ describe('VideoPromptPanel', () => {
     expect(await screen.findByText('你好')).toBeInTheDocument();
   });
 
+  it('forces regeneration when refreshing an existing prompt', async () => {
+    vi.mocked(fetchVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', contentEn: 'old', contentZh: 'old zh' });
+    vi.mocked(generateVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', contentEn: 'new', contentZh: 'new zh' });
+
+    renderWithLocale('en');
+
+    expect(await screen.findByText('old')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Regenerate' }));
+
+    await waitFor(() => expect(generateVideoOutput).toHaveBeenCalledWith('v', 'general', '', true));
+    expect(await screen.findByText('new')).toBeInTheDocument();
+  });
+
+  it('constrains long prompt text to the output box', async () => {
+    const longText = "what-you're-looking-for-without-break-opportunities";
+    vi.mocked(fetchVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', contentEn: longText, contentZh: longText });
+
+    renderWithLocale('en');
+
+    const promptContainer = (await screen.findByText(longText)).closest('.prose-video-prompt');
+    expect(promptContainer).toHaveClass('min-w-0', 'max-w-full', '[overflow-wrap:anywhere]');
+  });
+
+  it('uses only the regenerate button spinner while refreshing an existing prompt', async () => {
+    vi.mocked(fetchVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', contentEn: 'old', contentZh: 'old zh' });
+    vi.mocked(generateVideoOutput).mockReturnValue(new Promise(() => {}));
+
+    renderWithLocale('en');
+
+    expect(await screen.findByText('old')).toBeInTheDocument();
+    const regenerate = screen.getByRole('button', { name: 'Regenerate' });
+    await userEvent.click(regenerate);
+
+    await waitFor(() => expect(generateVideoOutput).toHaveBeenCalledWith('v', 'general', '', true));
+    expect(screen.queryByText('Generating…')).not.toBeInTheDocument();
+    expect(regenerate.querySelector('svg')).toHaveClass('animate-spin');
+  });
+
   it('renders as an integrated sidebar section', () => {
     renderWithLocale();
 
@@ -76,7 +114,7 @@ describe('VideoPromptPanel', () => {
     await waitFor(() => expect(fetchVideoOutput).toHaveBeenCalled());
     const generateBtn = await screen.findByRole('button', { name: '生成输出' });
     await userEvent.click(generateBtn);
-    expect(generateVideoOutput).toHaveBeenCalledWith('v', 'general', '');
+    expect(generateVideoOutput).toHaveBeenCalledWith('v', 'general', '', false);
     expect(setInflight).toHaveBeenCalledWith('v', 'general', expect.any(Promise));
     expect(await screen.findByText('生成中文')).toBeInTheDocument();
   });

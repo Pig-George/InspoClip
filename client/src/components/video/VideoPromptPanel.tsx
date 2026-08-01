@@ -73,6 +73,7 @@ const languageModeValues: LangMode[] = ['auto', 'en', 'zh', 'both'];
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_ATTEMPTS = 100; // 5 minutes max
+const promptContentClassName = 'prose-video-prompt min-w-0 max-w-full break-words [overflow-wrap:anywhere]';
 
 export function VideoPromptPanel({ videoId }: { videoId: string }) {
   const [purpose, setPurpose] = useState<VideoPurpose>('general');
@@ -157,7 +158,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
     };
   }, [videoId, purpose, loadExisting]);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (force = false) => {
     const inflight = getInflight(videoId, purpose);
     if (inflight) {
       setGenerating(true);
@@ -174,7 +175,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
 
     setGenerating(true);
     setError('');
-    const promise = generateVideoOutput(videoId, purpose, target);
+    const promise = generateVideoOutput(videoId, purpose, target, force);
     setInflight(videoId, purpose, promise);
     try {
       setOutput(await promise);
@@ -259,7 +260,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
         )}
       </div>
 
-      {(loading || generating) && (
+      {(loading || generating) && !output && (
         <div className="mt-3 flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <Loader2 className="h-4 w-4 animate-spin" />
           {generating ? copy.generating : copy.loading}
@@ -270,7 +271,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
 
       {!output && !loading && !generating && (
         <button
-          onClick={handleGenerate}
+          onClick={() => handleGenerate(false)}
           className="mt-3 flex items-center gap-1.5 rounded-full bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-heading text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20"
         >
           <Sparkles className="h-3.5 w-3.5" />
@@ -310,7 +311,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
                 }
               </button>
               <button
-                onClick={handleGenerate}
+                onClick={() => handleGenerate(true)}
                 disabled={generating}
                 className="rounded p-1 transition-colors hover:bg-[var(--muted)] disabled:opacity-40"
                 title={copy.regenerate}
@@ -328,7 +329,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
           ) : (
             <div className="space-y-2 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-3">
               {display.showEn && (
-                <div className="prose-video-prompt">
+                <div className={promptContentClassName}>
                   <ReactMarkdown>{display.en}</ReactMarkdown>
                 </div>
               )}
@@ -336,7 +337,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
                 <div className="border-t border-[var(--accent)]/10" />
               )}
               {display.showZh && (
-                <div className="prose-video-prompt">
+                <div className={promptContentClassName}>
                   <ReactMarkdown>{display.zh}</ReactMarkdown>
                 </div>
               )}

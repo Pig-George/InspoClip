@@ -79,7 +79,7 @@ export function DesignPrompt({ imageId }: DesignPromptProps) {
         </button>
       )}
 
-      {loading && (
+      {loading && !prompt && (
         <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <Loader2 className="w-4 h-4 animate-spin" />
           {locale === 'zh' ? '正在生成...' : 'Generating...'}

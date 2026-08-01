@@ -23,10 +23,10 @@ export async function fetchVideoJob(id: string): Promise<VideoJob> { return resp
 export async function fetchVideoAnalysis(id: string): Promise<VideoAnalysis> { return responseJson(await fetch(`${BASE}/videos/${id}/analysis`)); }
 export async function retryVideo(id: string): Promise<VideoJob> { return responseJson(await fetch(`${BASE}/videos/${id}/retry`, { method: 'POST' })); }
 export async function deleteVideo(id: string): Promise<void> { await responseJson(await fetch(`${BASE}/videos/${id}`, { method: 'DELETE' })); }
-export async function generateVideoOutput(id: string, purpose: VideoPurpose = 'general', target = ''): Promise<VideoPromptOutput> {
+export async function generateVideoOutput(id: string, purpose: VideoPurpose = 'general', target = '', force = false): Promise<VideoPromptOutput> {
   return responseJson(await fetch(`${BASE}/videos/${id}/prompts`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ purpose, target }),
+    body: JSON.stringify({ purpose, target, force }),
   }));
 }
 export type VideoOutputResult = VideoPromptOutput | { generating: true } | null;

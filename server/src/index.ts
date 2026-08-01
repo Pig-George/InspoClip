@@ -118,7 +118,6 @@ async function initDB() {
       summary TEXT NOT NULL, visual_style JSONB NOT NULL, analysis JSONB NOT NULL,
       created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
     );
-    DROP TABLE IF EXISTS video_prompt_outputs;
     CREATE TABLE IF NOT EXISTS video_prompt_outputs (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(), analysis_id UUID NOT NULL REFERENCES video_analyses(id) ON DELETE CASCADE,
       purpose TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', content_en TEXT NOT NULL, content_zh TEXT NOT NULL,
