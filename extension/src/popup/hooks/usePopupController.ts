@@ -119,8 +119,7 @@ export function usePopupController() {
       if (assetKind === "unsupported") throw new Error(t.unsupportedAsset)
       if (file.size > MAX_VIDEO_SIZE_BYTES) throw new Error("Video exceeds 200MB")
       await sendCurrentTabMessage({
-        ...(await buildAssetAnalysisMessage(file)),
-        serverUrl
+        ...(await buildAssetAnalysisMessage(file))
       }, t)
       setTimeout(() => window.close(), 150)
     } catch (err) {
@@ -134,8 +133,7 @@ export function usePopupController() {
         type: "START_ASSET_ANALYSIS",
         assetKind: "video",
         videoUrl: assetUrl,
-        fileName: assetUrl.split("/").pop() || "web-video.mp4",
-        serverUrl
+        fileName: assetUrl.split("/").pop() || "web-video.mp4"
       }, t)
       setTimeout(() => window.close(), 150)
     } catch (err) {

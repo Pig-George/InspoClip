@@ -52,7 +52,7 @@ import {
   setVideoPromptInflight,
   videoPromptRequestKey
 } from "../src/content/video-prompt-state"
-import { pollVideoJob as pollVideoJobWithRetry } from "../src/video"
+import { blobToDataUrl, sendRuntimeCommand } from "../src/runtime/command-client"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -101,13 +101,66 @@ export const config: PlasmoCSConfig = {
   let analysisHistory = []; // [{ kind: 'image'|'video', data/detail, previewUrl, blob, timestamp, saved }]
   let historyIndex = -1;
   let savedImageHashes = new Set(); // Track which analyses have been saved
-  let serverUrl = 'http://localhost:3001';
   let locale = (navigator.language || 'en').startsWith('zh') ? 'zh' : 'en';
   let promptLangMode = 'auto';
   let videoPromptLangMode = 'auto';
   let videoPromptPurpose = 'general';
   let videoPromptTarget = '';
   let areaRecordingDelaySeconds = DEFAULT_AREA_RECORDING_DELAY_SECONDS;
+
+  async function serializedBlobPayload(blob, filename) {
+    return {
+      dataUrl: await blobToDataUrl(blob),
+      filename,
+      mimeType: blob.type || 'application/octet-stream'
+    };
+  }
+
+  async function analyzeImageWithRuntime(blob, filename) {
+    const job = await sendRuntimeCommand({
+      type: 'runtime.analysis.image.start',
+      payload: await serializedBlobPayload(blob, filename)
+    });
+    return job.result;
+  }
+
+  async function checkImageSimilarityWithRuntime(blob, filename) {
+    return sendRuntimeCommand({
+      type: 'runtime.asset.image.similarity',
+      payload: await serializedBlobPayload(blob, filename)
+    });
+  }
+
+  async function saveImageWithRuntime(blob, filename, weekStart, dayOfWeek) {
+    return sendRuntimeCommand({
+      type: 'runtime.asset.image.save',
+      payload: {
+        ...(await serializedBlobPayload(blob, filename)),
+        weekStart,
+        dayOfWeek
+      }
+    });
+  }
+
+  async function startVideoWithRuntime(blob, filename, durationMs) {
+    const job = await sendRuntimeCommand({
+      type: 'runtime.analysis.video.start',
+      payload: {
+        ...(await serializedBlobPayload(blob, filename)),
+        draft: true,
+        ...(Number.isFinite(durationMs) && durationMs > 0 ? { durationMs: Math.round(durationMs) } : {})
+      }
+    });
+    return job.result || { videoId: job.assetId, jobId: job.id, status: job.status };
+  }
+
+  async function getVideoDetailWithRuntime(videoId) {
+    return sendRuntimeCommand({ type: 'runtime.asset.video.get', payload: { assetId: videoId } });
+  }
+
+  async function getContentUrlWithRuntime(kind, reference) {
+    return sendRuntimeCommand({ type: 'runtime.asset.content.url', payload: { kind, reference } });
+  }
 
   function syncContentRootInteractivity() {
     setContentRootInteractive(root, shouldExpandContentRoot({
@@ -117,9 +170,7 @@ export const config: PlasmoCSConfig = {
     }));
   }
 
-  // Load server URL
-  chrome.storage.sync.get(['serverUrl', 'lang', 'areaRecordingDelaySeconds'], (result) => {
-    if (result.serverUrl) serverUrl = result.serverUrl;
+  chrome.storage.sync.get(['lang', 'areaRecordingDelaySeconds'], (result) => {
     if (result.lang) locale = result.lang;
     areaRecordingDelaySeconds = normalizeAreaRecordingDelay(result.areaRecordingDelaySeconds);
   });
@@ -601,22 +652,12 @@ export const config: PlasmoCSConfig = {
         );
 
         const ext = croppedBlob.type === 'image/png' ? '.png' : '.jpg';
-        const formData = new FormData();
-        formData.append('image', croppedBlob, 'area' + ext);
-
-        const res = await fetch(`${serverUrl}/api/images/analyze`, { method: 'POST', body: formData });
-        if (!res.ok) throw new Error('Analysis failed');
-        const data = await res.json();
+        const data = await analyzeImageWithRuntime(croppedBlob, 'area' + ext);
 
         // Check similarity
         try {
-          const simForm = new FormData();
-          simForm.append('image', croppedBlob, 'check' + ext);
-          const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, { method: 'POST', body: simForm });
-          if (simRes.ok) {
-            const simData = await simRes.json();
-            data.similarImages = simData.similar || [];
-          }
+          const simData = await checkImageSimilarityWithRuntime(croppedBlob, 'check' + ext);
+          data.similarImages = simData.similar || [];
         } catch { data.similarImages = []; }
 
         capturedBlob = croppedBlob;
@@ -982,16 +1023,7 @@ export const config: PlasmoCSConfig = {
 
   async function analyzeRecordedAreaVideo(videoBlob, durationMs) {
     showToast(locale === 'zh' ? '正在上传录屏...' : 'Uploading recording...', 'loading');
-    const formData = new FormData();
-    formData.append('video', videoBlob, 'area-recording.webm');
-    formData.append('source', 'extension');
-    formData.append('draft', 'true');
-    if (Number.isFinite(durationMs) && durationMs > 0) {
-      formData.append('durationMs', String(Math.round(durationMs)));
-    }
-    const uploadRes = await fetch(`${serverUrl}/api/videos`, { method: 'POST', body: formData });
-    if (!uploadRes.ok) throw new Error(await readableError(uploadRes, 'Video upload failed'));
-    const uploadResult = await uploadRes.json();
+    const uploadResult = await startVideoWithRuntime(videoBlob, 'area-recording.webm', durationMs);
 
     const analysisProgress = createAnalysisToastProgress(
       locale === 'zh' ? '正在理解录屏...' : 'Understanding recording...'
@@ -1002,9 +1034,7 @@ export const config: PlasmoCSConfig = {
       });
       if (job.status === 'failed') throw new Error(job.errorMessage || 'Video analysis failed');
 
-      const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
-      if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
-      const detail = await detailRes.json();
+      const detail = await getVideoDetailWithRuntime(uploadResult.videoId);
       await analysisProgress.complete();
       pushVideoHistory(detail);
       transitionToVideoModal(detail, window.innerWidth - 20, 20);
@@ -1080,19 +1110,9 @@ export const config: PlasmoCSConfig = {
 
       // Check similarity
       const ext = blob.type === 'image/png' ? '.png' : '.jpg';
-      const checkForm = new FormData();
-      checkForm.append('image', blob, 'check' + ext);
-
-      const checkRes = await fetch(`${serverUrl}/api/images/check-similarity`, {
-        method: 'POST',
-        body: checkForm,
-      });
-
       let similar = [];
-      if (checkRes.ok) {
-        const checkData = await checkRes.json();
-        similar = checkData.similar || [];
-      }
+      const checkData = await checkImageSimilarityWithRuntime(blob, 'check' + ext);
+      similar = checkData.similar || [];
 
       if (similar.length > 0) {
         // Show confirmation dialog
@@ -1156,7 +1176,8 @@ export const config: PlasmoCSConfig = {
     similar.slice(0, 3).forEach((img, i) => {
       const imgEl = dialog.querySelector(`img[data-idx="${i}"]`);
       if (!imgEl) return;
-      fetch(`${serverUrl}/api/uploads/${img.filePath}`)
+      getContentUrlWithRuntime('image', img.filePath)
+        .then((contentUrl) => fetch(contentUrl))
         .then((res) => {
           if (!res.ok) throw new Error('Not found');
           return res.blob();
@@ -1208,21 +1229,8 @@ export const config: PlasmoCSConfig = {
       const monday = getMonday(now);
       const dateStr = formatDate(monday);
 
-      const weekRes = await fetch(`${serverUrl}/api/weeks/${dateStr}`);
-      if (!weekRes.ok) throw new Error('Failed to get week');
-      const weekData = await weekRes.json();
-
       const ext = blob.type === 'image/png' ? '.png' : '.jpg';
-      const formData = new FormData();
-      formData.append('image', blob, 'screenshot' + ext);
-      formData.append('weekId', weekData.week.id);
-      formData.append('dayOfWeek', String(dayOfWeek));
-
-      const uploadRes = await fetch(`${serverUrl}/api/images`, { method: 'POST', body: formData });
-      if (!uploadRes.ok) {
-        const errText = await uploadRes.text().catch(() => '');
-        throw new Error(errText || `HTTP ${uploadRes.status}`);
-      }
+      await saveImageWithRuntime(blob, 'screenshot' + ext, dateStr, dayOfWeek);
 
       showToast(locale === 'zh' ? '✓ 已保存到 InspoClip' : '✓ Saved to InspoClip', 'success');
       toastTimer = setTimeout(removeToast, 3500);
@@ -1260,29 +1268,12 @@ export const config: PlasmoCSConfig = {
 
       // Send to server
       const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
-      const formData = new FormData();
-      formData.append('image', capturedBlob, 'analyze' + ext);
-
-      const res = await fetch(`${serverUrl}/api/images/analyze`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error('Analysis failed');
-      analyzedData = await res.json();
+      analyzedData = await analyzeImageWithRuntime(capturedBlob, 'analyze' + ext);
 
       // Check for similar images
       try {
-        const simForm = new FormData();
-        simForm.append('image', capturedBlob, 'check' + ext);
-        const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, {
-          method: 'POST',
-          body: simForm,
-        });
-        if (simRes.ok) {
-          const simData = await simRes.json();
-          analyzedData.similarImages = simData.similar || [];
-        }
+        const simData = await checkImageSimilarityWithRuntime(capturedBlob, 'check' + ext);
+        analyzedData.similarImages = simData.similar || [];
       } catch {
         analyzedData.similarImages = [];
       }
@@ -1304,8 +1295,6 @@ export const config: PlasmoCSConfig = {
     analyzedData = null;
     capturedBlob = null;
     currentAssetResult = null;
-
-    if (asset.serverUrl) serverUrl = asset.serverUrl;
 
     try {
       if (asset.assetKind === 'image') {
@@ -1330,21 +1319,11 @@ export const config: PlasmoCSConfig = {
     try {
       capturedBlob = dataUrlToBlob(asset.dataUrl);
       const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
-      const formData = new FormData();
-      formData.append('image', capturedBlob, asset.fileName || 'asset' + ext);
-
-      const res = await fetch(`${serverUrl}/api/images/analyze`, { method: 'POST', body: formData });
-      if (!res.ok) throw new Error(await readableError(res, 'Analysis failed'));
-      analyzedData = await res.json();
+      analyzedData = await analyzeImageWithRuntime(capturedBlob, asset.fileName || 'asset' + ext);
 
       try {
-        const simForm = new FormData();
-        simForm.append('image', capturedBlob, 'check' + ext);
-        const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, { method: 'POST', body: simForm });
-        if (simRes.ok) {
-          const simData = await simRes.json();
-          analyzedData.similarImages = simData.similar || [];
-        }
+        const simData = await checkImageSimilarityWithRuntime(capturedBlob, 'check' + ext);
+        analyzedData.similarImages = simData.similar || [];
       } catch {
         analyzedData.similarImages = [];
       }
@@ -1365,13 +1344,7 @@ export const config: PlasmoCSConfig = {
       uploadResult = await uploadVideoUrlFromBackground(asset.videoUrl);
     } else {
       const videoBlob = dataUrlToBlob(asset.dataUrl);
-      const formData = new FormData();
-      formData.append('video', videoBlob, asset.fileName || 'asset-video.mp4');
-      formData.append('source', 'extension');
-      formData.append('draft', 'true');
-      const res = await fetch(`${serverUrl}/api/videos`, { method: 'POST', body: formData });
-      if (!res.ok) throw new Error(await readableError(res, 'Video upload failed'));
-      uploadResult = await res.json();
+      uploadResult = await startVideoWithRuntime(videoBlob, asset.fileName || 'asset-video.mp4');
     }
 
     const analysisProgress = createAnalysisToastProgress(
@@ -1383,9 +1356,7 @@ export const config: PlasmoCSConfig = {
       });
       if (job.status === 'failed') throw new Error(job.errorMessage || 'Video analysis failed');
 
-      const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
-      if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
-      const detail = await detailRes.json();
+      const detail = await getVideoDetailWithRuntime(uploadResult.videoId);
       await analysisProgress.complete();
       pushVideoHistory(detail);
       transitionToVideoModal(detail, window.innerWidth - 20, 20);
@@ -1395,24 +1366,36 @@ export const config: PlasmoCSConfig = {
   }
 
   async function uploadVideoUrlFromBackground(videoUrl) {
-    const response = await chrome.runtime.sendMessage({ type: 'UPLOAD_VIDEO_URL', url: videoUrl, serverUrl, draft: true });
-    if (!response?.success) throw new Error(response?.error || 'Video upload failed');
-    return response;
+    const job = await sendRuntimeCommand({
+      type: 'runtime.analysis.video.url.start',
+      payload: { videoUrl, draft: true }
+    });
+    return job.result || { videoId: job.assetId, jobId: job.id, status: job.status };
   }
 
   async function pollVideoJob(jobId, onUpdate) {
-    return pollVideoJobWithRetry(fetch, serverUrl, jobId, { onUpdate });
-  }
-
-  async function readableError(response, fallback) {
-    const text = await response.text().catch(() => '');
-    if (!text) return fallback;
-    try {
-      const json = JSON.parse(text);
-      return json.error || fallback;
-    } catch {
-      return text.slice(0, 240) || fallback;
+    let consecutiveErrors = 0;
+    let successfulPolls = 0;
+    while (successfulPolls < 240) {
+      try {
+        const job = await sendRuntimeCommand({
+          type: 'runtime.analysis.job.get',
+          payload: { jobId }
+        });
+        const rawJob = job?.result || job;
+        consecutiveErrors = 0;
+        successfulPolls += 1;
+        onUpdate?.(rawJob);
+        if (['completed', 'failed', 'cancelled'].includes(rawJob.status)) return rawJob;
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      } catch (error) {
+        if (!error?.detail?.retryable || consecutiveErrors >= 6) throw error;
+        const delay = Math.min(5000, 1500 * 2 ** consecutiveErrors);
+        consecutiveErrors += 1;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
     }
+    throw new Error('Video analysis timed out');
   }
 
   async function captureTabAsBlob() {
@@ -1680,13 +1663,20 @@ export const config: PlasmoCSConfig = {
         return;
       }
       setGenerating(false);
-      const params = new URLSearchParams({ purpose: videoPromptPurpose });
-      if (videoPromptTarget.trim()) params.set('target', videoPromptTarget.trim());
-      const res = await fetch(`${serverUrl}/api/videos/${videoId}/prompts?${params.toString()}`);
-      if (res.ok) {
-        const output = await res.json();
+      try {
+        const result = await sendRuntimeCommand({
+          type: 'runtime.prompt.generate',
+          payload: {
+            assetId: videoId,
+            purpose: videoPromptPurpose,
+            target: videoPromptTarget.trim(),
+            regenerate: false
+          }
+        });
+        const output = result.content;
         if (isCurrentPrompt(key)) renderVideoPromptOutput(modal, output);
-      } else if (res.status === 404) {
+      } catch (error) {
+        if (error?.detail?.code !== 'BACKEND_HTTP_404') throw error;
         if (isCurrentPrompt(key)) renderVideoPromptOutput(modal, null);
       }
     };
@@ -1698,15 +1688,15 @@ export const config: PlasmoCSConfig = {
         watchPromptPromise(key, existing);
         return;
       }
-      const body = { purpose: videoPromptPurpose, target: videoPromptTarget.trim() };
-      const promise = fetch(`${serverUrl}/api/videos/${videoId}/prompts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }).then(async (res) => {
-        if (!res.ok) throw new Error(await readableError(res, 'Prompt generation failed'));
-        return res.json();
-      });
+      const promise = sendRuntimeCommand({
+        type: 'runtime.prompt.generate',
+        payload: {
+          assetId: videoId,
+          purpose: videoPromptPurpose,
+          target: videoPromptTarget.trim(),
+          regenerate: true
+        }
+      }).then((result) => result.content);
 
       setVideoPromptInflight(key, promise);
       try {
@@ -1768,7 +1758,7 @@ export const config: PlasmoCSConfig = {
     const analysis = detail.analysis || {};
     const stages = Array.isArray(analysis.stages) ? analysis.stages : [];
     const title = localizedText(detail.summary) || localizedText(analysis.summary) || video.originalName || (locale === 'zh' ? '视频分析结果' : 'Video Analysis Result');
-    const videoSrc = `${serverUrl}/api/videos/${video.id}/content`;
+    const videoSrcPromise = getContentUrlWithRuntime('video', video.id);
     const vw = window.innerWidth;
     const targetX = Math.max(20, vw - 460 - 20);
 
@@ -1796,7 +1786,7 @@ export const config: PlasmoCSConfig = {
         </div>
 
         <div class="inspoclip-video-preview">
-          <video controls preload="metadata" data-video-src="${escapeHtml(videoSrc)}"></video>
+          <video controls preload="metadata"></video>
           <div class="inspoclip-video-preview-status">${locale === 'zh' ? '正在加载视频预览...' : 'Loading video preview...'}</div>
         </div>
 
@@ -1886,7 +1876,8 @@ export const config: PlasmoCSConfig = {
     const previewVideo = modal.querySelector('.inspoclip-video-preview video');
     const previewStatus = modal.querySelector('.inspoclip-video-preview-status');
     if (previewVideo) {
-      createObjectUrlVideoSource(videoSrc)
+      videoSrcPromise
+        .then((videoSrc) => createObjectUrlVideoSource(videoSrc))
         .then((objectUrl) => {
           if (currentModal !== modal) {
             revokeObjectUrlVideoSource(objectUrl);
@@ -1924,9 +1915,10 @@ export const config: PlasmoCSConfig = {
         saveBtn.disabled = true;
         saveBtn.textContent = locale === 'zh' ? '保存中...' : 'Saving...';
         try {
-          const res = await fetch(`${serverUrl}/api/videos/${video.id}/save`, { method: 'POST' });
-          if (!res.ok) throw new Error(await readableError(res, 'Save failed'));
-          const saved = await res.json();
+          const saved = await sendRuntimeCommand({
+            type: 'runtime.asset.video.save',
+            payload: { assetId: video.id }
+          });
           detail.video = saved.video || { ...video, isSaved: true };
           currentAssetResult = { kind: 'video', detail };
           const entry = currentHistoryEntry();
@@ -2074,16 +2066,13 @@ export const config: PlasmoCSConfig = {
       data.similarImages.slice(0, 4).forEach((img) => {
         const thumbEl = modal.querySelector(`img[data-fp="${img.filePath}"]`);
         if (!thumbEl) return;
-        chrome.runtime.sendMessage(
-          { type: 'FETCH_IMAGE', url: `${serverUrl}/api/uploads/${img.filePath}` },
-          (response) => {
-            if (response?.dataUrl) {
-              thumbEl.src = response.dataUrl;
-            } else {
-              thumbEl.style.display = 'none';
-            }
-          }
-        );
+        getContentUrlWithRuntime('image', img.filePath)
+          .then((url) => chrome.runtime.sendMessage({ type: 'FETCH_IMAGE', url }))
+          .then((response) => {
+            if (response?.dataUrl) thumbEl.src = response.dataUrl;
+            else thumbEl.style.display = 'none';
+          })
+          .catch(() => { thumbEl.style.display = 'none'; });
       });
     }
 
@@ -2174,18 +2163,8 @@ export const config: PlasmoCSConfig = {
         const monday = getMonday(now);
         const dateStr = formatDate(monday);
 
-        const weekRes = await fetch(`${serverUrl}/api/weeks/${dateStr}`);
-        if (!weekRes.ok) throw new Error('Failed to get week');
-        const weekData = await weekRes.json();
-
         const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
-        const formData = new FormData();
-        formData.append('image', capturedBlob, 'screenshot' + ext);
-        formData.append('weekId', weekData.week.id);
-        formData.append('dayOfWeek', String(dayOfWeek));
-
-        const uploadRes = await fetch(`${serverUrl}/api/images`, { method: 'POST', body: formData });
-        if (!uploadRes.ok) throw new Error('Upload failed');
+        await saveImageWithRuntime(capturedBlob, 'screenshot' + ext, dateStr, dayOfWeek);
 
         // Mark current analysis as saved
         if (historyIndex >= 0 && analysisHistory[historyIndex]) {

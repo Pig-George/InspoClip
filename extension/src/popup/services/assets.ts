@@ -7,29 +7,7 @@ type ExtensionManifest = {
   }
 }
 
-function trimBase(url: string): string {
-  return String(url || "").replace(/\/+$/, "")
-}
-
-async function responseJson<T>(response: Response): Promise<T> {
-  const body = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    const error = body && typeof body === "object" && "error" in body ? String(body.error) : `HTTP ${response.status}`
-    throw new Error(error)
-  }
-  return body as T
-}
-
 export type AssetKind = "image" | "video" | "unsupported"
-
-export type ImageAnalysisResult = {
-  terms?: string[]
-  colors?: string[]
-  prompt?: {
-    en?: string
-    zh?: string
-  }
-}
 
 export type AssetAnalysisMessage = {
   type: "START_ASSET_ANALYSIS"
@@ -50,16 +28,6 @@ export function detectAssetKind(file: File): AssetKind {
   if (IMAGE_EXTENSIONS.some((extension) => name.endsWith(extension))) return "image"
   if (VIDEO_EXTENSIONS.some((extension) => name.endsWith(extension))) return "video"
   return "unsupported"
-}
-
-export async function uploadImageForAnalysis<T = ImageAnalysisResult>(
-  fetchFn: typeof fetch,
-  serverUrl: string,
-  file: File
-): Promise<T> {
-  const form = new FormData()
-  form.append("image", file, file.name || "asset.png")
-  return responseJson<T>(await fetchFn(`${trimBase(serverUrl)}/api/images/analyze`, { method: "POST", body: form }))
 }
 
 export function fileToDataUrl(file: File): Promise<string> {

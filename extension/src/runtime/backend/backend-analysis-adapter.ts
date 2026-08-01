@@ -102,6 +102,9 @@ export class BackendAnalysisAdapter implements AnalysisAdapter {
     form.append("video", input.blob, input.filename || "video.mp4")
     form.append("source", "extension")
     if (input.draft) form.append("draft", "true")
+    if (Number.isFinite(input.durationMs) && Number(input.durationMs) > 0) {
+      form.append("durationMs", String(Math.round(Number(input.durationMs))))
+    }
     return this.client.request<T>("/api/videos", { method: "POST", body: form })
   }
 
@@ -158,6 +161,22 @@ export class BackendAnalysisAdapter implements AnalysisAdapter {
       mimeType: blob.type || "video/mp4",
       draft: options?.draft
     })
+  }
+
+  async analyzeVideoUrl(videoUrl: string, options?: { draft?: boolean }): Promise<AnalysisJob> {
+    const result = await this.uploadVideoUrl<BackendVideoUpload>(videoUrl, options)
+    const timestamp = this.now()
+    return {
+      id: result.jobId,
+      assetId: result.videoId,
+      assetKind: "video",
+      mode: "backend",
+      status: mapStatus(result.status),
+      progress: 0,
+      result,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    }
   }
 
   getVideoJobRaw<T extends { status: string }>(jobId: string): Promise<T> {
@@ -226,12 +245,14 @@ export class BackendAnalysisAdapter implements AnalysisAdapter {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           purpose,
+          ...(input.target ? { target: input.target } : {}),
           ...(input.language ? { language: input.language } : {}),
           force: true
         })
       })
     } else {
       const params = new URLSearchParams({ purpose })
+      if (input.target) params.set("target", input.target)
       if (input.language) params.set("language", input.language)
       content = await this.client.request(`/api/videos/${encodeURIComponent(input.assetId)}/prompts?${params.toString()}`, {
         method: "GET"

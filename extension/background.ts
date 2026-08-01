@@ -4,9 +4,13 @@ import { fetchImageAsDataUrl, sendContentMessage } from "./src/background/messag
 import offscreenDocumentUrl from "url:./offscreen.html"
 import { getExtensionRelativeUrl, getOffscreenDocumentOptions, getTabCaptureStreamOptions, normalizeTabCaptureErrorMessage, prepareTabCaptureSource, startAreaCaptureWithPreparedSource } from "./src/background/offscreen-recording"
 import { openVideoInApp, saveVideoFromUrl } from "./src/background/video"
+import { createCommandRouter } from "./src/runtime/command-router"
+import { isExtensionCommand } from "./src/runtime/contracts"
+import { getBackgroundRuntime } from "./src/runtime/background-runtime"
 
 const OFFSCREEN_DOCUMENT_PATH = getExtensionRelativeUrl(offscreenDocumentUrl)
 let creatingOffscreenDocument: Promise<void> | null = null
+const runtimeCommandRouter = createCommandRouter(getBackgroundRuntime)
 
 chrome.runtime.onInstalled.addListener(() => {
   CONTEXT_MENUS.forEach((item) => chrome.contextMenus.create(item))
@@ -108,6 +112,16 @@ function startAreaCaptureSession(tabId: number, mode: "analyze" | "save"): Promi
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (isExtensionCommand(message)) {
+    runtimeCommandRouter.dispatch(message)
+      .then((response) => sendResponse(response))
+      .catch((error) => sendResponse({
+        ok: false,
+        error: { code: "UNKNOWN_ERROR", message: error instanceof Error ? error.message : "Runtime command failed", retryable: false }
+      }))
+    return true
+  }
+
   if (message.type === "START_AREA_CAPTURE_SESSION") {
     ;(async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -210,7 +224,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "CAPTURE_AND_UPLOAD") {
-    captureAndUpload(message.serverUrl, message.dayOfWeek)
+    captureAndUpload(message.dayOfWeek)
       .then((result) => sendResponse({ success: true, ...result }))
       .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Upload failed" }))
     return true
@@ -236,7 +250,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "UPLOAD_VIDEO_URL") {
-    saveVideoFromUrl(message.url, message.serverUrl, { draft: message.draft === true })
+    saveVideoFromUrl(message.url, { draft: message.draft === true })
       .then((result) => sendResponse({ success: true, ...result }))
       .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Upload failed" }))
     return true

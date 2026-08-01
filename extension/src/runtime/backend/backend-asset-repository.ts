@@ -4,6 +4,8 @@ import type {
   AssetQuery,
   AssetRepository,
   CreateAssetInput,
+  ImageAnalysisInput,
+  ImageSaveInput,
   Page
 } from "../contracts"
 import { RuntimeFailure } from "../errors"
@@ -38,10 +40,19 @@ export class BackendAssetRepository implements AssetRepository {
     return this.client.request<T>("/api/images", { method: "POST", body: form })
   }
 
-  checkImageSimilarity<T = unknown>(blob: Blob, filename = "image.jpg"): Promise<T> {
+  checkImageSimilarity(input: ImageAnalysisInput): Promise<unknown>
+  checkImageSimilarity<T = unknown>(blob: Blob, filename?: string): Promise<T>
+  checkImageSimilarity<T = unknown>(inputOrBlob: ImageAnalysisInput | Blob, filename = "image.jpg"): Promise<T> {
+    const blob = inputOrBlob instanceof Blob ? inputOrBlob : inputOrBlob.blob
+    const resolvedFilename = inputOrBlob instanceof Blob ? filename : inputOrBlob.filename
     const form = new FormData()
-    form.append("image", blob, filename)
+    form.append("image", blob, resolvedFilename)
     return this.client.request<T>("/api/images/check-similarity", { method: "POST", body: form })
+  }
+
+  async saveImage(input: ImageSaveInput): Promise<unknown> {
+    const week = await this.getWeek<{ week: { id: string } }>(input.weekStart)
+    return this.saveImageBlob(input.blob, input.filename, week.week.id, input.dayOfWeek)
   }
 
   saveVideo<T = unknown>(videoId: string): Promise<T> {
@@ -66,6 +77,10 @@ export class BackendAssetRepository implements AssetRepository {
 
   getVideoContentUrl(videoId: string): string {
     return this.client.buildUrl(`/api/videos/${encodeURIComponent(videoId)}/content`)
+  }
+
+  getContentUrl(kind: "image" | "video", reference: string): string {
+    return kind === "video" ? this.getVideoContentUrl(reference) : this.getImageContentUrl(reference)
   }
 
   async createDraft(input: CreateAssetInput): Promise<Asset> {

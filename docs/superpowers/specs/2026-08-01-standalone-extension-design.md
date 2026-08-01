@@ -141,6 +141,8 @@ type CommandResult<T> =
   | { ok: false; error: RuntimeError }
 ```
 
+领域端口继续使用 `Blob`，但 Chrome Runtime Messaging 不直接传输 `Blob`。第一阶段的消息 DTO 使用 `dataUrl`、文件名和 MIME 类型，Background 收到后再恢复为 `Blob`；这保持现有上传行为，并确保调用方不携带后端地址。进入本地持久化阶段后，大视频先写入 OPFS，命令只传递本地 Blob 引用，避免在消息通道中重复复制大体积 Data URL。
+
 事件由 Background 广播，页面可在重新注入或重新打开弹窗后订阅并恢复：
 
 - `analysis.job.updated`

@@ -101,12 +101,19 @@ export type ImageAnalysisInput = {
 
 export type VideoAnalysisInput = ImageAnalysisInput & {
   draft?: boolean
+  durationMs?: number
+}
+
+export type ImageSaveInput = ImageAnalysisInput & {
+  weekStart: string
+  dayOfWeek: number
 }
 
 export type PromptGenerationInput = {
   assetId: string
   purpose?: string
   language?: string
+  target?: string
   regenerate?: boolean
 }
 
@@ -122,11 +129,17 @@ export interface AssetRepository {
   list(query: AssetQuery): Promise<Page<Asset>>
   update(assetId: string, patch: AssetPatch): Promise<Asset>
   delete(assetId: string): Promise<void>
+  checkImageSimilarity(input: ImageAnalysisInput): Promise<unknown>
+  saveImage(input: ImageSaveInput): Promise<unknown>
+  saveVideo(assetId: string): Promise<unknown>
+  getVideoDetail(assetId: string): Promise<unknown>
+  getContentUrl(kind: AssetKind, reference: string): string
 }
 
 export interface AnalysisAdapter {
   analyzeImage(input: ImageAnalysisInput): Promise<AnalysisJob>
   analyzeVideo(input: VideoAnalysisInput): Promise<AnalysisJob>
+  analyzeVideoUrl(videoUrl: string, options?: { draft?: boolean }): Promise<AnalysisJob>
   generatePrompt(input: PromptGenerationInput): Promise<PromptResult>
   getJob(jobId: string): Promise<AnalysisJob | null>
   cancelJob(jobId: string): Promise<void>
@@ -154,13 +167,26 @@ export type ExtensionRuntime = {
   blobs?: BlobStore
 }
 
+export type SerializedBlobInput = {
+  dataUrl: string
+  filename: string
+  mimeType: string
+  assetId?: string
+}
+
 export type ExtensionCommand =
-  | { type: "runtime.asset.createDraft"; payload: CreateAssetInput }
+  | { type: "runtime.asset.createDraft"; payload: SerializedBlobInput & { kind: AssetKind; source?: string } }
   | { type: "runtime.asset.save"; payload: { assetId: string } }
   | { type: "runtime.asset.get"; payload: { assetId: string } }
   | { type: "runtime.asset.list"; payload: AssetQuery }
-  | { type: "runtime.analysis.image.start"; payload: ImageAnalysisInput }
-  | { type: "runtime.analysis.video.start"; payload: VideoAnalysisInput }
+  | { type: "runtime.asset.image.similarity"; payload: SerializedBlobInput }
+  | { type: "runtime.asset.image.save"; payload: SerializedBlobInput & { weekStart: string; dayOfWeek: number } }
+  | { type: "runtime.asset.video.get"; payload: { assetId: string } }
+  | { type: "runtime.asset.video.save"; payload: { assetId: string } }
+  | { type: "runtime.asset.content.url"; payload: { kind: AssetKind; reference: string } }
+  | { type: "runtime.analysis.image.start"; payload: SerializedBlobInput }
+  | { type: "runtime.analysis.video.start"; payload: SerializedBlobInput & { draft?: boolean; durationMs?: number } }
+  | { type: "runtime.analysis.video.url.start"; payload: { videoUrl: string; draft?: boolean } }
   | { type: "runtime.analysis.job.get"; payload: { jobId: string } }
   | { type: "runtime.analysis.job.cancel"; payload: { jobId: string } }
   | { type: "runtime.prompt.generate"; payload: PromptGenerationInput }
