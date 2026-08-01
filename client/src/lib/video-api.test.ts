@@ -21,7 +21,16 @@ describe('video API', () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'p', purpose: 'general', contentEn: 'x', contentZh: 'y' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
     await generateVideoOutput('v');
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ purpose: 'general' });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ purpose: 'general', force: false });
+  });
+
+  it('sends the force flag when regenerating output', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'p', purpose: 'general', contentEn: 'x', contentZh: 'y' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await generateVideoOutput('v', 'general', '', true);
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ purpose: 'general', target: '', force: true });
   });
 
   it('surfaces the server error body', async () => {

@@ -20,6 +20,7 @@ function setup() {
   };
   const removeFile = vi.fn().mockResolvedValue(undefined);
   const inspect = vi.fn().mockResolvedValue({ durationMs: 20_000, width: 1280, height: 720, container: 'mp4' });
+  const generateOutput = vi.fn(async (_value, purpose) => ({ en: `${purpose}: en`, zh: `${purpose}: zh` }));
   const app = express();
   app.use(express.json());
   app.use('/api/videos', createVideosRouter({
@@ -29,12 +30,12 @@ function setup() {
     thumbnail: vi.fn().mockResolvedValue('demo.thumb.jpg'),
     removeFile,
     getModelSettings: async () => ({ model: 'qwen3.7-plus', fps: 3 }),
-    generateOutput: async (_value, purpose) => ({ en: `${purpose}: en`, zh: `${purpose}: zh` }),
+    generateOutput,
     videoRoot: 'C:/videos',
     resolvePlacement: async () => ({ weekId: 'week-today', dayOfWeek: 0 }),
   }));
   app.use('/api/video-jobs', createVideoJobsRouter(repo));
-  return { app, repo, removeFile, inspect };
+  return { app, repo, removeFile, inspect, generateOutput };
 }
 
 describe('video routes', () => {
@@ -95,6 +96,26 @@ describe('video routes', () => {
     expect(generated.body).toMatchObject({ purpose: 'general', contentEn: 'general: en', contentZh: 'general: zh' });
     const cached = await request(app).get(`/api/videos/${uploaded.body.videoId}/prompts?purpose=general`);
     expect(cached.body.id).toBe(generated.body.id);
+  });
+
+  it('regenerates and replaces a cached prompt when force is true', async () => {
+    const { app, repo, generateOutput } = setup();
+    const uploaded = await request(app).post('/api/videos').send({});
+    const claimed = await repo.claimPendingJob();
+    await repo.completeJob(claimed!.id, analysis);
+    generateOutput
+      .mockResolvedValueOnce({ en: 'first en', zh: 'first zh' })
+      .mockResolvedValueOnce({ en: 'second en', zh: 'second zh' });
+
+    await request(app).post(`/api/videos/${uploaded.body.videoId}/prompts`).send({ purpose: 'general' });
+    const regenerated = await request(app)
+      .post(`/api/videos/${uploaded.body.videoId}/prompts`)
+      .send({ purpose: 'general', force: true });
+
+    expect(generateOutput).toHaveBeenCalledTimes(2);
+    expect(regenerated.body).toMatchObject({ contentEn: 'second en', contentZh: 'second zh' });
+    const cached = await request(app).get(`/api/videos/${uploaded.body.videoId}/prompts?purpose=general`);
+    expect(cached.body).toMatchObject({ contentEn: 'second en', contentZh: 'second zh' });
   });
 
   it('retries failed jobs and deletes files idempotently', async () => {

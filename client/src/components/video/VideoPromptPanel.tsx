@@ -157,7 +157,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
     };
   }, [videoId, purpose, loadExisting]);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (force = false) => {
     const inflight = getInflight(videoId, purpose);
     if (inflight) {
       setGenerating(true);
@@ -174,7 +174,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
 
     setGenerating(true);
     setError('');
-    const promise = generateVideoOutput(videoId, purpose, target);
+    const promise = generateVideoOutput(videoId, purpose, target, force);
     setInflight(videoId, purpose, promise);
     try {
       setOutput(await promise);
@@ -270,7 +270,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
 
       {!output && !loading && !generating && (
         <button
-          onClick={handleGenerate}
+          onClick={() => handleGenerate(false)}
           className="mt-3 flex items-center gap-1.5 rounded-full bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-heading text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20"
         >
           <Sparkles className="h-3.5 w-3.5" />
@@ -310,7 +310,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
                 }
               </button>
               <button
-                onClick={handleGenerate}
+                onClick={() => handleGenerate(true)}
                 disabled={generating}
                 className="rounded p-1 transition-colors hover:bg-[var(--muted)] disabled:opacity-40"
                 title={copy.regenerate}
