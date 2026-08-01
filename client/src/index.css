@@ -272,9 +272,13 @@ html {
 
 /* ── Video prompt Markdown rendering ── */
 .prose-video-prompt {
+  min-width: 0;
+  max-width: 100%;
   font-size: 0.875rem;
   line-height: 1.7;
   color: var(--text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .prose-video-prompt h1,

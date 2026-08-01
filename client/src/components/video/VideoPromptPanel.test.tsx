@@ -63,6 +63,16 @@ describe('VideoPromptPanel', () => {
     expect(await screen.findByText('new')).toBeInTheDocument();
   });
 
+  it('constrains long prompt text to the output box', async () => {
+    const longText = "what-you're-looking-for-without-break-opportunities";
+    vi.mocked(fetchVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', contentEn: longText, contentZh: longText });
+
+    renderWithLocale('en');
+
+    const promptContainer = (await screen.findByText(longText)).closest('.prose-video-prompt');
+    expect(promptContainer).toHaveClass('min-w-0', 'max-w-full', '[overflow-wrap:anywhere]');
+  });
+
   it('uses only the regenerate button spinner while refreshing an existing prompt', async () => {
     vi.mocked(fetchVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', contentEn: 'old', contentZh: 'old zh' });
     vi.mocked(generateVideoOutput).mockReturnValue(new Promise(() => {}));

@@ -73,6 +73,7 @@ const languageModeValues: LangMode[] = ['auto', 'en', 'zh', 'both'];
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_ATTEMPTS = 100; // 5 minutes max
+const promptContentClassName = 'prose-video-prompt min-w-0 max-w-full break-words [overflow-wrap:anywhere]';
 
 export function VideoPromptPanel({ videoId }: { videoId: string }) {
   const [purpose, setPurpose] = useState<VideoPurpose>('general');
@@ -328,7 +329,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
           ) : (
             <div className="space-y-2 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-3">
               {display.showEn && (
-                <div className="prose-video-prompt">
+                <div className={promptContentClassName}>
                   <ReactMarkdown>{display.en}</ReactMarkdown>
                 </div>
               )}
@@ -336,7 +337,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
                 <div className="border-t border-[var(--accent)]/10" />
               )}
               {display.showZh && (
-                <div className="prose-video-prompt">
+                <div className={promptContentClassName}>
                   <ReactMarkdown>{display.zh}</ReactMarkdown>
                 </div>
               )}
