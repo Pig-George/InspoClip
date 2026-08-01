@@ -26,7 +26,7 @@ export class RuntimeFactory {
     this.fetchFn = dependencies.fetchFn || fetch
   }
 
-  get(settings: RuntimeSettings): ExtensionRuntime {
+  async get(settings: RuntimeSettings): Promise<ExtensionRuntime> {
     if (settings.mode !== "backend") {
       throw new RuntimeFailure({
         code: "STANDALONE_MODE_NOT_ENABLED",
