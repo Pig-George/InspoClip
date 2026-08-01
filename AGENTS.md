@@ -69,6 +69,7 @@ pnpm test:version
 ```
 
 - `pnpm version:sync` 会同步 `client/package.json`、`server/package.json`、`extension/package.json` 和 `extension/legacy/manifest.json`；同步失败或检查发现版本漂移时不得继续合并或发布。
+- 根目录 `package.json` 与 `pnpm version:sync` 生成的全部版本文件必须在同一次 `develop` 版本提交中一并提交；缺少任一版本文件时不得合并、打标签、推送或创建 Release。
 
 ### 自动合并与发版流程
 
