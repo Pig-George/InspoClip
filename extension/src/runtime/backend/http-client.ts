@@ -17,8 +17,9 @@ function isRetryableStatus(status: number): boolean {
 }
 
 async function readJson(response: Response): Promise<unknown> {
-  if (response.status === 204 || response.headers.get("content-length") === "0") return undefined
-  const contentType = response.headers.get("content-type") || ""
+  if (response.status === 204 || response.headers?.get?.("content-length") === "0") return undefined
+  const contentType = response.headers?.get?.("content-type") || ""
+  if (!response.headers && typeof response.json === "function") return response.json().catch(() => undefined)
   if (!contentType.toLowerCase().includes("json")) return undefined
   return response.json().catch(() => undefined)
 }
