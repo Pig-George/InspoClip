@@ -259,7 +259,7 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
         )}
       </div>
 
-      {(loading || generating) && (
+      {(loading || generating) && !output && (
         <div className="mt-3 flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <Loader2 className="h-4 w-4 animate-spin" />
           {generating ? copy.generating : copy.loading}

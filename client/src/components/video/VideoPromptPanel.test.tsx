@@ -63,6 +63,21 @@ describe('VideoPromptPanel', () => {
     expect(await screen.findByText('new')).toBeInTheDocument();
   });
 
+  it('uses only the regenerate button spinner while refreshing an existing prompt', async () => {
+    vi.mocked(fetchVideoOutput).mockResolvedValue({ id: 'p', purpose: 'general', target: '', contentEn: 'old', contentZh: 'old zh' });
+    vi.mocked(generateVideoOutput).mockReturnValue(new Promise(() => {}));
+
+    renderWithLocale('en');
+
+    expect(await screen.findByText('old')).toBeInTheDocument();
+    const regenerate = screen.getByRole('button', { name: 'Regenerate' });
+    await userEvent.click(regenerate);
+
+    await waitFor(() => expect(generateVideoOutput).toHaveBeenCalledWith('v', 'general', '', true));
+    expect(screen.queryByText('Generating…')).not.toBeInTheDocument();
+    expect(regenerate.querySelector('svg')).toHaveClass('animate-spin');
+  });
+
   it('renders as an integrated sidebar section', () => {
     renderWithLocale();
 
