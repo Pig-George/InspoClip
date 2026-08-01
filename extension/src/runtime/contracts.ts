@@ -46,6 +46,11 @@ export type Asset = {
   title?: string
   titleEn?: string
   titleZh?: string
+  filename?: string
+  mimeType?: string
+  size?: number
+  source?: string
+  durationMs?: number
   blob?: BlobRef
   thumbnail?: BlobRef
   analysis?: unknown
@@ -61,6 +66,11 @@ export type AnalysisJob = {
   progress?: number
   result?: unknown
   error?: RuntimeError
+  provider?: string
+  model?: string
+  retryCount?: number
+  nextRetryAt?: string
+  remoteFileId?: string
   createdAt: string
   updatedAt: string
 }
