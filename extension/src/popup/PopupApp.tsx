@@ -48,7 +48,7 @@ export function PopupApp() {
         />
       </main>
 
-      <Footer t={popup.t} onOpenApp={popup.openApp} showWorkspaceLink={popup.runtimeMode === "backend"} />
+      <Footer t={popup.t} onOpenApp={popup.openWorkspace} />
       <StatusBanner status={popup.status} />
 
       <SettingsSection

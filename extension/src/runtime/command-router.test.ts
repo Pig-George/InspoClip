@@ -79,4 +79,19 @@ describe("runtime command router", () => {
       data: { usedBytes: 2048, quotaBytes: 4096 }
     })
   })
+
+  test("reads local asset content as a data URL", async () => {
+    const router = createCommandRouter(async () => ({
+      mode: "standalone",
+      assets: {
+        get: async () => ({ id: "asset-1", blob: { store: "standalone", key: "images/asset-1/original.png", mimeType: "image/png", size: 5 } })
+      },
+      blobs: { get: async () => new Blob(["image"], { type: "image/png" }) }
+    } as unknown as ExtensionRuntime))
+
+    await expect(router.dispatch({ type: "runtime.asset.content.read", payload: { assetId: "asset-1" } })).resolves.toMatchObject({
+      ok: true,
+      data: { dataUrl: "data:image/png;base64,aW1hZ2U=", mimeType: "image/png" }
+    })
+  })
 })

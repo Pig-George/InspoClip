@@ -22,6 +22,13 @@ function dataUrlToBlob(input: SerializedBlobInput): Blob {
   return new Blob([bytes], { type: input.mimeType || header.match(/^data:([^;,]+)/)?.[1] || "application/octet-stream" })
 }
 
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  let binary = ""
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return `data:${blob.type || "application/octet-stream"};base64,${btoa(binary)}`
+}
+
 async function execute(runtime: ExtensionRuntime, command: ExtensionCommand): Promise<unknown> {
   switch (command.type) {
     case "runtime.asset.createDraft":
@@ -60,6 +67,13 @@ async function execute(runtime: ExtensionRuntime, command: ExtensionCommand): Pr
       return runtime.assets.saveVideo(command.payload.assetId)
     case "runtime.asset.content.url":
       return runtime.assets.getContentUrl(command.payload.kind, command.payload.reference)
+    case "runtime.asset.content.read": {
+      const asset = await runtime.assets.get(command.payload.assetId)
+      if (!asset?.blob || !runtime.blobs) throw new Error("Local asset content is unavailable")
+      const blob = await runtime.blobs.get(asset.blob)
+      if (!blob) throw new Error("Local asset content is unavailable")
+      return { dataUrl: await blobToDataUrl(blob), mimeType: blob.type || asset.mimeType || "application/octet-stream" }
+    }
     case "runtime.analysis.image.start":
       return runtime.analysis.analyzeImage({
         assetId: command.payload.assetId,

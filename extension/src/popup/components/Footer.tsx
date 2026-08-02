@@ -6,13 +6,12 @@ import { PopupIcon } from "./PopupIcon"
 type FooterProps = {
   t: I18nMessages
   onOpenApp: (event: React.MouseEvent<HTMLAnchorElement>) => void
-  showWorkspaceLink?: boolean
 }
 
-export function Footer({ t, onOpenApp, showWorkspaceLink = true }: FooterProps) {
+export function Footer({ t, onOpenApp }: FooterProps) {
   return (
     <div className="footer">
-      {showWorkspaceLink ? <a href="#" onClick={onOpenApp}><PopupIcon name="external-link" />{t.openInspoClip}</a> : null}
+      <a href="#" onClick={onOpenApp}><PopupIcon name="external-link" />{t.openInspoClip}</a>
     </div>
   )
 }

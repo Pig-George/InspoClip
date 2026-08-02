@@ -6,13 +6,12 @@ import { I18N } from "../constants"
 import { Footer } from "./Footer"
 
 describe("Footer runtime mode visibility", () => {
-  test("hides the workspace link in standalone mode", () => {
+  test("keeps the workspace link available for standalone timeline navigation", () => {
     const markup = renderToStaticMarkup(createElement(Footer, {
       onOpenApp: vi.fn(),
-      showWorkspaceLink: false,
       t: I18N.en
     }))
 
-    expect(markup).not.toContain("Open InspoClip")
+    expect(markup).toContain("Open InspoClip")
   })
 })

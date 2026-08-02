@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { DEFAULT_APP_URL, DEFAULT_MODEL_SETTINGS, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS, I18N, MAX_VIDEO_SIZE_BYTES, detectBrowserLocale } from "../constants"
 import { buildAssetAnalysisMessage, detectAssetKind } from "../services/assets"
 import { loadPopupSettings, normalizeAppUrl, normalizeServerUrl, savePopupSettings } from "../services/settings"
-import { getTabDisplayLabel, openOrFocusApp, requestAreaCaptureSession, sendCurrentTabMessage } from "../services/tabs"
+import { getTabDisplayLabel, openOrFocusApp, openOrFocusLocalTimeline, requestAreaCaptureSession, sendCurrentTabMessage } from "../services/tabs"
 import { sendRuntimeCommand } from "../../runtime/command-client"
 import type { CaptureMode, ConnectionState, Locale, ModelSettings, RuntimeMode, ShortcutTarget, StatusMessage, StorageUsage } from "../types"
 
@@ -127,6 +127,15 @@ export function usePopupController() {
     await openOrFocusApp(appUrl)
   }
 
+  async function openWorkspace(event: React.MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault()
+    if (runtimeMode === "standalone") {
+      await openOrFocusLocalTimeline()
+      return
+    }
+    await openOrFocusApp(appUrl)
+  }
+
   function showStatus(message: string, type: StatusMessage["type"]) {
     setStatus({ message, type })
     setTimeout(() => setStatus(null), 3000)
@@ -184,6 +193,7 @@ export function usePopupController() {
     handleAssetFile,
     handleAssetUrl,
     openApp,
+    openWorkspace,
     saveSettings,
     setAppUrl,
     setCaptureMode,

@@ -194,6 +194,7 @@ export type ExtensionCommand =
   | { type: "runtime.asset.video.get"; payload: { assetId: string } }
   | { type: "runtime.asset.video.save"; payload: { assetId: string } }
   | { type: "runtime.asset.content.url"; payload: { kind: AssetKind; reference: string } }
+  | { type: "runtime.asset.content.read"; payload: { assetId: string } }
   | { type: "runtime.analysis.image.start"; payload: SerializedBlobInput }
   | { type: "runtime.analysis.video.start"; payload: SerializedBlobInput & { draft?: boolean; durationMs?: number } }
   | { type: "runtime.analysis.video.url.start"; payload: { videoUrl: string; draft?: boolean } }
