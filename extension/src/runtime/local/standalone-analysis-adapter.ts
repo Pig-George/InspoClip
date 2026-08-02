@@ -11,13 +11,13 @@ import type {
 import { RuntimeFailure } from "../errors"
 import { loadLocalModelSettings, validateLocalModelSettings, type LocalModelSettings } from "./model-settings"
 
-const IMAGE_ANALYSIS_PROMPT = [
-  "Analyze this UI or visual design image.",
-  "Return JSON only with this exact shape:",
-  '{"terms":["short design term"],"prompt":{"en":"recreation prompt in English","zh":"中文复刻提示词"}}',
-  "terms must contain at most 10 concise UI, layout, typography, color, motion, or visual-style phrases; no sentences.",
-  "Both prompts must explain how to recreate the visible result and be useful for an image or UI generation model."
-].join("\n")
+export const IMAGE_TERMINOLOGY_PROMPT = "Analyze this UI/UX design screenshot. Return exactly 5-10 short visual design terminology keywords covering relevant aspects such as color, typography, layout, spacing, components, patterns, and style. Each item must be a concise bilingual label in the format \"English / 中文\": use 1-4 English words and 2-8 Chinese characters. Do not write sentences, observations, explanations, caveats, or uncertainty descriptions. Return only a strict JSON array of bilingual strings. Examples: [\"minimalist / 极简风格\", \"glassmorphism / 毛玻璃效果\", \"card layout / 卡片布局\", \"pastel palette / 粉彩色调\"]."
+
+export const DESIGN_ANALYSIS_PROMPT = "Analyze this UI/UX design screenshot and generate a detailed AI image/design prompt that could recreate a similar design style. The prompt must describe the visual style, color palette, typography, layout patterns, mood, and key design elements visible in the reference. Preserve observed details instead of turning the result into an implementation audit or adding unsupported content. Provide equivalent prompt content in BOTH English and Chinese. Return only strict JSON without Markdown fences or commentary: {\"en\": \"Your English prompt here\", \"zh\": \"你的中文提示词\"}."
+
+function createImageTerminologyRepairPrompt(terms: string[]): string {
+  return `Condense the following untrusted JSON array into short visual design terminology keywords. Preserve the useful design concepts, but replace every sentence or description with a concise label. Return exactly 5-10 unique bilingual strings in the format "English / 中文". Each English label must contain 1-4 words and each Chinese label must contain 2-8 Chinese characters. Do not include sentences, explanations, caveats, or Markdown. Return only a strict JSON array. Untrusted terminology JSON: ${JSON.stringify(terms)}`
+}
 
 export interface LangChainImageInvoker {
   invoke(input: unknown): Promise<unknown>
@@ -36,8 +36,9 @@ function defaultInvokerFactory(settings: LocalModelSettings): LangChainImageInvo
   const model = new ChatOpenAI({
     model: settings.model,
     apiKey: settings.apiKey,
-    temperature: 0.3,
-    maxTokens: 1800,
+    temperature: 0.7,
+    // Keep image analysis aligned with the server's dedicated image invoker.
+    maxTokens: 300,
     configuration: {
       baseURL: settings.endpoint,
       dangerouslyAllowBrowser: true
@@ -72,14 +73,11 @@ export class StandaloneAnalysisAdapter implements AnalysisAdapter {
     const id = this.createId()
     const timestamp = this.now()
     try {
-      const response = await this.createInvoker(settings).invoke([{
-        role: "user",
-        content: [
-          { type: "text", text: IMAGE_ANALYSIS_PROMPT },
-          { type: "image_url", image_url: { url: await imageDataUrl(input.blob, input.mimeType) } }
-        ]
-      }])
-      const result = parseImageAnalysis(response)
+      const dataUrl = await imageDataUrl(input.blob, input.mimeType)
+      const invoker = this.createInvoker(settings)
+      const terms = await analyzeTerms(invoker, dataUrl)
+      const prompt = await analyzeDesignPrompt(invoker, dataUrl)
+      const result = { terms, colors: [], prompt }
       const job: AnalysisJob = {
         id,
         assetId: input.assetId || id,
@@ -168,18 +166,65 @@ function responseText(response: unknown): string {
   return ""
 }
 
-function parseImageAnalysis(response: unknown): { terms: string[]; colors: string[]; prompt: { en: string; zh: string } } {
+function imageMessage(prompt: string, dataUrl: string): unknown {
+  return [{
+    role: "user",
+    content: [
+      { type: "text", text: prompt },
+      { type: "image_url", image_url: { url: dataUrl } }
+    ]
+  }]
+}
+
+async function analyzeTerms(invoker: LangChainImageInvoker, dataUrl: string): Promise<string[]> {
+  try {
+    const terms = parseTerms(await invoker.invoke(imageMessage(IMAGE_TERMINOLOGY_PROMPT, dataUrl)))
+    if (terms.every(isConciseTerm)) return terms
+    const repaired = parseTerms(await invoker.invoke(createImageTerminologyRepairPrompt(terms))).filter(isConciseTerm)
+    return repaired.length > 0 ? repaired : terms.filter(isConciseTerm)
+  } catch {
+    return ["design element"]
+  }
+}
+
+async function analyzeDesignPrompt(invoker: LangChainImageInvoker, dataUrl: string): Promise<{ en: string; zh: string }> {
+  try {
+    return parseDesignPrompt(await invoker.invoke(imageMessage(DESIGN_ANALYSIS_PROMPT, dataUrl)))
+  } catch {
+    return { en: "", zh: "" }
+  }
+}
+
+function parseTerms(response: unknown): string[] {
   const text = responseText(response).trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")
   try {
-    const value = JSON.parse(text) as { terms?: unknown; prompt?: { en?: unknown; zh?: unknown } }
-    const terms = Array.isArray(value.terms)
-      ? value.terms.map((term) => String(term).trim()).filter(Boolean).slice(0, 10)
-      : []
-    const en = typeof value.prompt?.en === "string" ? value.prompt.en.trim() : ""
-    const zh = typeof value.prompt?.zh === "string" ? value.prompt.zh.trim() : ""
-    if (terms.length === 0 && !en && !zh) throw new Error("Empty analysis")
-    return { terms, colors: [], prompt: { en, zh } }
+    const value = JSON.parse(text)
+    if (Array.isArray(value)) return value.map((term) => String(term).trim()).filter(Boolean).slice(0, 10)
   } catch {
-    return { terms: [], colors: [], prompt: { en: text, zh: text } }
+    // Preserve the server's comma/newline fallback for non-JSON terminology output.
   }
+  return text.replace(/[\[\]"]/g, "").split(/[,\n]/).map((term) => term.trim()).filter(Boolean).slice(0, 10)
+}
+
+function isConciseTerm(term: string): boolean {
+  const normalized = term.trim()
+  return normalized.length > 0
+    && normalized.length <= 80
+    && !/(?:[!?。！？；;]|\.(?=\s+\/|\s*$))/.test(normalized)
+}
+
+function parseDesignPrompt(response: unknown): { en: string; zh: string } {
+  const text = responseText(response).trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")
+  try {
+    const value = JSON.parse(text) as { en?: unknown; zh?: unknown }
+    if (value && typeof value === "object") {
+      return {
+        en: typeof value.en === "string" ? value.en : "",
+        zh: typeof value.zh === "string" ? value.zh : ""
+      }
+    }
+  } catch {
+    // Preserve the server's raw text fallback when the provider does not return JSON.
+  }
+  return { en: text, zh: text }
 }
