@@ -1,10 +1,12 @@
 import { DEFAULT_APP_URL, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS } from "../constants"
 import type { Locale, PopupSettings, ShortcutSettings } from "../types"
+import { loadRuntimeMode, saveRuntimeMode } from "../../runtime/settings"
 
 export async function loadPopupSettings(): Promise<PopupSettings> {
   const result = await chrome.storage.sync.get(["serverUrl", "appUrl", "shortcuts", "lang"])
   const serverUrl = result.serverUrl || DEFAULT_SERVER_URL
   return {
+    runtimeMode: await loadRuntimeMode(),
     serverUrl,
     appUrl: result.appUrl || serverUrl.replace(/:3001$/, ":8080") || DEFAULT_APP_URL,
     shortcuts: {
@@ -16,6 +18,7 @@ export async function loadPopupSettings(): Promise<PopupSettings> {
 }
 
 export async function savePopupSettings(settings: PopupSettings): Promise<void> {
+  await saveRuntimeMode(settings.runtimeMode)
   await chrome.storage.sync.set({
     serverUrl: settings.serverUrl,
     appUrl: settings.appUrl,

@@ -82,6 +82,8 @@ async function execute(runtime: ExtensionRuntime, command: ExtensionCommand): Pr
       return runtime.analysis.getJob(command.payload.jobId)
     case "runtime.analysis.job.cancel":
       return runtime.analysis.cancelJob(command.payload.jobId)
+    case "runtime.storage.usage":
+      return runtime.blobs?.usage() || { usedBytes: 0 }
     case "runtime.prompt.generate":
       return runtime.analysis.generatePrompt(command.payload)
   }

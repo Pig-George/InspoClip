@@ -49,7 +49,13 @@ export const I18N: Record<Locale, I18nMessages> = {
     publicVideoUrl: "Analyze a public video URL",
     settingsDescription: "Connection addresses and keyboard shortcuts",
     serviceConnection: "Service connection",
-    pageUnavailable: "Current page"
+    pageUnavailable: "Current page",
+    runtimeMode: "Runtime mode",
+    backendMode: "Backend service",
+    standaloneMode: "Local mode",
+    standaloneModeHint: "Assets stay in this browser. AI provider setup will be available in a later phase.",
+    localStorageUsage: "Local storage",
+    localModeReady: "Local storage ready"
   },
   zh: {
     subtitle: "设计灵感剪贴簿",
@@ -88,7 +94,13 @@ export const I18N: Record<Locale, I18nMessages> = {
     publicVideoUrl: "通过公开视频链接分析",
     settingsDescription: "连接地址与快捷键",
     serviceConnection: "服务连接",
-    pageUnavailable: "当前页面"
+    pageUnavailable: "当前页面",
+    runtimeMode: "运行模式",
+    backendMode: "后端服务",
+    standaloneMode: "独立运行",
+    standaloneModeHint: "素材保存在当前浏览器。AI 模型配置将在后续阶段开放。",
+    localStorageUsage: "本地存储",
+    localModeReady: "本地存储已就绪"
   }
 }
 

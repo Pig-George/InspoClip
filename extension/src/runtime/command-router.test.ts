@@ -67,4 +67,16 @@ describe("runtime command router", () => {
       error: { code: "UNKNOWN_ERROR", message: "Save failed", retryable: false }
     })
   })
+
+  test("returns local storage usage through the runtime boundary", async () => {
+    const router = createCommandRouter(async () => ({
+      mode: "standalone",
+      blobs: { usage: async () => ({ usedBytes: 2048, quotaBytes: 4096 }) }
+    } as unknown as ExtensionRuntime))
+
+    await expect(router.dispatch({ type: "runtime.storage.usage", payload: {} })).resolves.toEqual({
+      ok: true,
+      data: { usedBytes: 2048, quotaBytes: 4096 }
+    })
+  })
 })

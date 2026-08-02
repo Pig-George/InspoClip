@@ -199,6 +199,7 @@ export type ExtensionCommand =
   | { type: "runtime.analysis.video.url.start"; payload: { videoUrl: string; draft?: boolean } }
   | { type: "runtime.analysis.job.get"; payload: { jobId: string } }
   | { type: "runtime.analysis.job.cancel"; payload: { jobId: string } }
+  | { type: "runtime.storage.usage"; payload: Record<string, never> }
   | { type: "runtime.prompt.generate"; payload: PromptGenerationInput }
 
 export function isExtensionCommand(value: unknown): value is ExtensionCommand {

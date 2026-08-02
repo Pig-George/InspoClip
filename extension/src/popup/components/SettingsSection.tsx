@@ -1,4 +1,4 @@
-import type { I18nMessages, ShortcutTarget } from "../types"
+import type { I18nMessages, RuntimeMode, ShortcutTarget } from "../types"
 import { formatShortcut } from "../shortcut"
 import { PopupIcon } from "./PopupIcon"
 
@@ -6,13 +6,16 @@ type SettingsSectionProps = {
   appUrl: string
   open: boolean
   recordingShortcut: ShortcutTarget | null
+  runtimeMode: RuntimeMode
   serverUrl: string
   shortcutAnalyze: string
   shortcutSave: string
+  storageUsageLabel?: string
   t: I18nMessages
   onAppUrlChange: (value: string) => void
   onClose: () => void
   onSaveSettings: () => void | Promise<void>
+  onRuntimeModeChange: (value: RuntimeMode) => void
   onServerUrlChange: (value: string) => void
   onSetShortcutAnalyze: (value: string) => void
   onSetShortcutSave: (value: string) => void
@@ -23,13 +26,16 @@ export function SettingsSection({
   appUrl,
   open,
   recordingShortcut,
+  runtimeMode,
   serverUrl,
   shortcutAnalyze,
   shortcutSave,
+  storageUsageLabel,
   t,
   onAppUrlChange,
   onClose,
   onSaveSettings,
+  onRuntimeModeChange,
   onServerUrlChange,
   onSetShortcutAnalyze,
   onSetShortcutSave,
@@ -43,6 +49,19 @@ export function SettingsSection({
       </div>
 
       <div className="settings-content">
+        <div className="settings-card">
+          <h3><PopupIcon name="server" />{t.runtimeMode}</h3>
+          <select className="runtime-mode-select" value={runtimeMode} onChange={(event) => onRuntimeModeChange(event.target.value as RuntimeMode)}>
+            <option value="standalone">{t.standaloneMode}</option>
+            <option value="backend">{t.backendMode}</option>
+          </select>
+          {runtimeMode === "standalone" ? (
+            <>
+              <p className="settings-hint">{t.standaloneModeHint}</p>
+              <div className="storage-usage"><span>{t.localStorageUsage}</span><strong>{storageUsageLabel || "..."}</strong></div>
+            </>
+          ) : null}
+        </div>
         <div className="settings-card">
           <h3><PopupIcon name="server" />{t.serviceConnection}</h3>
           <label htmlFor="serverUrl">Server URL</label>

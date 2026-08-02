@@ -55,9 +55,11 @@ export function PopupApp() {
         appUrl={popup.appUrl}
         open={popup.settingsOpen}
         recordingShortcut={popup.recordingShortcut}
+        runtimeMode={popup.runtimeMode}
         serverUrl={popup.serverUrl}
         shortcutAnalyze={popup.shortcutAnalyze}
         shortcutSave={popup.shortcutSave}
+        storageUsageLabel={popup.storageUsageLabel}
         t={popup.t}
         onAppUrlChange={popup.setAppUrl}
         onClose={() => popup.setSettingsOpen(false)}
@@ -65,6 +67,7 @@ export function PopupApp() {
           await popup.saveSettings()
           popup.setSettingsOpen(false)
         }}
+        onRuntimeModeChange={popup.setRuntimeMode}
         onServerUrlChange={popup.setServerUrl}
         onSetShortcutAnalyze={popup.setShortcutAnalyze}
         onSetShortcutSave={popup.setShortcutSave}

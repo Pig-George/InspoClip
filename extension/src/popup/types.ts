@@ -3,6 +3,8 @@ export type Locale = "en" | "zh"
 export type CaptureMode = "area" | "page"
 
 export type ConnectionState = "testing" | "connected" | "error"
+export type RuntimeMode = "backend" | "standalone"
+export type StorageUsage = { usedBytes: number; quotaBytes?: number }
 
 export type ShortcutTarget = "analyze" | "save"
 
@@ -17,6 +19,7 @@ export type ShortcutSettings = {
 }
 
 export type PopupSettings = {
+  runtimeMode: RuntimeMode
   serverUrl: string
   appUrl: string
   shortcuts: ShortcutSettings
@@ -61,4 +64,10 @@ export type I18nMessages = {
   settingsDescription: string
   serviceConnection: string
   pageUnavailable: string
+  runtimeMode: string
+  backendMode: string
+  standaloneMode: string
+  standaloneModeHint: string
+  localStorageUsage: string
+  localModeReady: string
 }

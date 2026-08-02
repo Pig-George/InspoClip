@@ -4,11 +4,14 @@ import { DEFAULT_APP_URL, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS, I18N, MAX_VIDEO
 import { buildAssetAnalysisMessage, detectAssetKind } from "../services/assets"
 import { loadPopupSettings, normalizeAppUrl, normalizeServerUrl, savePopupSettings } from "../services/settings"
 import { getTabDisplayLabel, openOrFocusApp, requestAreaCaptureSession, sendCurrentTabMessage } from "../services/tabs"
-import type { CaptureMode, ConnectionState, Locale, ShortcutTarget, StatusMessage } from "../types"
+import { sendRuntimeCommand } from "../../runtime/command-client"
+import type { CaptureMode, ConnectionState, Locale, RuntimeMode, ShortcutTarget, StatusMessage, StorageUsage } from "../types"
 
 export function usePopupController() {
   const [locale, setLocale] = useState<Locale>(() => detectBrowserLocale())
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL)
+  const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>("backend")
+  const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
   const [appUrl, setAppUrl] = useState(DEFAULT_APP_URL)
   const [captureMode, setCaptureMode] = useState<CaptureMode>("area")
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -26,6 +29,7 @@ export function usePopupController() {
 
   useEffect(() => {
     loadPopupSettings().then((settings) => {
+      setRuntimeMode(settings.runtimeMode)
       setServerUrl(settings.serverUrl)
       setAppUrl(settings.appUrl)
       setShortcutAnalyze(settings.shortcuts.analyze)
@@ -41,8 +45,14 @@ export function usePopupController() {
   }, [])
 
   useEffect(() => {
+    if (runtimeMode === "standalone") {
+      setConnectionState("connected")
+      setConnectionLabel(I18N[locale].localModeReady)
+      void sendRuntimeCommand<StorageUsage>({ type: "runtime.storage.usage", payload: {} }).then(setStorageUsage).catch(() => setStorageUsage(null))
+      return
+    }
     void testServerConnection()
-  }, [serverUrl, locale])
+  }, [serverUrl, locale, runtimeMode])
 
   async function testServerConnection() {
     setConnectionState("testing")
@@ -77,6 +87,7 @@ export function usePopupController() {
     setAppUrl(normalizedAppUrl)
     await savePopupSettings({
       serverUrl: normalizedServerUrl,
+      runtimeMode,
       appUrl: normalizedAppUrl,
       shortcuts: {
         analyze: shortcutAnalyze.trim(),
@@ -84,7 +95,13 @@ export function usePopupController() {
       },
       lang: locale
     })
-    await testServerConnection()
+    if (runtimeMode === "backend") {
+      await testServerConnection()
+    } else {
+      setConnectionState("connected")
+      setConnectionLabel(I18N[locale].localModeReady)
+      void sendRuntimeCommand<StorageUsage>({ type: "runtime.storage.usage", payload: {} }).then(setStorageUsage).catch(() => setStorageUsage(null))
+    }
   }
 
   async function triggerAnalyze() {
@@ -151,6 +168,9 @@ export function usePopupController() {
     locale,
     recordingShortcut,
     serverUrl,
+    runtimeMode,
+    storageUsage,
+    storageUsageLabel: formatStorageUsage(storageUsage),
     settingsOpen,
     shortcutAnalyze,
     shortcutSave,
@@ -165,6 +185,7 @@ export function usePopupController() {
     setCaptureMode,
     setRecordingShortcut,
     setServerUrl,
+    setRuntimeMode,
     setSettingsOpen,
     setShortcutAnalyze,
     setShortcutSave,
@@ -173,4 +194,14 @@ export function usePopupController() {
     toggleLanguage,
     triggerAnalyze
   }
+}
+
+function formatStorageUsage(usage: StorageUsage | null): string {
+  if (!usage) return "..."
+  const format = (value: number) => {
+    if (value < 1024) return `${value} B`
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`
+  }
+  return usage.quotaBytes ? `${format(usage.usedBytes)} / ${format(usage.quotaBytes)}` : format(usage.usedBytes)
 }
