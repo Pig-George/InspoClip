@@ -4,6 +4,7 @@ import { IndexedDbAssetRepository } from "./indexed-db-asset-repository"
 import { IndexedDbJobRepository } from "./indexed-db-job-repository"
 import { OpfsBlobStore } from "./opfs-blob-store"
 import { StandaloneAnalysisAdapter } from "./standalone-analysis-adapter"
+import { cleanupExpiredDrafts } from "./draft-cleanup"
 
 type StandaloneRuntimeOptions = {
   indexedDb?: IDBFactory
@@ -16,11 +17,14 @@ export async function createStandaloneRuntime(options: StandaloneRuntimeOptions 
   const database = await openInspoClipDb(options.indexedDb || indexedDB, options.databaseName || LOCAL_DATABASE_NAME)
   options.onDatabaseOpen?.(database)
   const blobs = options.blobs || new OpfsBlobStore()
+  const jobs = new IndexedDbJobRepository(database)
+  const assets = new IndexedDbAssetRepository(database, blobs)
+  await cleanupExpiredDrafts({ assets, jobs }).catch(() => undefined)
   return {
     mode: "standalone",
-    assets: new IndexedDbAssetRepository(database, blobs),
+    assets,
     analysis: new StandaloneAnalysisAdapter(),
-    jobs: new IndexedDbJobRepository(database),
+    jobs,
     blobs
   }
 }
