@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useState } from "react"
 
-import { DEFAULT_APP_URL, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS, I18N, MAX_VIDEO_SIZE_BYTES, detectBrowserLocale } from "../constants"
+import { DEFAULT_APP_URL, DEFAULT_MODEL_SETTINGS, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS, I18N, MAX_VIDEO_SIZE_BYTES, detectBrowserLocale } from "../constants"
 import { buildAssetAnalysisMessage, detectAssetKind } from "../services/assets"
 import { loadPopupSettings, normalizeAppUrl, normalizeServerUrl, savePopupSettings } from "../services/settings"
 import { getTabDisplayLabel, openOrFocusApp, requestAreaCaptureSession, sendCurrentTabMessage } from "../services/tabs"
 import { sendRuntimeCommand } from "../../runtime/command-client"
-import type { CaptureMode, ConnectionState, Locale, RuntimeMode, ShortcutTarget, StatusMessage, StorageUsage } from "../types"
+import type { CaptureMode, ConnectionState, Locale, ModelSettings, RuntimeMode, ShortcutTarget, StatusMessage, StorageUsage } from "../types"
 
 export function usePopupController() {
   const [locale, setLocale] = useState<Locale>(() => detectBrowserLocale())
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL)
   const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>("backend")
+  const [modelSettings, setModelSettings] = useState<ModelSettings>(DEFAULT_MODEL_SETTINGS)
   const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
   const [appUrl, setAppUrl] = useState(DEFAULT_APP_URL)
   const [captureMode, setCaptureMode] = useState<CaptureMode>("area")
@@ -30,6 +31,7 @@ export function usePopupController() {
   useEffect(() => {
     loadPopupSettings().then((settings) => {
       setRuntimeMode(settings.runtimeMode)
+      setModelSettings(settings.modelSettings)
       setServerUrl(settings.serverUrl)
       setAppUrl(settings.appUrl)
       setShortcutAnalyze(settings.shortcuts.analyze)
@@ -88,6 +90,7 @@ export function usePopupController() {
     await savePopupSettings({
       serverUrl: normalizedServerUrl,
       runtimeMode,
+      modelSettings,
       appUrl: normalizedAppUrl,
       shortcuts: {
         analyze: shortcutAnalyze.trim(),
@@ -169,6 +172,7 @@ export function usePopupController() {
     recordingShortcut,
     serverUrl,
     runtimeMode,
+    modelSettings,
     storageUsage,
     storageUsageLabel: formatStorageUsage(storageUsage),
     settingsOpen,
@@ -186,6 +190,7 @@ export function usePopupController() {
     setRecordingShortcut,
     setServerUrl,
     setRuntimeMode,
+    setModelSettings,
     setSettingsOpen,
     setShortcutAnalyze,
     setShortcutSave,

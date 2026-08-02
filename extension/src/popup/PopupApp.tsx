@@ -48,11 +48,12 @@ export function PopupApp() {
         />
       </main>
 
-      <Footer t={popup.t} version={version} onOpenApp={popup.openApp} />
+      <Footer t={popup.t} version={version} onOpenApp={popup.openApp} showWorkspaceLink={popup.runtimeMode === "backend"} />
       <StatusBanner status={popup.status} />
 
       <SettingsSection
         appUrl={popup.appUrl}
+        modelSettings={popup.modelSettings}
         open={popup.settingsOpen}
         recordingShortcut={popup.recordingShortcut}
         runtimeMode={popup.runtimeMode}
@@ -62,6 +63,7 @@ export function PopupApp() {
         storageUsageLabel={popup.storageUsageLabel}
         t={popup.t}
         onAppUrlChange={popup.setAppUrl}
+        onModelSettingsChange={popup.setModelSettings}
         onClose={() => popup.setSettingsOpen(false)}
         onSaveSettings={async () => {
           await popup.saveSettings()

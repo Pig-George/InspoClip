@@ -5,6 +5,13 @@ export type CaptureMode = "area" | "page"
 export type ConnectionState = "testing" | "connected" | "error"
 export type RuntimeMode = "backend" | "standalone"
 export type StorageUsage = { usedBytes: number; quotaBytes?: number }
+export type ModelProvider = "qwen" | "openai-compatible"
+export type ModelSettings = {
+  provider: ModelProvider
+  endpoint: string
+  model: string
+  apiKey: string
+}
 
 export type ShortcutTarget = "analyze" | "save"
 
@@ -20,6 +27,7 @@ export type ShortcutSettings = {
 
 export type PopupSettings = {
   runtimeMode: RuntimeMode
+  modelSettings: ModelSettings
   serverUrl: string
   appUrl: string
   shortcuts: ShortcutSettings
@@ -70,4 +78,12 @@ export type I18nMessages = {
   standaloneModeHint: string
   localStorageUsage: string
   localModeReady: string
+  modelConfiguration: string
+  modelProvider: string
+  qwenProvider: string
+  openaiCompatibleProvider: string
+  modelEndpoint: string
+  modelName: string
+  apiKey: string
+  modelConfigurationHint: string
 }

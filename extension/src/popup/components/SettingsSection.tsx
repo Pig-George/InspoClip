@@ -1,9 +1,10 @@
-import type { I18nMessages, RuntimeMode, ShortcutTarget } from "../types"
+import type { I18nMessages, ModelSettings, RuntimeMode, ShortcutTarget } from "../types"
 import { formatShortcut } from "../shortcut"
 import { PopupIcon } from "./PopupIcon"
 
 type SettingsSectionProps = {
   appUrl: string
+  modelSettings: ModelSettings
   open: boolean
   recordingShortcut: ShortcutTarget | null
   runtimeMode: RuntimeMode
@@ -13,6 +14,7 @@ type SettingsSectionProps = {
   storageUsageLabel?: string
   t: I18nMessages
   onAppUrlChange: (value: string) => void
+  onModelSettingsChange: (value: ModelSettings) => void
   onClose: () => void
   onSaveSettings: () => void | Promise<void>
   onRuntimeModeChange: (value: RuntimeMode) => void
@@ -24,6 +26,7 @@ type SettingsSectionProps = {
 
 export function SettingsSection({
   appUrl,
+  modelSettings,
   open,
   recordingShortcut,
   runtimeMode,
@@ -33,6 +36,7 @@ export function SettingsSection({
   storageUsageLabel,
   t,
   onAppUrlChange,
+  onModelSettingsChange,
   onClose,
   onSaveSettings,
   onRuntimeModeChange,
@@ -57,18 +61,38 @@ export function SettingsSection({
           </select>
           {runtimeMode === "standalone" ? (
             <>
+              <div className="settings-card settings-card-nested">
+                <h3><PopupIcon name="sparkles" />{t.modelConfiguration}</h3>
+                <label htmlFor="modelProvider">{t.modelProvider}</label>
+                <select
+                  className="runtime-mode-select"
+                  id="modelProvider"
+                  value={modelSettings.provider}
+                  onChange={(event) => onModelSettingsChange({ ...modelSettings, provider: event.target.value as ModelSettings["provider"] })}
+                >
+                  <option value="qwen">{t.qwenProvider}</option>
+                  <option value="openai-compatible">{t.openaiCompatibleProvider}</option>
+                </select>
+                <label htmlFor="modelEndpoint">{t.modelEndpoint}</label>
+                <input id="modelEndpoint" type="url" value={modelSettings.endpoint} onChange={(event) => onModelSettingsChange({ ...modelSettings, endpoint: event.target.value })} />
+                <label htmlFor="modelName">{t.modelName}</label>
+                <input id="modelName" type="text" value={modelSettings.model} onChange={(event) => onModelSettingsChange({ ...modelSettings, model: event.target.value })} />
+                <label htmlFor="modelApiKey">{t.apiKey}</label>
+                <input id="modelApiKey" type="password" autoComplete="off" value={modelSettings.apiKey} onChange={(event) => onModelSettingsChange({ ...modelSettings, apiKey: event.target.value })} />
+                <p className="settings-hint">{t.modelConfigurationHint}</p>
+              </div>
               <p className="settings-hint">{t.standaloneModeHint}</p>
               <div className="storage-usage"><span>{t.localStorageUsage}</span><strong>{storageUsageLabel || "..."}</strong></div>
             </>
           ) : null}
         </div>
-        <div className="settings-card">
+        {runtimeMode === "backend" ? <div className="settings-card">
           <h3><PopupIcon name="server" />{t.serviceConnection}</h3>
           <label htmlFor="serverUrl">Server URL</label>
           <input type="text" id="serverUrl" value={serverUrl} onChange={(event) => onServerUrlChange(event.target.value)} />
           <label htmlFor="appUrl">Frontend URL</label>
           <input type="text" id="appUrl" value={appUrl} onChange={(event) => onAppUrlChange(event.target.value)} />
-        </div>
+        </div> : null}
 
         <div className="settings-card">
           <h3><PopupIcon name="command" />{t.shortcuts}</h3>

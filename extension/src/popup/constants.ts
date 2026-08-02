@@ -9,6 +9,13 @@ export const DEFAULT_SHORTCUTS: ShortcutSettings = {
   save: "Ctrl+Shift+S"
 }
 
+export const DEFAULT_MODEL_SETTINGS = {
+  provider: "qwen" as const,
+  endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  model: "qwen3.7-plus",
+  apiKey: ""
+}
+
 export const MAX_VIDEO_SIZE_BYTES = 200 * 1024 * 1024
 
 export const I18N: Record<Locale, I18nMessages> = {
@@ -55,7 +62,15 @@ export const I18N: Record<Locale, I18nMessages> = {
     standaloneMode: "Local mode",
     standaloneModeHint: "Assets stay in this browser. AI provider setup will be available in a later phase.",
     localStorageUsage: "Local storage",
-    localModeReady: "Local storage ready"
+    localModeReady: "Local storage ready",
+    modelConfiguration: "AI model",
+    modelProvider: "Model provider",
+    qwenProvider: "Qwen",
+    openaiCompatibleProvider: "OpenAI-compatible",
+    modelEndpoint: "API endpoint",
+    modelName: "Model name",
+    apiKey: "API key",
+    modelConfigurationHint: "Stored only in this browser and used by standalone analysis."
   },
   zh: {
     subtitle: "设计灵感剪贴簿",
@@ -100,7 +115,15 @@ export const I18N: Record<Locale, I18nMessages> = {
     standaloneMode: "独立运行",
     standaloneModeHint: "素材保存在当前浏览器。AI 模型配置将在后续阶段开放。",
     localStorageUsage: "本地存储",
-    localModeReady: "本地存储已就绪"
+    localModeReady: "本地存储已就绪",
+    modelConfiguration: "大模型配置",
+    modelProvider: "模型供应商",
+    qwenProvider: "通义千问",
+    openaiCompatibleProvider: "OpenAI 兼容接口",
+    modelEndpoint: "接口地址",
+    modelName: "模型名称",
+    apiKey: "API Key",
+    modelConfigurationHint: "仅保存在当前浏览器，用于独立模式分析。"
   }
 }
 
