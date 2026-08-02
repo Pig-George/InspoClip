@@ -10,11 +10,9 @@ describe("Footer runtime mode visibility", () => {
     const markup = renderToStaticMarkup(createElement(Footer, {
       onOpenApp: vi.fn(),
       showWorkspaceLink: false,
-      t: I18N.en,
-      version: "1.5.3"
+      t: I18N.en
     }))
 
     expect(markup).not.toContain("Open InspoClip")
-    expect(markup).toContain("v1.5.3")
   })
 })

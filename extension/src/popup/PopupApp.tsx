@@ -48,13 +48,14 @@ export function PopupApp() {
         />
       </main>
 
-      <Footer t={popup.t} version={version} onOpenApp={popup.openApp} showWorkspaceLink={popup.runtimeMode === "backend"} />
+      <Footer t={popup.t} onOpenApp={popup.openApp} showWorkspaceLink={popup.runtimeMode === "backend"} />
       <StatusBanner status={popup.status} />
 
       <SettingsSection
         appUrl={popup.appUrl}
         modelSettings={popup.modelSettings}
         open={popup.settingsOpen}
+        version={version}
         recordingShortcut={popup.recordingShortcut}
         runtimeMode={popup.runtimeMode}
         serverUrl={popup.serverUrl}

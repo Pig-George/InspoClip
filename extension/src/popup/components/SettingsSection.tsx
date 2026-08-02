@@ -6,6 +6,7 @@ type SettingsSectionProps = {
   appUrl: string
   modelSettings: ModelSettings
   open: boolean
+  version: string
   recordingShortcut: ShortcutTarget | null
   runtimeMode: RuntimeMode
   serverUrl: string
@@ -28,6 +29,7 @@ export function SettingsSection({
   appUrl,
   modelSettings,
   open,
+  version,
   recordingShortcut,
   runtimeMode,
   serverUrl,
@@ -124,6 +126,7 @@ export function SettingsSection({
 
       <div className="settings-footer">
         <button type="button" onClick={onSaveSettings}>{t.saveSettings}</button>
+        <span className="settings-version" aria-label={`Version ${version}`}>v{version}</span>
       </div>
     </section>
   )

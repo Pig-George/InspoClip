@@ -18,6 +18,7 @@ describe("SettingsSection", () => {
       },
       onModelSettingsChange: vi.fn(),
       open: true,
+      version: "1.5.3",
       recordingShortcut: null,
       runtimeMode: "standalone",
       serverUrl: "http://localhost:3001",
@@ -52,6 +53,7 @@ describe("SettingsSection", () => {
       modelSettings: model,
       onModelSettingsChange: vi.fn(),
       open: true,
+      version: "1.5.3",
       recordingShortcut: null,
       runtimeMode: "standalone",
       serverUrl: "http://localhost:3001",
@@ -71,6 +73,8 @@ describe("SettingsSection", () => {
 
     expect(markup).toContain("Model provider")
     expect(markup).toContain("qwen3.7-plus")
+    expect(markup).toContain('class="settings-version"')
+    expect(markup).toContain("v1.5.3")
     expect(markup).not.toContain('id="serverUrl"')
     expect(markup).not.toContain('id="appUrl"')
   })
