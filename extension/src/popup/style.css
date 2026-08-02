@@ -461,8 +461,8 @@ button { color: inherit; }
 .shortcut-hint { margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 5px; color: #a08b7f; font-size: 9px; }
 kbd { padding: 2px 5px; border: 1px solid #ddcdbb; border-bottom-width: 2px; border-radius: 5px; background: var(--paper-strong); color: #776157; font: 8.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
 
-.footer { padding: 10px 16px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; border-top: 1px solid var(--line); background: rgba(251, 246, 237, .92); }
-.footer a { min-height: 37px; display: flex; align-items: center; justify-content: center; gap: 7px; border-radius: 11px; color: var(--brand-deep); font-size: 11px; font-weight: 800; text-decoration: none; }
+.footer { padding: 10px 16px 14px; display: grid; grid-template-columns: 1fr; align-items: center; border-top: 1px solid var(--line); background: rgba(251, 246, 237, .92); }
+.footer a { width: 100%; min-height: 37px; display: flex; align-items: center; justify-content: center; gap: 7px; border-radius: 11px; color: var(--brand-deep); font-size: 11px; font-weight: 800; text-decoration: none; }
 .footer a:hover { background: #f0e3d3; }
 .footer svg { width: 14px; height: 14px; }
 .footer-version { padding: 4px 7px; border: 1px solid rgba(161, 134, 115, .24); border-radius: 999px; background: rgba(255, 253, 248, .7); color: #a08b7f; font: 8.5px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; }
