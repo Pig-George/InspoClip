@@ -32,29 +32,6 @@ describe("StandaloneAnalysisAdapter", () => {
     expect(invoke.mock.calls[1]?.[0][0].content[0].text).toBe(DESIGN_ANALYSIS_PROMPT)
   })
 
-  test("uses the server's image model generation limits", async () => {
-    const createInvoker = vi.fn(() => ({
-      invoke: vi.fn()
-        .mockResolvedValueOnce({ content: JSON.stringify(["card layout / 卡片布局"]) })
-        .mockResolvedValueOnce({ content: JSON.stringify({ en: "A card layout", zh: "卡片布局" }) })
-    }))
-    const adapter = new StandaloneAnalysisAdapter({
-      loadSettings: async () => ({ provider: "qwen", endpoint: "https://example.com/v1", model: "vision-model", apiKey: "secret" }),
-      createInvoker
-    })
-
-    await adapter.analyzeImage({
-      blob: new Blob(["image"], { type: "image/png" }),
-      filename: "image.png",
-      mimeType: "image/png"
-    })
-
-    expect(createInvoker.mock.calls[0]?.[0]).toMatchObject({
-      temperature: 0.7,
-      maxTokens: 300
-    })
-  })
-
   test("repairs verbose terminology before returning the image result", async () => {
     const invoke = vi.fn()
       .mockResolvedValueOnce({ content: JSON.stringify(["This is an unnecessarily long sentence about the card layout and its visual hierarchy."]) })

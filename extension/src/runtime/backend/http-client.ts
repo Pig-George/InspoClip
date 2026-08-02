@@ -2,6 +2,10 @@ import { RuntimeFailure } from "../errors"
 
 export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
 
+export type BackendHttpClientOptions = {
+  allowLoopbackFallback?: boolean
+}
+
 function trimBase(url: string): string {
   return String(url || "").trim().replace(/\/+$/, "")
 }
@@ -35,10 +39,12 @@ function backendMessage(body: unknown, status: number): string {
 export class BackendHttpClient {
   readonly baseUrl: string
   private readonly fetchFn: FetchLike
+  private readonly allowLoopbackFallback: boolean
 
-  constructor(baseUrl: string, fetchFn: FetchLike = fetch) {
+  constructor(baseUrl: string, fetchFn: FetchLike = fetch, options: BackendHttpClientOptions = {}) {
     this.baseUrl = trimBase(baseUrl)
     this.fetchFn = fetchFn
+    this.allowLoopbackFallback = options.allowLoopbackFallback === true
   }
 
   buildUrl(path: string): string {
@@ -47,10 +53,17 @@ export class BackendHttpClient {
   }
 
   async request<T = void>(path: string, init?: RequestInit): Promise<T> {
-    let response: Response
-    try {
-      response = await this.fetchFn(this.buildUrl(path), init)
-    } catch {
+    let response: Response | undefined
+    const urls = this.allowLoopbackFallback ? requestUrls(this.baseUrl, path) : [this.buildUrl(path)]
+    for (const url of urls) {
+      try {
+        response = await this.fetchFn(url, init)
+        break
+      } catch {
+        // Retry localhost through IPv4 below; do not expose provider/network details to the UI.
+      }
+    }
+    if (!response) {
       throw new RuntimeFailure({
         code: "NETWORK_ERROR",
         message: "Unable to reach the InspoClip backend",
@@ -71,5 +84,18 @@ export class BackendHttpClient {
     }
 
     return body as T
+  }
+}
+
+function requestUrls(baseUrl: string, path: string): string[] {
+  const primary = `${baseUrl}/${String(path || "").replace(/^\/+/, "")}`
+  try {
+    const url = new URL(baseUrl)
+    if (url.hostname !== "localhost") return [primary]
+    url.hostname = "127.0.0.1"
+    const fallbackBase = url.toString().replace(/\/$/, "")
+    return [primary, `${fallbackBase}/${String(path || "").replace(/^\/+/, "")}`]
+  } catch {
+    return [primary]
   }
 }

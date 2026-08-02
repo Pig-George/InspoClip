@@ -47,7 +47,7 @@ export class RuntimeFactory {
   }
 
   private createBackendRuntime(serverUrl: string): ExtensionRuntime {
-    const client = new BackendHttpClient(serverUrl, this.fetchFn)
+    const client = new BackendHttpClient(serverUrl, this.fetchFn, { allowLoopbackFallback: true })
     return {
       mode: "backend",
       analysis: new BackendAnalysisAdapter(client, this.fetchFn),

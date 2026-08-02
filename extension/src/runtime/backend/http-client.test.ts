@@ -76,4 +76,22 @@ describe("BackendHttpClient", () => {
       expect(JSON.stringify(toRuntimeError(error))).not.toContain("sk-secret")
     }
   })
+
+  test("falls back from localhost to IPv4 loopback for Docker-bound services", async () => {
+    const calls: string[] = []
+    const client = new BackendHttpClient("http://localhost:3001", async (url) => {
+      calls.push(String(url))
+      if (calls.length === 1) throw new TypeError("Failed to fetch")
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })
+    }, { allowLoopbackFallback: true })
+
+    await expect(client.request<{ ok: boolean }>("/api/health")).resolves.toEqual({ ok: true })
+    expect(calls).toEqual([
+      "http://localhost:3001/api/health",
+      "http://127.0.0.1:3001/api/health"
+    ])
+  })
 })
