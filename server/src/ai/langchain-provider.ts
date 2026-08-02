@@ -17,6 +17,7 @@ export interface InvokerOptions {
   apiKey: string;
   maxTokens: number;
   temperature: number;
+  timeout: number;
   configuration: {
     baseURL: string;
     fetch?: typeof fetch;
@@ -41,6 +42,7 @@ type OpenAICompatibleVideoPart = {
 
 const DEFAULT_MAX_TOKENS = 8192;
 const IMAGE_MAX_TOKENS = 300;
+const MODEL_REQUEST_TIMEOUT_MS = 90_000;
 
 const defaultInvokerFactory: InvokerFactory = (options) => {
   const model = new ChatOpenAI(options);
@@ -123,6 +125,7 @@ export function createLangChainProvider(
     apiKey: validatedConfig.apiKey,
     maxTokens: DEFAULT_MAX_TOKENS,
     temperature: 0.7,
+    timeout: MODEL_REQUEST_TIMEOUT_MS,
     configuration: {
       baseURL: validatedConfig.baseURL,
       ...clientConfiguration,
@@ -133,6 +136,7 @@ export function createLangChainProvider(
     apiKey: validatedConfig.apiKey,
     maxTokens: IMAGE_MAX_TOKENS,
     temperature: 0.7,
+    timeout: MODEL_REQUEST_TIMEOUT_MS,
     configuration: {
       baseURL: validatedConfig.baseURL,
       ...clientConfiguration,

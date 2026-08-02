@@ -7,6 +7,7 @@ import {
 } from '../ai/native-image-providers.js';
 import type { ModelProvider } from '../ai/provider.js';
 import { AiService } from '../ai/service.js';
+import { IMAGE_ANALYSIS_TIMEOUT_MS, withRequestTimeout } from '../ai/request-timeout.js';
 
 export interface LegacyAiConfig {
   provider: string;
@@ -88,11 +89,17 @@ export function createLegacyImageProvider(
 }
 
 export async function generateTerms(imagePath: string): Promise<string[]> {
-  return (await createService()).generateTerms(imagePath);
+  return withRequestTimeout(
+    (await createService()).generateTerms(imagePath),
+    IMAGE_ANALYSIS_TIMEOUT_MS,
+  );
 }
 
 export async function generateDesignPrompt(
   imagePath: string,
 ): Promise<{ en: string; zh: string }> {
-  return (await createService()).generateDesignPrompt(imagePath);
+  return withRequestTimeout(
+    (await createService()).generateDesignPrompt(imagePath),
+    IMAGE_ANALYSIS_TIMEOUT_MS,
+  );
 }
