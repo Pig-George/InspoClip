@@ -22,10 +22,24 @@ describe("RuntimeFactory", () => {
     expect(first).not.toBe(second)
   })
 
-  test("does not silently fall back when standalone mode is not enabled", async () => {
-    const factory = new RuntimeFactory({ fetchFn: async () => new Response() })
+  test("creates and isolates a standalone runtime without falling back", async () => {
+    let standaloneCreates = 0
+    const standaloneRuntime = { mode: "standalone" as const } as never
+    const factory = new RuntimeFactory({
+      fetchFn: async () => new Response(),
+      createStandaloneRuntime: async () => {
+        standaloneCreates += 1
+        return standaloneRuntime
+      }
+    })
 
-    await expect(factory.get({ mode: "standalone", serverUrl: "http://localhost:3001" }))
-      .rejects.toThrowError("Standalone mode is not enabled in this build")
+    const backend = await factory.get({ mode: "backend", serverUrl: "http://localhost:3001" })
+    const standalone = await factory.get({ mode: "standalone", serverUrl: "http://localhost:3001" })
+    const standaloneAgain = await factory.get({ mode: "standalone", serverUrl: "http://different:3001" })
+
+    expect(standalone).toBe(standaloneRuntime)
+    expect(standaloneAgain).toBe(standaloneRuntime)
+    expect(standalone).not.toBe(backend)
+    expect(standaloneCreates).toBe(1)
   })
 })

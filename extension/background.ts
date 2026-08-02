@@ -7,12 +7,16 @@ import { openVideoInApp, saveVideoFromUrl } from "./src/background/video"
 import { createCommandRouter } from "./src/runtime/command-router"
 import { isExtensionCommand } from "./src/runtime/contracts"
 import { getBackgroundRuntime } from "./src/runtime/background-runtime"
+import { initializeRuntimeMode } from "./src/runtime/settings"
 
 const OFFSCREEN_DOCUMENT_PATH = getExtensionRelativeUrl(offscreenDocumentUrl)
 let creatingOffscreenDocument: Promise<void> | null = null
 const runtimeCommandRouter = createCommandRouter(getBackgroundRuntime)
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
+  void initializeRuntimeMode(details.reason).catch((error) => {
+    console.error("Failed to initialize InspoClip runtime mode:", error)
+  })
   CONTEXT_MENUS.forEach((item) => chrome.contextMenus.create(item))
 })
 
