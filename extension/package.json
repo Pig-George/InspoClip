@@ -12,6 +12,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@langchain/core": "^1.2.4",
+    "@langchain/openai": "^1.5.5",
     "@plasmohq/storage": "^1.15.0",
     "lucide": "0.468.0",
     "plasmo": "^0.90.5",

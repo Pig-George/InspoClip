@@ -43,6 +43,6 @@ describe("createStandaloneRuntime", () => {
       blob: new Blob(["video"]),
       filename: "demo.mp4",
       mimeType: "video/mp4"
-    })).rejects.toMatchObject({ detail: { code: "MODEL_CONFIGURATION_REQUIRED" } })
+    })).rejects.toMatchObject({ detail: { code: "LOCAL_VIDEO_ANALYSIS_UNAVAILABLE" } })
   })
 })
