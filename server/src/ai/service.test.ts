@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ModelProvider } from './provider.js';
-import { DESIGN_ANALYSIS_PROMPT, IMAGE_TERMINOLOGY_PROMPT } from './prompts.js';
+import { DESIGN_ANALYSIS_PROMPT, IMAGE_TERMINOLOGY_JSON_OBJECT_INSTRUCTION, IMAGE_TERMINOLOGY_PROMPT } from './prompts.js';
 import {
   AiService,
   type AiServiceDependencies,
@@ -47,7 +47,7 @@ describe('AiService', () => {
     expect(harness.provider.analyzeImage).toHaveBeenCalledWith({
       base64Image: harness.resized.toString('base64'),
       mimeType: 'image/jpeg',
-      prompt: IMAGE_TERMINOLOGY_PROMPT,
+      prompt: `${IMAGE_TERMINOLOGY_PROMPT}\n${IMAGE_TERMINOLOGY_JSON_OBJECT_INSTRUCTION}`,
     });
   });
 
@@ -62,7 +62,7 @@ describe('AiService', () => {
     expect(harness.provider.analyzeImage).toHaveBeenCalledWith({
       base64Image: harness.original.toString('base64'),
       mimeType: 'image/png',
-      prompt: IMAGE_TERMINOLOGY_PROMPT,
+      prompt: `${IMAGE_TERMINOLOGY_PROMPT}\n${IMAGE_TERMINOLOGY_JSON_OBJECT_INSTRUCTION}`,
     });
   });
 
@@ -148,6 +148,13 @@ describe('AiService', () => {
 
     await expect(harness.service.generateTerms('/uploads/design.jpg'))
       .resolves.toEqual(values.slice(0, 10));
+  });
+
+  it('rejects malformed structured terminology objects', async () => {
+    const harness = createHarness({ terms: 'not-an-array' });
+
+    await expect(harness.service.generateTerms('/uploads/design.jpg'))
+      .rejects.toThrow('terms');
   });
 
   it('repairs verbose terminology descriptions into concise labels', async () => {

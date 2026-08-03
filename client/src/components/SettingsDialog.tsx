@@ -13,6 +13,23 @@ interface SettingsDialogProps {
 
 type SettingsTab = 'image' | 'video';
 
+type ModelProvider = 'alibaba-bailian' | 'openai' | 'openrouter' | 'google-ai-studio' | 'openai-compatible';
+
+const providerProfiles: Record<ModelProvider, { label: string; baseURL: string; model: string }> = {
+  'alibaba-bailian': { label: 'Alibaba Cloud Model Studio', baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen3.7-plus' },
+  openai: { label: 'OpenAI', baseURL: 'https://api.openai.com/v1', model: 'gpt-4.1-mini' },
+  openrouter: { label: 'OpenRouter', baseURL: 'https://openrouter.ai/api/v1', model: 'google/gemini-2.5-flash' },
+  'google-ai-studio': { label: 'Google AI Studio', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/', model: 'gemini-2.5-flash' },
+  'openai-compatible': { label: 'Other OpenAI-compatible service', baseURL: 'https://api.openai.com/v1', model: 'gpt-4.1-mini' },
+};
+
+function normalizeProvider(value: string | undefined): ModelProvider {
+  if (value === 'qwen' || value === 'dashscope') return 'alibaba-bailian';
+  if (value === 'gemini') return 'google-ai-studio';
+  if (value && value in providerProfiles) return value as ModelProvider;
+  return 'alibaba-bailian';
+}
+
 function isMaskedKey(value: string | undefined): boolean {
   return !!value && /[*•]/.test(value);
 }
@@ -67,6 +84,8 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     image: locale === 'zh' ? '图片分析' : 'Image analysis',
     video: locale === 'zh' ? '视频理解' : 'Video understanding',
   };
+  const imageProvider = normalizeProvider(config.AI_PROVIDER);
+  const videoProvider = normalizeProvider(config.VIDEO_AI_PROVIDER);
 
   return (
     <AnimatePresence>
@@ -142,16 +161,20 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     </label>
                     <select
                       id="image-ai-provider"
-                      value={config.AI_PROVIDER || 'gemini'}
-                      onChange={(e) => setConfig({ ...config, AI_PROVIDER: e.target.value })}
+                      value={imageProvider}
+                      onChange={(e) => {
+                        const provider = e.target.value as ModelProvider;
+                        const profile = providerProfiles[provider];
+                        setConfig({ ...config, AI_PROVIDER: provider, AI_API_BASE: profile.baseURL, AI_MODEL: profile.model });
+                      }}
                       className={inputClass}
                     >
-                      <option value="gemini">Google Gemini (Vision)</option>
-                      <option value="openai">OpenAI Compatible (DeepSeek / GPT / Grok)</option>
-                      <option value="anthropic">Anthropic (Claude)</option>
+                      {Object.entries(providerProfiles).map(([value, profile]) => (
+                        <option key={value} value={value}>{profile.label}</option>
+                      ))}
                     </select>
                     <p className="text-xs text-[var(--text-muted)] mt-1">
-                      All providers support image-to-text vision analysis.
+                      Uses OpenAI-compatible JSON object output for stable structured analysis.
                     </p>
                   </div>
 
@@ -167,7 +190,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                       autoComplete="off"
                       value={config.AI_API_KEY || ''}
                       onChange={(e) => setConfig({ ...config, AI_API_KEY: e.target.value })}
-                      placeholder={config.AI_PROVIDER === 'gemini' ? 'AIza...' : 'sk-...'}
+                      placeholder="sk-..."
                       className={inputClass}
                     />
                     {isMaskedKey(config.AI_API_KEY) && (
@@ -177,8 +200,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     )}
                   </div>
 
-                  {(config.AI_PROVIDER === 'openai' || config.AI_PROVIDER === 'anthropic') && (
-                    <div>
+                  <div>
                       <label htmlFor="image-ai-base" className="flex items-center gap-2 text-sm font-heading text-[var(--text)] mb-1.5">
                         <Link className="w-4 h-4 text-[var(--accent)]" />
                         {t('ApiEndpoint')}
@@ -188,11 +210,10 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                         type="text"
                         value={config.AI_API_BASE || ''}
                         onChange={(e) => setConfig({ ...config, AI_API_BASE: e.target.value })}
-                        placeholder={config.AI_PROVIDER === 'anthropic' ? 'https://api.anthropic.com/v1' : 'https://api.deepseek.com/v1'}
+                        placeholder={providerProfiles[imageProvider].baseURL}
                         className={inputClass}
                       />
-                    </div>
-                  )}
+                  </div>
 
                   <div>
                     <label htmlFor="image-ai-model" className="flex items-center gap-2 text-sm font-heading text-[var(--text)] mb-1.5">
@@ -205,20 +226,12 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                       value={config.AI_MODEL || ''}
                       onChange={(e) => setConfig({ ...config, AI_MODEL: e.target.value })}
                       placeholder={
-                        config.AI_PROVIDER === 'gemini'
-                          ? 'gemini-2.0-flash'
-                          : config.AI_PROVIDER === 'anthropic'
-                            ? 'claude-sonnet-4-6'
-                            : 'deepseek-chat'
+                        providerProfiles[imageProvider].model
                       }
                       className={inputClass}
                     />
                     <p className="text-xs text-[var(--text-muted)] mt-1">
-                      {config.AI_PROVIDER === 'gemini'
-                        ? 'gemini-2.0-flash, gemini-2.5-pro, etc.'
-                        : config.AI_PROVIDER === 'anthropic'
-                          ? 'claude-sonnet-4-6, claude-opus-4-7, etc.'
-                          : 'Must be vision-capable: gpt-4o, grok-4.20-auto, etc.'}
+                      Select a vision-capable model that supports JSON object response format.
                     </p>
                   </div>
                 </div>
@@ -236,12 +249,32 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   </div>
 
                   <div>
+                    <label htmlFor="video-ai-provider" className="text-sm font-heading text-[var(--text)]">
+                      {locale === 'zh' ? '模型服务平台' : 'Video provider'}
+                    </label>
+                    <select
+                      id="video-ai-provider"
+                      value={videoProvider}
+                      onChange={(e) => {
+                        const provider = e.target.value as ModelProvider;
+                        const profile = providerProfiles[provider];
+                        setConfig({ ...config, VIDEO_AI_PROVIDER: provider, VIDEO_AI_API_BASE: profile.baseURL, VIDEO_AI_MODEL: profile.model });
+                      }}
+                      className={`mt-1.5 ${inputClass}`}
+                    >
+                      {Object.entries(providerProfiles).map(([value, profile]) => (
+                        <option key={value} value={value}>{profile.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
                     <label htmlFor="video-ai-model" className="text-sm font-heading text-[var(--text)]">
                       {locale === 'zh' ? '视频模型' : 'Video model'}
                     </label>
                     <input
                       id="video-ai-model"
-                      value={config.VIDEO_AI_MODEL || 'qwen3.7-plus'}
+                      value={config.VIDEO_AI_MODEL || providerProfiles[videoProvider].model}
                       onChange={(e) => setConfig({ ...config, VIDEO_AI_MODEL: e.target.value })}
                       className={`mt-1.5 ${inputClass}`}
                     />
@@ -253,7 +286,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     </label>
                     <input
                       id="video-ai-base"
-                      value={config.VIDEO_AI_API_BASE || 'https://dashscope.aliyuncs.com/compatible-mode/v1'}
+                      value={config.VIDEO_AI_API_BASE || providerProfiles[videoProvider].baseURL}
                       onChange={(e) => setConfig({ ...config, VIDEO_AI_API_BASE: e.target.value })}
                       className={`mt-1.5 ${inputClass}`}
                     />

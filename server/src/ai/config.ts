@@ -1,4 +1,15 @@
-export type ModelProviderName = 'openai-compatible';
+export type ModelProviderName =
+  | 'alibaba-bailian'
+  | 'openai'
+  | 'openrouter'
+  | 'google-ai-studio'
+  | 'openai-compatible';
+
+export interface ModelProviderProfile {
+  label: string;
+  baseURL: string;
+  model: string;
+}
 
 export interface ModelConfig {
   provider: ModelProviderName;
@@ -9,7 +20,52 @@ export interface ModelConfig {
 }
 
 const DEFAULT_FPS = 3;
-const SUPPORTED_PROVIDERS = new Set<ModelProviderName>(['openai-compatible']);
+
+const PROVIDER_PROFILES: Record<ModelProviderName, ModelProviderProfile> = {
+  'alibaba-bailian': {
+    label: 'Alibaba Cloud Model Studio',
+    baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen3.7-plus',
+  },
+  openai: {
+    label: 'OpenAI',
+    baseURL: 'https://api.openai.com/v1',
+    model: 'gpt-4.1-mini',
+  },
+  openrouter: {
+    label: 'OpenRouter',
+    baseURL: 'https://openrouter.ai/api/v1',
+    model: 'google/gemini-2.5-flash',
+  },
+  'google-ai-studio': {
+    label: 'Google AI Studio',
+    baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+    model: 'gemini-2.5-flash',
+  },
+  'openai-compatible': {
+    label: 'Other OpenAI-compatible service',
+    baseURL: 'https://api.openai.com/v1',
+    model: 'gpt-4.1-mini',
+  },
+};
+
+const LEGACY_PROVIDER_ALIASES: Record<string, ModelProviderName> = {
+  qwen: 'alibaba-bailian',
+  dashscope: 'alibaba-bailian',
+  gemini: 'google-ai-studio',
+};
+
+export function normalizeModelProviderName(value: string | undefined): ModelProviderName {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return 'alibaba-bailian';
+  if (normalized in PROVIDER_PROFILES) return normalized as ModelProviderName;
+  if (normalized in LEGACY_PROVIDER_ALIASES) return LEGACY_PROVIDER_ALIASES[normalized];
+  throw new Error(`Unsupported AI provider: ${value}`);
+}
+
+export function getModelProviderProfile(provider: ModelProviderName): ModelProviderProfile {
+  return PROVIDER_PROFILES[provider];
+}
 
 export function loadModelConfig(env: Record<string, string | undefined>): ModelConfig {
   const fps = env.AI_VIDEO_FPS === undefined
@@ -19,26 +75,21 @@ export function loadModelConfig(env: Record<string, string | undefined>): ModelC
     throw new Error('AI video FPS must be an integer between 1 and 5');
   }
 
-  const provider = (env.AI_PROVIDER?.trim() || 'openai-compatible') as ModelProviderName;
-  if (!SUPPORTED_PROVIDERS.has(provider)) {
-    throw new Error(`Unsupported AI provider: ${provider}`);
-  }
-
+  const provider = normalizeModelProviderName(env.AI_PROVIDER);
+  const profile = getModelProviderProfile(provider);
   return {
     provider,
     // Loading remains usable by settings UIs before a key is configured.
     // validateModelConfig is the fail-fast boundary before model construction.
     apiKey: env.AI_API_KEY?.trim() || '',
-    baseURL: env.AI_API_BASE?.trim() || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    model: env.AI_MODEL?.trim() || 'qwen3.7-plus',
+    baseURL: env.AI_API_BASE?.trim() || profile.baseURL,
+    model: env.AI_MODEL?.trim() || profile.model,
     fps,
   };
 }
 
 export function validateModelConfig(config: ModelConfig): ModelConfig {
-  if (!SUPPORTED_PROVIDERS.has(config.provider)) {
-    throw new Error(`Unsupported AI provider: ${config.provider}`);
-  }
+  const provider = normalizeModelProviderName(config.provider);
   if (!config.apiKey.trim()) throw new Error('AI API key must not be empty');
   if (!config.model.trim()) throw new Error('AI model must not be empty');
   if (!isValidFps(config.fps)) {
@@ -57,6 +108,7 @@ export function validateModelConfig(config: ModelConfig): ModelConfig {
 
   return {
     ...config,
+    provider,
     apiKey: config.apiKey.trim(),
     baseURL: config.baseURL.trim(),
     model: config.model.trim(),

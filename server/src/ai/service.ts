@@ -1,15 +1,18 @@
 import { readFile } from 'node:fs/promises';
 
 import sharp from 'sharp';
+import { z } from 'zod';
 
 import type { ImageMimeType, ModelProvider } from './provider.js';
-import { DESIGN_ANALYSIS_PROMPT, IMAGE_TERMINOLOGY_PROMPT, VIDEO_ANALYSIS_PROMPT, createImageTerminologyRepairPrompt, createPurposeTransformationPrompt, type Purpose, type PurposeOptions } from './prompts.js';
+import { DESIGN_ANALYSIS_PROMPT, IMAGE_TERMINOLOGY_JSON_OBJECT_INSTRUCTION, IMAGE_TERMINOLOGY_PROMPT, VIDEO_ANALYSIS_PROMPT, createImageTerminologyRepairPrompt, createPurposeTransformationPrompt, type Purpose, type PurposeOptions } from './prompts.js';
 import { parseVideoAnalysis } from './parser.js';
 import type { VideoAnalysis } from './types.js';
 
 const MAX_IMAGE_DIMENSION = 1024;
 const JPEG_QUALITY = 80;
 const MAX_TERMINOLOGY_LENGTH = 80;
+const terminologyOutputSchema = z.object({ terms: z.array(z.string()).min(1).max(10) }).strict();
+const bilingualPromptSchema = z.object({ en: z.string().min(1), zh: z.string().min(1) }).strict();
 
 export interface ImageMetadata {
   width?: number;
@@ -62,15 +65,15 @@ export class AiService {
     const image = await this.prepareImage(imagePath);
     const response = await this.provider.analyzeImage({
       ...image,
-      prompt: IMAGE_TERMINOLOGY_PROMPT,
+      prompt: `${IMAGE_TERMINOLOGY_PROMPT}\n${IMAGE_TERMINOLOGY_JSON_OBJECT_INSTRUCTION}`,
     });
-    const terms = parseTerms(responseText(response));
+    const terms = parseTerms(response);
     if (terms.every(isConciseTerm)) return terms;
 
     const repairedResponse = await this.provider.generateText({
-      prompt: createImageTerminologyRepairPrompt(terms),
+      prompt: `${createImageTerminologyRepairPrompt(terms)}\n${IMAGE_TERMINOLOGY_JSON_OBJECT_INSTRUCTION}`,
     });
-    const repairedTerms = parseTerms(responseText(repairedResponse)).filter(isConciseTerm);
+    const repairedTerms = parseTerms(repairedResponse).filter(isConciseTerm);
     if (repairedTerms.length > 0) return repairedTerms;
 
     return terms.filter(isConciseTerm);
@@ -82,17 +85,17 @@ export class AiService {
       ...image,
       prompt: DESIGN_ANALYSIS_PROMPT,
     });
-    return parseDesignPrompt(responseText(response));
+    return parseDesignPrompt(response);
   }
 
   async analyzeVideo(input: { videoUrl: string; fps?: number; minPixels?: number; maxPixels?: number }): Promise<{ analysis: VideoAnalysis; rawResponse: string }> {
     const response = await this.provider.analyzeVideo({ ...input, prompt: VIDEO_ANALYSIS_PROMPT });
-    const rawResponse = responseText(response);
+    const rawResponse = serializedResponse(response);
     try {
-      return { analysis: parseVideoResponse(rawResponse), rawResponse };
+      return { analysis: parseVideoResponse(response), rawResponse };
     } catch (firstError) {
       const repairPrompt = `Repair the following untrusted model output so it matches the required video analysis JSON schema. Return JSON only.\nSchema instructions:\n${VIDEO_ANALYSIS_PROMPT}\nUntrusted output:\n${JSON.stringify(rawResponse)}`;
-      const repaired = responseText(await this.provider.generateText({ prompt: repairPrompt }));
+      const repaired = await this.provider.generateText({ prompt: repairPrompt });
       try {
         return { analysis: parseVideoResponse(repaired), rawResponse };
       } catch {
@@ -106,8 +109,7 @@ export class AiService {
 
   async generateVideoOutput(analysis: VideoAnalysis, purpose: Purpose = 'general', options: PurposeOptions = {}): Promise<{ en: string; zh: string }> {
     const prompt = `${createPurposeTransformationPrompt(purpose, options)}\nSource analysis JSON:\n${JSON.stringify(analysis)}`;
-    const text = responseText(await this.provider.generateText({ prompt })).trim();
-    return parseVideoPromptOutput(text);
+    return parseVideoPromptOutput(await this.provider.generateText({ prompt }));
   }
 
   private async prepareImage(imagePath: string): Promise<PreparedImage> {
@@ -140,7 +142,9 @@ export class AiService {
   }
 }
 
-function parseVideoResponse(text: string): VideoAnalysis {
+function parseVideoResponse(response: unknown): VideoAnalysis {
+  if (isRecord(response)) return parseVideoAnalysis(response);
+  const text = responseText(response);
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   return parseVideoAnalysis(JSON.parse(cleaned));
 }
@@ -182,7 +186,15 @@ function responseText(response: unknown): string {
   return response === null || response === undefined ? '' : String(response);
 }
 
-function parseTerms(text: string): string[] {
+function serializedResponse(response: unknown): string {
+  return typeof response === 'string' ? response : JSON.stringify(response);
+}
+
+function parseTerms(response: unknown): string[] {
+  if (isRecord(response)) {
+    return terminologyOutputSchema.parse(response).terms;
+  }
+  const text = responseText(response);
   try {
     const parsed: unknown = JSON.parse(text);
     if (Array.isArray(parsed) && parsed.length > 0) {
@@ -207,7 +219,11 @@ function isConciseTerm(term: string): boolean {
     && !/(?:[!?。！？；;]|\.(?=\s+\/|\s*$))/.test(normalized);
 }
 
-function parseDesignPrompt(text: string): { en: string; zh: string } {
+function parseDesignPrompt(response: unknown): { en: string; zh: string } {
+  if (isRecord(response)) {
+    return bilingualPromptSchema.parse(response);
+  }
+  const text = responseText(response);
   const trimmed = text.trim();
   const jsonText = trimmed
     .replace(/^```(?:json)?\s*/i, '')
@@ -227,7 +243,13 @@ function parseDesignPrompt(text: string): { en: string; zh: string } {
   return { en: trimmed, zh: trimmed };
 }
 
-function parseVideoPromptOutput(text: string): { en: string; zh: string } {
+function parseVideoPromptOutput(response: unknown): { en: string; zh: string } {
+  if (isRecord(response)) return parseDesignPrompt(response);
+  const text = responseText(response);
   const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   return parseDesignPrompt(trimmed);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

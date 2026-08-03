@@ -42,7 +42,7 @@ describe('SettingsDialog', () => {
 
     expect(screen.getByRole('tab', { name: 'Video understanding' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('Video model')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Provider')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Video provider')).toBeInTheDocument();
   });
 
   it('shows the client version in the settings footer', async () => {
