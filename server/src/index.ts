@@ -137,11 +137,11 @@ async function initDB() {
 
   // Seed default config
   const defaults: Record<string, string> = {
-    AI_PROVIDER: process.env.AI_PROVIDER || 'openai',
+    AI_PROVIDER: process.env.AI_PROVIDER || 'alibaba-bailian',
     AI_API_KEY: process.env.AI_API_KEY || 'sk-placeholder',
-    AI_API_BASE: process.env.AI_API_BASE || 'https://api.openai.com/v1',
-    AI_MODEL: process.env.AI_MODEL || 'gpt-5.4',
-    VIDEO_AI_PROVIDER: process.env.VIDEO_AI_PROVIDER || 'openai-compatible',
+    AI_API_BASE: process.env.AI_API_BASE || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    AI_MODEL: process.env.AI_MODEL || 'qwen3.7-plus',
+    VIDEO_AI_PROVIDER: process.env.VIDEO_AI_PROVIDER || 'alibaba-bailian',
     VIDEO_AI_API_KEY: process.env.VIDEO_AI_API_KEY || '',
     VIDEO_AI_API_BASE: process.env.VIDEO_AI_API_BASE || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     VIDEO_AI_MODEL: process.env.VIDEO_AI_MODEL || 'qwen3.7-plus',

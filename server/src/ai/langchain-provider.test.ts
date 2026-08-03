@@ -20,6 +20,16 @@ function createHarness(content: unknown = '{"ok":true}') {
 }
 
 describe('createLangChainProvider', () => {
+  it('requests JSON object mode and parses model content before returning it', async () => {
+    const { invoke, provider } = createHarness('{"en":"Prompt","zh":"提示词"}');
+
+    await expect(provider.generateText({ prompt: 'Create a prompt' })).resolves.toEqual({
+      en: 'Prompt',
+      zh: '提示词',
+    });
+    expect(invoke).toHaveBeenCalledWith('Create a prompt');
+  });
+
   it('configures ChatOpenAI-compatible model parameters', () => {
     const { factory } = createHarness();
 
@@ -35,7 +45,7 @@ describe('createLangChainProvider', () => {
 
   it('keeps the legacy 300-token limit for image analysis', async () => {
     const defaultInvoke = vi.fn().mockResolvedValue({ content: 'default' });
-    const imageInvoke = vi.fn().mockResolvedValue({ content: 'image' });
+    const imageInvoke = vi.fn().mockResolvedValue({ content: '{"terms":["image"]}' });
     const factory = vi.fn((options: Parameters<InvokerFactory>[0]) => ({
       invoke: options.maxTokens === 300 ? imageInvoke : defaultInvoke,
     })) as InvokerFactory;
@@ -167,20 +177,21 @@ describe('createLangChainProvider', () => {
     expect(invoke).toHaveBeenCalledWith('Rewrite this copy');
   });
 
-  it('returns the model raw content without parsing it', async () => {
+  it('rejects non-object model JSON responses', async () => {
     const rawContent = [{ type: 'text', text: 'structured response' }];
     const { provider } = createHarness(rawContent);
 
-    await expect(provider.generateText({ prompt: 'Hello' })).resolves.toBe(rawContent);
+    await expect(provider.generateText({ prompt: 'Hello' }))
+      .rejects.toThrow('invalid JSON object');
   });
 
   it('satisfies the business provider contract', async () => {
-    const { provider } = createHarness('typed result');
+    const { provider } = createHarness('{"result":"typed result"}');
     const businessProvider: ModelProvider = provider;
 
     await expect(
       businessProvider.generateText({ prompt: 'contract test' }),
-    ).resolves.toBe('typed result');
+    ).resolves.toEqual({ result: 'typed result' });
   });
 
   it('rejects invalid endpoints before constructing an invoker', () => {
@@ -301,5 +312,6 @@ describe('createLangChainProvider', () => {
     });
     expect(body.max_tokens).toBe(8192);
     expect(body.temperature).toBe(0.7);
+    expect(body.response_format).toEqual({ type: 'json_object' });
   });
 });
