@@ -42,7 +42,11 @@ import { formatDate, getMonday } from "../src/content/date"
 import { dataUrlToBlob } from "../src/content/image"
 import { renderSafeMarkdown } from "../src/content/markdown"
 import { createObjectUrlVideoSource, jumpVideoToTime, revokeObjectUrlVideoSource } from "../src/content/media"
-import { getPromptText as resolvePromptText } from "../src/content/prompt"
+import {
+  createPromptRegenerationTracker,
+  extractPromptFromImageAnalysis,
+  getPromptText as resolvePromptText
+} from "../src/content/prompt"
 import { matchShortcut } from "../src/content/shortcut"
 import { getContentStyles } from "../src/content/styles"
 import { syncToastElement } from "../src/content/toast"
@@ -108,6 +112,7 @@ export const config: PlasmoCSConfig = {
   let videoPromptPurpose = 'general';
   let videoPromptTarget = '';
   let areaRecordingDelaySeconds = DEFAULT_AREA_RECORDING_DELAY_SECONDS;
+  const imagePromptRegenerationTracker = createPromptRegenerationTracker();
 
   function syncContentRootInteractivity() {
     setContentRootInteractive(root, shouldExpandContentRoot({
@@ -1969,6 +1974,10 @@ export const config: PlasmoCSConfig = {
   function showModal(data, previewUrl, originX, originY) {
     removeModal(false);
 
+    const historyEntry = currentHistoryEntry();
+    const promptRegenerationActive = historyEntry?.kind === 'image'
+      && imagePromptRegenerationTracker.isActive(historyEntry);
+
     const modal = document.createElement('div');
     modal.className = 'inspoclip-modal-overlay';
 
@@ -2048,6 +2057,7 @@ export const config: PlasmoCSConfig = {
                   <button class="inspoclip-lang-btn" data-lang="both">EN/中</button>
                 </div>
                 <button class="inspoclip-copy-all" data-type="prompt" title="${getCopyButtonTitle(locale)}" aria-label="${getCopyButtonTitle(locale)}">${getCopyButtonIcon()}</button>
+                <button class="inspoclip-copy-all inspoclip-prompt-regenerate ${promptRegenerationActive ? 'is-loading' : ''}" title="${locale === 'zh' ? '重新生成' : 'Regenerate'}" aria-label="${locale === 'zh' ? '重新生成' : 'Regenerate'}" ${promptRegenerationActive ? 'disabled aria-busy="true"' : ''}>${getPromptRegenerateIcon()}</button>
               </div>
             </div>
             <div class="inspoclip-prompt" id="inspoclip-prompt"></div>
@@ -2146,6 +2156,61 @@ export const config: PlasmoCSConfig = {
         renderPrompt(data.prompt);
       });
     });
+
+    const regeneratePromptBtn = modal.querySelector('.inspoclip-prompt-regenerate');
+    if (regeneratePromptBtn) {
+      regeneratePromptBtn.addEventListener('click', async () => {
+        const entry = currentHistoryEntry();
+        if (entry?.kind === 'image' && imagePromptRegenerationTracker.isActive(entry)) return;
+
+        const sourceBlob = entry?.kind === 'image' ? entry.blob : capturedBlob;
+        if (!sourceBlob) {
+          showToast(locale === 'zh' ? '无法重新获取 Prompt：原始图片不可用' : 'Cannot regenerate Prompt: the original image is unavailable', 'error');
+          return;
+        }
+
+        regeneratePromptBtn.disabled = true;
+        regeneratePromptBtn.classList.add('is-loading');
+        regeneratePromptBtn.setAttribute('aria-busy', 'true');
+        try {
+          const ext = sourceBlob.type === 'image/png' ? '.png' : '.jpg';
+          const formData = new FormData();
+          formData.append('image', sourceBlob, `prompt-refresh${ext}`);
+          const request = fetch(`${serverUrl}/api/images/analyze`, {
+            method: 'POST',
+            body: formData
+          }).then(async (response) => {
+            if (!response.ok) throw new Error(await readableError(response, 'Prompt regeneration failed'));
+            return response.json();
+          });
+          const refreshed = entry?.kind === 'image'
+            ? await imagePromptRegenerationTracker.start(entry, request)
+            : await request;
+          const prompt = extractPromptFromImageAnalysis(refreshed);
+          if (!prompt) throw new Error(locale === 'zh' ? '模型未返回有效 Prompt' : 'The model did not return a valid Prompt');
+
+          data.prompt = prompt;
+          if (entry?.kind === 'image') entry.data.prompt = prompt;
+          if (currentModal === modal && currentHistoryEntry() === entry) renderPrompt(prompt);
+        } catch (error) {
+          if (currentModal === modal && currentHistoryEntry() === entry) {
+            const message = error?.message || String(error);
+            showToast(locale === 'zh' ? `重新生成失败: ${message}` : `Regeneration failed: ${message}`, 'error');
+          }
+        } finally {
+          const visibleModal = currentModal;
+          if (visibleModal && currentHistoryEntry() === entry) {
+            const visibleButton = visibleModal.querySelector('.inspoclip-prompt-regenerate');
+            if (visibleButton) {
+              visibleButton.disabled = false;
+              visibleButton.classList.remove('is-loading');
+              visibleButton.removeAttribute('aria-busy');
+            }
+            if (visibleModal !== modal && entry?.kind === 'image') renderPrompt(entry.data.prompt);
+          }
+        }
+      });
+    }
 
     // Upload button — check similar images first
     const uploadBtn = modal.querySelector('.inspoclip-upload-btn');
@@ -2471,6 +2536,17 @@ export const config: PlasmoCSConfig = {
 
   function getPromptText(prompt) {
     return resolvePromptText(prompt, promptLangMode, locale);
+  }
+
+  function getPromptRegenerateIcon() {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M21 12a9 9 0 0 0-15.5-6.5L3 8" />
+        <path d="M3 3v5h5" />
+        <path d="M3 12a9 9 0 0 0 15.5 6.5L21 16" />
+        <path d="M21 21v-5h-5" />
+      </svg>
+    `;
   }
 
   function renderPrompt(prompt) {

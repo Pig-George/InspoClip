@@ -399,6 +399,19 @@
       color: #3f9a4c;
     }
 
+    .inspoclip-prompt-regenerate:disabled {
+      cursor: wait;
+      opacity: 0.6;
+    }
+
+    .inspoclip-prompt-regenerate.is-loading svg {
+      animation: inspoclip-prompt-refresh-spin 0.85s linear infinite;
+    }
+
+    @keyframes inspoclip-prompt-refresh-spin {
+      to { transform: rotate(360deg); }
+    }
+
     /* Terms */
     .inspoclip-terms {
       display: flex;
