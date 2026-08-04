@@ -65,6 +65,7 @@ describe('VideoCard', () => {
     }} onOpen={() => undefined} onRefresh={() => undefined} />, 'en');
 
     expect(screen.getByText('Card expansion motion')).toBeInTheDocument();
+    expect(screen.getByText('Analysis complete')).toBeInTheDocument();
     expect(screen.queryByText('卡片展开动效')).not.toBeInTheDocument();
     expect(screen.queryByText('raw-file.mp4')).not.toBeInTheDocument();
   });

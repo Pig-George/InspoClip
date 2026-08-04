@@ -34,6 +34,12 @@ export const translations = {
   EmptyPage: { zh: '今日灵感为空~', en: 'No inspiration today~' },
   Analyzing: { zh: '分析中...', en: 'Analyzing...' },
 
+  // Video cards
+  VideoAnalysisPending: { zh: '等待分析', en: 'Waiting for analysis' },
+  VideoAnalysisProcessing: { zh: '分析中', en: 'Analyzing' },
+  VideoAnalysisCompleted: { zh: '分析完成', en: 'Analysis complete' },
+  VideoAnalysisFailed: { zh: '分析失败', en: 'Analysis failed' },
+
   // Notes
   Notes: { zh: '笔记', en: 'Notes' },
   NotesPlaceholder: { zh: '在这里写周笔记...', en: 'Write your weekly notes here...' },

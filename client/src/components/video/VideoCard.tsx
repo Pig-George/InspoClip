@@ -6,6 +6,7 @@ import { deleteVideo, retryVideo, videoThumbnailUrl } from '@/lib/video-api';
 import { DecorElement } from '@/components/DecorElement';
 import { toast } from '@/components/Toast';
 import { useLanguage } from '@/context/LanguageContext';
+import type { TranslationKey } from '@/i18n/translations';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { localizedText } from '@/lib/localized-text';
 import type { DecorationType } from '@/types';
@@ -25,7 +26,12 @@ function formatDuration(durationMs: number): string {
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-const statusLabel = { pending: '等待分析', processing: '分析中', completed: '分析完成', failed: '分析失败' } as const;
+const statusTranslationKey: Record<NonNullable<WeekVideo['job']>['status'], TranslationKey> = {
+  pending: 'VideoAnalysisPending',
+  processing: 'VideoAnalysisProcessing',
+  completed: 'VideoAnalysisCompleted',
+  failed: 'VideoAnalysisFailed',
+};
 const decorations: DecorationType[] = ['tape', 'pin', 'clip', 'washi', 'stitch', 'staple', 'sticker', 'corner'];
 
 function stableCharCode(value: string, index: number): number {
@@ -41,7 +47,7 @@ function videoCardStyle(videoId: string): { rotate: number; decoration: Decorati
 
 export function VideoCard({ video, onOpen, onRefresh }: VideoCardProps) {
   const { rotate, decoration } = videoCardStyle(video.id);
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -142,7 +148,7 @@ export function VideoCard({ video, onOpen, onRefresh }: VideoCardProps) {
       <div className="mt-2 px-1">
         <p className="truncate font-heading text-xs font-medium text-[var(--text)]">{title}</p>
         <p className={`text-[10px] font-handwriting ${video.job?.status === 'failed' ? 'text-red-400' : 'text-[var(--text-muted)]'}`}>
-          {video.job ? statusLabel[video.job.status] : '等待分析'}
+          {video.job ? t(statusTranslationKey[video.job.status]) : t('VideoAnalysisPending')}
           {video.job?.status === 'processing' && <span className="ml-1">{video.job.progress}%</span>}
         </p>
       </div>
