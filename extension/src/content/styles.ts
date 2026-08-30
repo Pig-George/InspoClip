@@ -237,12 +237,16 @@
 
     /* Modal */
     .inspoclip-modal {
+      --card: #fdf7ef;
+      --card-alt: #faf3e8;
+      --accent: #c0784a;
+      --muted: #efe0ce;
       position: fixed;
       left: var(--target-x);
       top: var(--target-y);
       width: 380px;
       max-height: calc(100vh - 40px);
-      background: #faf3e6;
+      background: var(--card);
       border-radius: 16px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.1);
       display: flex;

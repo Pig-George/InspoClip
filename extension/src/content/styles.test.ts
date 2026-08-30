@@ -155,11 +155,14 @@ describe("content styles", () => {
     const languageActiveRule = styles.match(/\.inspoclip-lang-btn\.active\s*\{([^}]*)\}/s)?.[1] || ""
     const navRule = styles.match(/\.inspoclip-nav-btn\s*\{([^}]*)\}/s)?.[1] || ""
     const closeRule = styles.match(/\.inspoclip-modal-close\s*\{([^}]*)\}/s)?.[1] || ""
+    const modalRule = styles.match(/\.inspoclip-modal\s*\{([^}]*)\}/s)?.[1] || ""
 
     expect(hostRule).toMatch(/--card:\s*#fdf7ef;/)
     expect(hostRule).toMatch(/--muted:\s*#efe0ce;/)
     expect(hostRule).toMatch(/--accent:\s*#c0784a;/)
     expect(hostRule).toMatch(/--text-muted:\s*#8b6a52;/)
+    expect(modalRule).toMatch(/--card:\s*#fdf7ef;/)
+    expect(modalRule).toMatch(/--accent:\s*#c0784a;/)
 
     expect(iconRule).toMatch(/width:\s*22px;/)
     expect(iconRule).toMatch(/height:\s*22px;/)
