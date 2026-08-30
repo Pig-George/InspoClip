@@ -17,6 +17,7 @@ export function PopupApp() {
         connectionLabel={popup.connectionLabel}
         connectionState={popup.connectionState}
         locale={popup.locale}
+        runtimeMode={popup.runtimeMode}
         t={popup.t}
         onOpenSettings={() => popup.setSettingsOpen(true)}
         onTestConnection={popup.testServerConnection}
@@ -53,6 +54,7 @@ export function PopupApp() {
 
       <SettingsSection
         appUrl={popup.appUrl}
+        developmentDiagnostics={popup.developmentDiagnostics}
         modelSettings={popup.modelSettings}
         open={popup.settingsOpen}
         version={version}
@@ -64,6 +66,7 @@ export function PopupApp() {
         storageUsageLabel={popup.storageUsageLabel}
         t={popup.t}
         onAppUrlChange={popup.setAppUrl}
+        onClearDevelopmentDiagnostics={popup.clearDevelopmentDiagnostics}
         onModelSettingsChange={popup.setModelSettings}
         onClose={() => popup.setSettingsOpen(false)}
         onSaveSettings={async () => {

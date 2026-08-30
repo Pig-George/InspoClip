@@ -528,6 +528,20 @@ kbd { padding: 2px 5px; border: 1px solid #ddcdbb; border-bottom-width: 2px; bor
 .storage-usage { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; color: var(--muted); font-size: 9.5px; }
 .storage-usage strong { color: var(--ink); font-size: 10px; }
 
+.diagnostics-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.diagnostics-header h3 { margin-bottom: 0; }
+.diagnostics-actions { display: flex; gap: 4px; }
+.diagnostics-actions button { width: 25px; height: 25px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 7px; background: var(--paper-strong); color: var(--brand-deep); cursor: pointer; }
+.diagnostics-actions button:hover:not(:disabled) { background: var(--brand-soft); }
+.diagnostics-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.diagnostics-actions svg { width: 13px; height: 13px; }
+.diagnostic-list { max-height: 132px; margin-top: 10px; overflow-y: auto; }
+.diagnostic-entry { padding: 8px 0; border-top: 1px dashed var(--line); font-size: 9px; }
+.diagnostic-entry time { display: block; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.diagnostic-entry strong, .diagnostic-entry span { display: block; overflow-wrap: anywhere; }
+.diagnostic-entry strong { margin-top: 3px; color: var(--ink); font-size: 9.5px; }
+.diagnostic-entry span { margin-top: 3px; color: var(--danger); }
+
 .shortcut-row { display: flex; align-items: center; gap: 7px; }
 .shortcut-row + .shortcut-row { margin-top: 8px; }
 .shortcut-label { flex: 1; color: #6f594d; font-size: 10px; }

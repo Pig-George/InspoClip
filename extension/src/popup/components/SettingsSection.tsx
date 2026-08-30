@@ -1,9 +1,14 @@
 import type { I18nMessages, ModelSettings, RuntimeMode, ShortcutTarget } from "../types"
+import type { ExtensionLogEntry } from "../../runtime/extension-logger"
+import { isDevelopmentBuild } from "../../runtime/build-mode"
 import { formatShortcut } from "../shortcut"
+import { DevelopmentDiagnostics } from "./DevelopmentDiagnostics"
 import { PopupIcon } from "./PopupIcon"
+import { MODEL_PROVIDER_PRESETS } from "../constants"
 
 type SettingsSectionProps = {
   appUrl: string
+  developmentDiagnostics?: ExtensionLogEntry[]
   modelSettings: ModelSettings
   open: boolean
   version: string
@@ -15,6 +20,7 @@ type SettingsSectionProps = {
   storageUsageLabel?: string
   t: I18nMessages
   onAppUrlChange: (value: string) => void
+  onClearDevelopmentDiagnostics?: () => void | Promise<void>
   onModelSettingsChange: (value: ModelSettings) => void
   onClose: () => void
   onSaveSettings: () => void | Promise<void>
@@ -27,6 +33,7 @@ type SettingsSectionProps = {
 
 export function SettingsSection({
   appUrl,
+  developmentDiagnostics = [],
   modelSettings,
   open,
   version,
@@ -38,6 +45,7 @@ export function SettingsSection({
   storageUsageLabel,
   t,
   onAppUrlChange,
+  onClearDevelopmentDiagnostics = () => undefined,
   onModelSettingsChange,
   onClose,
   onSaveSettings,
@@ -70,15 +78,34 @@ export function SettingsSection({
                   className="runtime-mode-select"
                   id="modelProvider"
                   value={modelSettings.provider}
-                  onChange={(event) => onModelSettingsChange({ ...modelSettings, provider: event.target.value as ModelSettings["provider"] })}
+                  onChange={(event) => {
+                    const provider = event.target.value as ModelSettings["provider"]
+                    onModelSettingsChange({ ...modelSettings, ...MODEL_PROVIDER_PRESETS[provider], apiKey: modelSettings.apiKey })
+                  }}
                 >
-                  <option value="qwen">{t.qwenProvider}</option>
+                  <option value="qwen">{t.bailianProvider}</option>
+                  <option value="openai">{t.openaiProvider}</option>
+                  <option value="openrouter">{t.openrouterProvider}</option>
                   <option value="openai-compatible">{t.openaiCompatibleProvider}</option>
                 </select>
                 <label htmlFor="modelEndpoint">{t.modelEndpoint}</label>
                 <input id="modelEndpoint" type="url" value={modelSettings.endpoint} onChange={(event) => onModelSettingsChange({ ...modelSettings, endpoint: event.target.value })} />
                 <label htmlFor="modelName">{t.modelName}</label>
                 <input id="modelName" type="text" value={modelSettings.model} onChange={(event) => onModelSettingsChange({ ...modelSettings, model: event.target.value })} />
+                <label htmlFor="videoFrameCount">{t.videoFrameCount}</label>
+                <input
+                  id="videoFrameCount"
+                  type="number"
+                  min="4"
+                  max="48"
+                  step="1"
+                  value={modelSettings.videoFrameCount}
+                  onChange={(event) => onModelSettingsChange({
+                    ...modelSettings,
+                    videoFrameCount: Math.min(48, Math.max(4, Number(event.target.value) || 16))
+                  })}
+                />
+                <p className="settings-hint">{t.videoFrameCountHint}</p>
                 <label htmlFor="modelApiKey">{t.apiKey}</label>
                 <input id="modelApiKey" type="password" autoComplete="off" value={modelSettings.apiKey} onChange={(event) => onModelSettingsChange({ ...modelSettings, apiKey: event.target.value })} />
                 <p className="settings-hint">{t.modelConfigurationHint}</p>
@@ -95,6 +122,8 @@ export function SettingsSection({
           <label htmlFor="appUrl">Frontend URL</label>
           <input type="text" id="appUrl" value={appUrl} onChange={(event) => onAppUrlChange(event.target.value)} />
         </div> : null}
+
+        {isDevelopmentBuild ? <DevelopmentDiagnostics diagnostics={developmentDiagnostics} t={t} onClear={onClearDevelopmentDiagnostics} /> : null}
 
         <div className="settings-card">
           <h3><PopupIcon name="command" />{t.shortcuts}</h3>

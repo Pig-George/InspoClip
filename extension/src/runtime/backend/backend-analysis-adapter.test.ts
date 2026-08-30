@@ -109,6 +109,19 @@ describe("BackendAnalysisAdapter", () => {
     ])
   })
 
+  test("downloads a video with the Worker global fetch context", async () => {
+    const fetchFn = (async function (this: unknown, url: string | URL | Request) {
+      if (this !== globalThis) throw new TypeError("Illegal invocation")
+      if (String(url).startsWith("https://")) {
+        return new Response(new Blob(["video"], { type: "video/mp4" }), { status: 200 })
+      }
+      return jsonResponse({ videoId: "video-1", jobId: "job-1", status: "pending" }, 202)
+    }) as FetchLike
+    const adapter = createAdapter(fetchFn)
+
+    await expect(adapter.uploadVideoUrl("https://example.com/demo.mp4")).resolves.toMatchObject({ jobId: "job-1" })
+  })
+
   test("polling recovers from a transient browser network change", async () => {
     let calls = 0
     const waits: number[] = []

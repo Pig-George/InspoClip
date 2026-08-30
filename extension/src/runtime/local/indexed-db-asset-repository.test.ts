@@ -62,17 +62,18 @@ describe("IndexedDbAssetRepository", () => {
       kind: "video",
       blob: new Blob(["video"], { type: "video/webm" }),
       filename: "recording.webm",
-      mimeType: "video/webm"
+      mimeType: "video/webm",
+      durationMs: 10_250
     })
 
     expect(image).toMatchObject({ id: "asset-1", kind: "image", state: "draft", mode: "standalone", filename: "capture.png" })
-    expect(video).toMatchObject({ id: "asset-2", kind: "video", state: "draft", filename: "recording.webm" })
+    expect(video).toMatchObject({ id: "asset-2", kind: "video", state: "draft", filename: "recording.webm", durationMs: 10_250 })
     expect(image.blob?.key).toBe("images/asset-1/original.png")
     expect(video.blob?.key).toBe("videos/asset-2/original.webm")
     expect(await blobs.get(image.blob as BlobRef)).toBeInstanceOf(Blob)
 
     const restored = new IndexedDbAssetRepository(database, blobs)
-    await expect(restored.get("asset-2")).resolves.toMatchObject({ kind: "video", filename: "recording.webm" })
+    await expect(restored.get("asset-2")).resolves.toMatchObject({ kind: "video", filename: "recording.webm", durationMs: 10_250 })
   })
 
   test("lists only saved assets by default and keeps drafts isolated", async () => {
@@ -100,6 +101,27 @@ describe("IndexedDbAssetRepository", () => {
     const allFirstPage = await repository.list({ limit: 1 })
     const allSecondPage = await repository.list({ limit: 1, cursor: allFirstPage.nextCursor })
     expect(allFirstPage.items[0].id).not.toBe(allSecondPage.items[0].id)
+  })
+
+  test("keeps completed image analysis when saving an image", async () => {
+    const { repository } = await setup()
+    const analysis = {
+      terms: ["card layout / 卡片布局"],
+      colors: ["#3377cc"],
+      prompt: { en: "A card layout", zh: "卡片布局" }
+    }
+
+    const saved = await repository.saveImage({
+      blob: new Blob(["image"], { type: "image/png" }),
+      filename: "capture.png",
+      mimeType: "image/png",
+      weekStart: "2026-08-03",
+      dayOfWeek: 0,
+      analysis
+    }) as { id: string; state: string; analysis?: unknown }
+
+    expect(saved).toMatchObject({ state: "saved", analysis })
+    await expect(repository.get(saved.id)).resolves.toMatchObject({ state: "saved", analysis })
   })
 
   test("deletes metadata and its original blob", async () => {

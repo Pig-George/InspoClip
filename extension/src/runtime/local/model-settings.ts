@@ -1,12 +1,13 @@
 import { RuntimeFailure } from "../errors"
 
-export type LocalModelProvider = "qwen" | "openai-compatible"
+export type LocalModelProvider = "qwen" | "openai" | "openrouter" | "openai-compatible"
 
 export type LocalModelSettings = {
   provider: LocalModelProvider
   endpoint: string
   model: string
   apiKey: string
+  videoFrameCount?: number
 }
 
 export const LOCAL_MODEL_SETTINGS_KEY = "modelSettings"
@@ -15,7 +16,8 @@ export const DEFAULT_LOCAL_MODEL_SETTINGS: LocalModelSettings = {
   provider: "qwen",
   endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1",
   model: "qwen3.7-plus",
-  apiKey: ""
+  apiKey: "",
+  videoFrameCount: 16
 }
 
 type StorageAreaLike = {
@@ -33,10 +35,11 @@ export async function loadLocalModelSettings(storage: StorageAreaLike = defaultS
   const settings = value && typeof value === "object" ? value as Partial<LocalModelSettings> : {}
   return {
     ...DEFAULT_LOCAL_MODEL_SETTINGS,
-    provider: settings.provider === "openai-compatible" ? "openai-compatible" : "qwen",
+    provider: normalizeLocalModelProvider(settings.provider),
     endpoint: typeof settings.endpoint === "string" ? settings.endpoint : DEFAULT_LOCAL_MODEL_SETTINGS.endpoint,
     model: typeof settings.model === "string" ? settings.model : DEFAULT_LOCAL_MODEL_SETTINGS.model,
-    apiKey: typeof settings.apiKey === "string" ? settings.apiKey : ""
+    apiKey: typeof settings.apiKey === "string" ? settings.apiKey : "",
+    videoFrameCount: normalizeVideoFrameCount(settings.videoFrameCount)
   }
 }
 
@@ -70,11 +73,22 @@ export function validateLocalModelSettings(settings: LocalModelSettings): LocalM
   const isLocalHttp = endpoint.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(endpoint.hostname)
   if (endpoint.protocol !== "https:" && !isLocalHttp) throw invalidEndpoint()
   return {
-    provider: settings.provider === "openai-compatible" ? "openai-compatible" : "qwen",
+    provider: normalizeLocalModelProvider(settings.provider),
     endpoint: endpoint.toString().replace(/\/$/, ""),
     model: settings.model.trim(),
-    apiKey: settings.apiKey.trim()
+    apiKey: settings.apiKey.trim(),
+    videoFrameCount: normalizeVideoFrameCount(settings.videoFrameCount)
   }
+}
+
+function normalizeVideoFrameCount(value: unknown): number {
+  const number = Number(value)
+  return Math.min(48, Math.max(4, Number.isFinite(number) ? Math.round(number) : 16))
+}
+
+function normalizeLocalModelProvider(value: unknown): LocalModelProvider {
+  if (value === "openai" || value === "openrouter" || value === "openai-compatible") return value
+  return "qwen"
 }
 
 function invalidEndpoint(): RuntimeFailure {

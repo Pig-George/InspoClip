@@ -13,13 +13,13 @@ describe("RuntimeFactory", () => {
     expect(first.mode).toBe("backend")
   })
 
-  test("recreates the runtime when the backend address changes", async () => {
+  test("reuses the runtime for localhost aliases targeting the same backend", async () => {
     const factory = new RuntimeFactory({ fetchFn: async () => new Response() })
 
     const first = await factory.get({ mode: "backend", serverUrl: "http://localhost:3001" })
     const second = await factory.get({ mode: "backend", serverUrl: "http://127.0.0.1:3001" })
 
-    expect(first).not.toBe(second)
+    expect(first).toBe(second)
   })
 
   test("creates and isolates a standalone runtime without falling back", async () => {

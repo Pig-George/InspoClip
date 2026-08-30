@@ -14,6 +14,7 @@ describe("local model settings", () => {
     await expect(loadLocalModelSettings(storage())).resolves.toMatchObject({
       provider: "qwen",
       model: "qwen3.7-plus",
+      videoFrameCount: 16,
       apiKey: ""
     })
   })
@@ -23,6 +24,7 @@ describe("local model settings", () => {
       provider: "qwen",
       endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1",
       model: "qwen3.7-plus",
+      videoFrameCount: 16,
       apiKey: "secret"
     })).toMatchObject({ apiKey: "secret" })
 
@@ -30,7 +32,25 @@ describe("local model settings", () => {
       provider: "qwen",
       endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1",
       model: "qwen3.7-plus",
+      videoFrameCount: 16,
       apiKey: ""
     })).toThrow("AI API key")
+  })
+
+  test("preserves named OpenAI-compatible service platforms", () => {
+    expect(validateLocalModelSettings({
+      provider: "openrouter",
+      endpoint: "https://openrouter.ai/api/v1",
+      model: "openai/gpt-4.1-mini",
+      videoFrameCount: 24,
+      apiKey: "secret"
+    })).toMatchObject({ provider: "openrouter" })
+  })
+
+  test("normalizes the configurable video frame count", async () => {
+    await expect(loadLocalModelSettings(storage({ modelSettings: { videoFrameCount: 100 } })))
+      .resolves.toMatchObject({ videoFrameCount: 48 })
+    await expect(loadLocalModelSettings(storage({ modelSettings: { videoFrameCount: 1 } })))
+      .resolves.toMatchObject({ videoFrameCount: 4 })
   })
 })

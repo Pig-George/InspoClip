@@ -68,6 +68,10 @@ export class IndexedDbAssetRepository implements AssetRepository {
       mimeType: input.mimeType || input.blob.type,
       size: input.blob.size,
       source: input.source,
+      ...(Number.isFinite(input.durationMs) && Number(input.durationMs) > 0
+        ? { durationMs: Number(input.durationMs) }
+        : {}),
+      ...(input.analysis !== undefined ? { analysis: structuredClone(input.analysis) } : {}),
       blob,
       createdAt: timestamp,
       updatedAt: timestamp
@@ -144,7 +148,8 @@ export class IndexedDbAssetRepository implements AssetRepository {
       blob: input.blob,
       filename: input.filename,
       mimeType: input.mimeType,
-      source: "extension"
+      source: "extension",
+      ...(input.analysis !== undefined ? { analysis: input.analysis } : {})
     })
     return this.save(asset.id)
   }
@@ -155,7 +160,17 @@ export class IndexedDbAssetRepository implements AssetRepository {
 
   async getVideoDetail(assetId: string): Promise<unknown> {
     const asset = await this.get(assetId)
-    return asset ? { video: asset, analysis: asset.analysis || null } : null
+    return asset ? {
+      video: {
+        ...asset,
+        originalName: asset.filename,
+        isSaved: asset.state === "saved"
+      },
+      analysis: asset.analysis || null,
+      summary: asset.analysis && typeof asset.analysis === "object" && "summary" in asset.analysis
+        ? asset.analysis.summary
+        : undefined
+    } : null
   }
 
   getContentUrl(_kind: "image" | "video", _reference: string): string {

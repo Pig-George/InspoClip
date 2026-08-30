@@ -3,6 +3,9 @@ import { BackendAnalysisAdapter } from "./backend/backend-analysis-adapter"
 import { BackendAssetRepository } from "./backend/backend-asset-repository"
 import { BackendHttpClient, type FetchLike } from "./backend/http-client"
 import { createStandaloneRuntime as createDefaultStandaloneRuntime } from "./local/standalone-runtime"
+import { normalizeBackendUrl } from "./backend-url"
+import { isDevelopmentBuild } from "./build-mode"
+import { createExtensionLogRecorder, type ExtensionLogStorage } from "./extension-logger"
 
 export type RuntimeSettings = {
   mode: RuntimeMode
@@ -12,24 +15,26 @@ export type RuntimeSettings = {
 type RuntimeFactoryDependencies = {
   fetchFn?: FetchLike
   createStandaloneRuntime?: () => Promise<ExtensionRuntime>
-}
-
-function normalizeServerUrl(serverUrl: string): string {
-  return String(serverUrl || "").trim().replace(/\/+$/, "")
+  diagnosticStorage?: ExtensionLogStorage
+  diagnosticsEnabled?: boolean
 }
 
 export class RuntimeFactory {
   private readonly fetchFn: FetchLike
   private readonly createStandaloneRuntime: () => Promise<ExtensionRuntime>
+  private readonly diagnosticStorage?: ExtensionLogStorage
+  private readonly diagnosticsEnabled: boolean
   private readonly runtimes = new Map<string, Promise<ExtensionRuntime>>()
 
   constructor(dependencies: RuntimeFactoryDependencies = {}) {
     this.fetchFn = dependencies.fetchFn || fetch
     this.createStandaloneRuntime = dependencies.createStandaloneRuntime || createDefaultStandaloneRuntime
+    this.diagnosticStorage = dependencies.diagnosticStorage
+    this.diagnosticsEnabled = dependencies.diagnosticsEnabled ?? isDevelopmentBuild
   }
 
   async get(settings: RuntimeSettings): Promise<ExtensionRuntime> {
-    const serverUrl = normalizeServerUrl(settings.serverUrl)
+    const serverUrl = normalizeBackendUrl(settings.serverUrl)
     const cacheKey = settings.mode === "standalone" ? "standalone" : `backend:${serverUrl}`
     const existing = this.runtimes.get(cacheKey)
     if (existing) return existing
@@ -47,7 +52,25 @@ export class RuntimeFactory {
   }
 
   private createBackendRuntime(serverUrl: string): ExtensionRuntime {
-    const client = new BackendHttpClient(serverUrl, this.fetchFn, { allowLoopbackFallback: true })
+    const diagnosticStorage = this.diagnosticStorage || (
+      this.diagnosticsEnabled && typeof chrome !== "undefined"
+        ? chrome.storage.local as unknown as ExtensionLogStorage
+        : undefined
+    )
+    const recordLog = diagnosticStorage
+      ? createExtensionLogRecorder(diagnosticStorage, this.diagnosticsEnabled)
+      : undefined
+    const client = new BackendHttpClient(serverUrl, this.fetchFn, {
+      allowLoopbackFallback: true,
+      ...(recordLog ? {
+        onRequestFailure: ({ url, method, error, context }) => recordLog({
+          source: "backend",
+          level: "error",
+          error,
+          context: { method, url, ...(context || {}) }
+        })
+      } : {})
+    })
     return {
       mode: "backend",
       analysis: new BackendAnalysisAdapter(client, this.fetchFn),

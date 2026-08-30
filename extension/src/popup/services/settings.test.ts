@@ -21,7 +21,21 @@ describe("popup settings storage", () => {
   test("loads default Qwen settings for a new standalone profile", async () => {
     await expect(loadPopupSettings()).resolves.toMatchObject({
       runtimeMode: "backend",
-      modelSettings: DEFAULT_MODEL_SETTINGS
+      modelSettings: DEFAULT_MODEL_SETTINGS,
+      serverUrl: "http://127.0.0.1:3001"
+    })
+  })
+
+  test("normalizes an existing localhost backend setting for Docker", async () => {
+    vi.stubGlobal("chrome", {
+      storage: {
+        sync: { get: vi.fn().mockResolvedValue({ serverUrl: "http://localhost:3001/" }), set: syncSet },
+        local: { get: vi.fn().mockResolvedValue({}), set: localSet }
+      }
+    })
+
+    await expect(loadPopupSettings()).resolves.toMatchObject({
+      serverUrl: "http://127.0.0.1:3001"
     })
   })
 

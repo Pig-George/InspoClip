@@ -23,7 +23,7 @@ export async function createStandaloneRuntime(options: StandaloneRuntimeOptions 
   return {
     mode: "standalone",
     assets,
-    analysis: new StandaloneAnalysisAdapter(),
+    analysis: new StandaloneAnalysisAdapter({ assets, jobs, blobs }),
     jobs,
     blobs
   }

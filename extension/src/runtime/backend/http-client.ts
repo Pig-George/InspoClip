@@ -1,9 +1,16 @@
 import { RuntimeFailure } from "../errors"
+export type BackendRequestFailureDiagnostic = {
+  url: string
+  method: string
+  error: unknown
+  context?: Record<string, unknown>
+}
 
 export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
 
 export type BackendHttpClientOptions = {
   allowLoopbackFallback?: boolean
+  onRequestFailure?: (diagnostic: BackendRequestFailureDiagnostic) => void | Promise<void>
 }
 
 function trimBase(url: string): string {
@@ -40,11 +47,13 @@ export class BackendHttpClient {
   readonly baseUrl: string
   private readonly fetchFn: FetchLike
   private readonly allowLoopbackFallback: boolean
+  private readonly onRequestFailure?: (diagnostic: BackendRequestFailureDiagnostic) => void | Promise<void>
 
   constructor(baseUrl: string, fetchFn: FetchLike = fetch, options: BackendHttpClientOptions = {}) {
     this.baseUrl = trimBase(baseUrl)
     this.fetchFn = fetchFn
     this.allowLoopbackFallback = options.allowLoopbackFallback === true
+    this.onRequestFailure = options.onRequestFailure
   }
 
   buildUrl(path: string): string {
@@ -57,13 +66,29 @@ export class BackendHttpClient {
     const urls = this.allowLoopbackFallback ? requestUrls(this.baseUrl, path) : [this.buildUrl(path)]
     for (const url of urls) {
       try {
-        response = await this.fetchFn(url, init)
+        response = await this.fetchFn.call(globalThis, url, init)
         break
-      } catch {
+      } catch (error) {
+        try {
+          await this.onRequestFailure?.({ url, method: init?.method || "GET", error })
+        } catch (diagnosticError) {
+          console.warn("[InspoClip] Failed to persist backend diagnostics", diagnosticError)
+        }
+        console.warn("[InspoClip] Backend request attempt failed", {
+          url,
+          method: init?.method || "GET",
+          error
+        })
         // Retry localhost through IPv4 below; do not expose provider/network details to the UI.
       }
     }
     if (!response) {
+      console.error("[InspoClip] Unable to reach backend after all attempts", {
+        baseUrl: this.baseUrl,
+        path,
+        method: init?.method || "GET",
+        attemptedUrls: urls
+      })
       throw new RuntimeFailure({
         code: "NETWORK_ERROR",
         message: "Unable to reach the InspoClip backend",
@@ -74,10 +99,21 @@ export class BackendHttpClient {
 
     const body = await readJson(response)
     if (!response.ok) {
+      const message = backendMessage(body, response.status)
+      try {
+        await this.onRequestFailure?.({
+          url: this.buildUrl(path),
+          method: init?.method || "GET",
+          error: new Error(message),
+          context: { status: response.status }
+        })
+      } catch (diagnosticError) {
+        console.warn("[InspoClip] Failed to persist backend diagnostics", diagnosticError)
+      }
       const action = errorAction(response.status)
       throw new RuntimeFailure({
         code: `BACKEND_HTTP_${response.status}`,
-        message: backendMessage(body, response.status),
+        message,
         retryable: isRetryableStatus(response.status),
         ...(action ? { action } : {})
       })

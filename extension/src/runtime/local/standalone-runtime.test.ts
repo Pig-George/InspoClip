@@ -19,7 +19,7 @@ const databases: IDBDatabase[] = []
 afterEach(() => databases.splice(0).forEach((database) => database.close()))
 
 describe("createStandaloneRuntime", () => {
-  test("combines persistent assets, jobs, blobs and a local-only analysis gate", async () => {
+  test("combines persistent assets, jobs, blobs and the local model configuration gate", async () => {
     const blobs = new MemoryBlobStore()
     const runtime = await createStandaloneRuntime({
       indexedDb: new IDBFactory(),
@@ -43,6 +43,6 @@ describe("createStandaloneRuntime", () => {
       blob: new Blob(["video"]),
       filename: "demo.mp4",
       mimeType: "video/mp4"
-    })).rejects.toMatchObject({ detail: { code: "LOCAL_VIDEO_ANALYSIS_UNAVAILABLE" } })
+    })).rejects.toMatchObject({ detail: { code: "MODEL_CONFIGURATION_REQUIRED" } })
   })
 })

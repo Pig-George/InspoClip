@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from "react"
 
 import { DEFAULT_APP_URL, DEFAULT_MODEL_SETTINGS, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS, I18N, MAX_VIDEO_SIZE_BYTES, detectBrowserLocale } from "../constants"
 import { buildAssetAnalysisMessage, detectAssetKind } from "../services/assets"
+import { clearPopupExtensionLogs, loadPopupExtensionLogs, recordPopupLog } from "../services/extension-logs"
 import { loadPopupSettings, normalizeAppUrl, normalizeServerUrl, savePopupSettings } from "../services/settings"
 import { getTabDisplayLabel, openOrFocusApp, openOrFocusLocalTimeline, requestAreaCaptureSession, sendCurrentTabMessage } from "../services/tabs"
+import type { ExtensionLogEntry } from "../../runtime/extension-logger"
+import { isDevelopmentBuild } from "../../runtime/build-mode"
 import { sendRuntimeCommand } from "../../runtime/command-client"
 import type { CaptureMode, ConnectionState, Locale, ModelSettings, RuntimeMode, ShortcutTarget, StatusMessage, StorageUsage } from "../types"
 
@@ -25,6 +28,7 @@ export function usePopupController() {
   const [recordingShortcut, setRecordingShortcut] = useState<ShortcutTarget | null>(null)
   const [assetUrl, setAssetUrl] = useState("")
   const [currentPageLabel, setCurrentPageLabel] = useState("")
+  const [developmentDiagnostics, setDevelopmentDiagnostics] = useState<ExtensionLogEntry[]>([])
 
   const t = useMemo(() => I18N[locale], [locale])
 
@@ -39,6 +43,11 @@ export function usePopupController() {
       if (settings.lang) setLocale(settings.lang)
     })
   }, [])
+
+  useEffect(() => {
+    if (!isDevelopmentBuild || !settingsOpen) return
+    void loadPopupExtensionLogs().then(setDevelopmentDiagnostics).catch(() => setDevelopmentDiagnostics([]))
+  }, [settingsOpen])
 
   useEffect(() => {
     chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
@@ -138,6 +147,7 @@ export function usePopupController() {
 
   function showStatus(message: string, type: StatusMessage["type"]) {
     setStatus({ message, type })
+    if (type === "error") void recordPopupLog({ source: "popup", level: "error", error: message })
     setTimeout(() => setStatus(null), 3000)
   }
 
@@ -170,12 +180,18 @@ export function usePopupController() {
     }
   }
 
+  async function clearDevelopmentDiagnostics() {
+    await clearPopupExtensionLogs()
+    setDevelopmentDiagnostics([])
+  }
+
   return {
     appUrl,
     analyzing,
     captureMode,
     connectionLabel,
     connectionState,
+    developmentDiagnostics,
     currentPageLabel,
     locale,
     recordingShortcut,
@@ -190,6 +206,7 @@ export function usePopupController() {
     status,
     t,
     assetUrl,
+    clearDevelopmentDiagnostics,
     handleAssetFile,
     handleAssetUrl,
     openApp,

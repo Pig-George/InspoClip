@@ -135,7 +135,7 @@ export class BackendAnalysisAdapter implements AnalysisAdapter {
 
     let response: Response
     try {
-      response = await this.fetchFn(videoUrl)
+      response = await this.fetchFn.call(globalThis, videoUrl)
     } catch {
       throw new RuntimeFailure({
         code: "VIDEO_DOWNLOAD_FAILED",
@@ -237,6 +237,13 @@ export class BackendAnalysisAdapter implements AnalysisAdapter {
   }
 
   async generatePrompt(input: PromptGenerationInput): Promise<PromptResult> {
+    if (input.purpose === "image-design") {
+      const query = input.regenerate ? "?force=true" : ""
+      const content = await this.client.request(`/api/images/${encodeURIComponent(input.assetId)}/prompt${query}`, {
+        method: "GET"
+      })
+      return { assetId: input.assetId, content }
+    }
     const purpose = input.purpose || "general"
     let content: unknown
     if (input.regenerate) {

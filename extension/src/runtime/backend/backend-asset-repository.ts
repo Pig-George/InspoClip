@@ -91,7 +91,10 @@ export class BackendAssetRepository implements AssetRepository {
       state: "draft",
       mode: "backend",
       createdAt: timestamp,
-      updatedAt: timestamp
+      updatedAt: timestamp,
+      ...(Number.isFinite(input.durationMs) && Number(input.durationMs) > 0
+        ? { durationMs: Number(input.durationMs) }
+        : {})
     }
     this.drafts.set(asset.id, asset)
     return asset

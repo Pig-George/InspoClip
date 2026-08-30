@@ -5,12 +5,13 @@ export type CaptureMode = "area" | "page"
 export type ConnectionState = "testing" | "connected" | "error"
 export type RuntimeMode = "backend" | "standalone"
 export type StorageUsage = { usedBytes: number; quotaBytes?: number }
-export type ModelProvider = "qwen" | "openai-compatible"
+export type ModelProvider = "qwen" | "openai" | "openrouter" | "openai-compatible"
 export type ModelSettings = {
   provider: ModelProvider
   endpoint: string
   model: string
   apiKey: string
+  videoFrameCount: number
 }
 
 export type ShortcutTarget = "analyze" | "save"
@@ -80,10 +81,18 @@ export type I18nMessages = {
   localModeReady: string
   modelConfiguration: string
   modelProvider: string
-  qwenProvider: string
+  bailianProvider: string
+  openaiProvider: string
+  openrouterProvider: string
   openaiCompatibleProvider: string
   modelEndpoint: string
   modelName: string
   apiKey: string
+  videoFrameCount: string
+  videoFrameCountHint: string
   modelConfigurationHint: string
+  developmentDiagnostics?: string
+  developmentDiagnosticsEmpty?: string
+  copyDiagnostics?: string
+  clearDiagnostics?: string
 }
