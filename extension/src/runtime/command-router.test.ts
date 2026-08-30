@@ -68,6 +68,41 @@ describe("runtime command router", () => {
     })
   })
 
+  test("routes asset analysis updates through the runtime boundary", async () => {
+    let received: unknown
+    const router = createCommandRouter(async () => ({
+      mode: "standalone",
+      assets: {
+        update: async (assetId: string, patch: unknown) => {
+          received = { assetId, patch }
+          return { id: assetId, ...(patch as object) }
+        }
+      }
+    } as unknown as ExtensionRuntime))
+
+    await expect(router.dispatch({
+      type: "runtime.asset.update",
+      payload: { assetId: "asset-1", patch: { analysis: { prompt: { en: "updated" } } } }
+    })).resolves.toMatchObject({ ok: true, data: { id: "asset-1" } })
+    expect(received).toEqual({ assetId: "asset-1", patch: { analysis: { prompt: { en: "updated" } } } })
+  })
+
+  test("routes image and video deletion to backend-specific repository methods", async () => {
+    const deleted: string[] = []
+    const router = createCommandRouter(async () => ({
+      mode: "backend",
+      assets: {
+        deleteImage: async (assetId: string) => { deleted.push(`image:${assetId}`) },
+        deleteVideo: async (assetId: string) => { deleted.push(`video:${assetId}`) },
+        delete: async (assetId: string) => { deleted.push(`generic:${assetId}`) }
+      }
+    } as unknown as ExtensionRuntime))
+
+    await router.dispatch({ type: "runtime.asset.delete", payload: { assetId: "image-1", kind: "image" } })
+    await router.dispatch({ type: "runtime.asset.delete", payload: { assetId: "video-1", kind: "video" } })
+    expect(deleted).toEqual(["image:image-1", "video:video-1"])
+  })
+
   test("returns local storage usage through the runtime boundary", async () => {
     const router = createCommandRouter(async () => ({
       mode: "standalone",

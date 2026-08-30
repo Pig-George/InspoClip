@@ -85,9 +85,11 @@ export type CreateAssetInput = {
   filename: string
   mimeType: string
   source?: string
+  durationMs?: number
+  analysis?: unknown
 }
 
-export type AssetPatch = Partial<Pick<Asset, "title" | "titleEn" | "titleZh" | "tags" | "analysis">>
+export type AssetPatch = Partial<Pick<Asset, "title" | "titleEn" | "titleZh" | "tags" | "analysis" | "durationMs">>
 
 export type AssetQuery = {
   state?: AssetState
@@ -117,6 +119,8 @@ export type VideoAnalysisInput = ImageAnalysisInput & {
 export type ImageSaveInput = ImageAnalysisInput & {
   weekStart: string
   dayOfWeek: number
+  /** Analysis produced before the image was saved. Kept with the local asset for later prompt generation. */
+  analysis?: unknown
 }
 
 export type PromptGenerationInput = {
@@ -187,10 +191,12 @@ export type SerializedBlobInput = {
 export type ExtensionCommand =
   | { type: "runtime.asset.createDraft"; payload: SerializedBlobInput & { kind: AssetKind; source?: string } }
   | { type: "runtime.asset.save"; payload: { assetId: string } }
+  | { type: "runtime.asset.delete"; payload: { assetId: string; kind: AssetKind } }
+  | { type: "runtime.asset.update"; payload: { assetId: string; patch: AssetPatch } }
   | { type: "runtime.asset.get"; payload: { assetId: string } }
   | { type: "runtime.asset.list"; payload: AssetQuery }
   | { type: "runtime.asset.image.similarity"; payload: SerializedBlobInput }
-  | { type: "runtime.asset.image.save"; payload: SerializedBlobInput & { weekStart: string; dayOfWeek: number } }
+  | { type: "runtime.asset.image.save"; payload: SerializedBlobInput & { weekStart: string; dayOfWeek: number; analysis?: unknown } }
   | { type: "runtime.asset.video.get"; payload: { assetId: string } }
   | { type: "runtime.asset.video.save"; payload: { assetId: string } }
   | { type: "runtime.asset.content.url"; payload: { kind: AssetKind; reference: string } }

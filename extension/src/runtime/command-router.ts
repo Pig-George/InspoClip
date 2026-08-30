@@ -5,6 +5,7 @@ import {
   type CommandResult,
   type ExtensionCommand,
   type ExtensionRuntime,
+  type AssetRepository,
   type SerializedBlobInput
 } from "./contracts"
 import { toRuntimeError } from "./errors"
@@ -41,6 +42,17 @@ async function execute(runtime: ExtensionRuntime, command: ExtensionCommand): Pr
       })
     case "runtime.asset.save":
       return runtime.assets.save(command.payload.assetId)
+    case "runtime.asset.delete": {
+      const repository = runtime.assets as AssetRepository & {
+        deleteImage?: (assetId: string) => Promise<unknown>
+        deleteVideo?: (assetId: string) => Promise<unknown>
+      }
+      if (command.payload.kind === "image" && repository.deleteImage) return repository.deleteImage(command.payload.assetId)
+      if (command.payload.kind === "video" && repository.deleteVideo) return repository.deleteVideo(command.payload.assetId)
+      return runtime.assets.delete(command.payload.assetId)
+    }
+    case "runtime.asset.update":
+      return runtime.assets.update(command.payload.assetId, command.payload.patch)
     case "runtime.asset.get":
       return runtime.assets.get(command.payload.assetId)
     case "runtime.asset.list":
@@ -59,7 +71,8 @@ async function execute(runtime: ExtensionRuntime, command: ExtensionCommand): Pr
         filename: command.payload.filename,
         mimeType: command.payload.mimeType,
         weekStart: command.payload.weekStart,
-        dayOfWeek: command.payload.dayOfWeek
+        dayOfWeek: command.payload.dayOfWeek,
+        analysis: command.payload.analysis
       })
     case "runtime.asset.video.get":
       return runtime.assets.getVideoDetail(command.payload.assetId)
