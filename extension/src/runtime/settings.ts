@@ -1,6 +1,7 @@
 import type { RuntimeMode } from "./contracts"
 
 export const RUNTIME_MODE_KEY = "runtimeMode"
+export const DEFAULT_RUNTIME_MODE: RuntimeMode = "standalone"
 
 export interface StorageAreaLike {
   get(keys: string | string[]): Promise<Record<string, unknown>>
@@ -17,7 +18,7 @@ function isRuntimeMode(value: unknown): value is RuntimeMode {
 
 export async function loadRuntimeMode(storage: StorageAreaLike = localStorageArea()): Promise<RuntimeMode> {
   const result = await storage.get([RUNTIME_MODE_KEY])
-  return isRuntimeMode(result[RUNTIME_MODE_KEY]) ? result[RUNTIME_MODE_KEY] : "backend"
+  return isRuntimeMode(result[RUNTIME_MODE_KEY]) ? result[RUNTIME_MODE_KEY] : DEFAULT_RUNTIME_MODE
 }
 
 export async function saveRuntimeMode(mode: RuntimeMode, storage: StorageAreaLike = localStorageArea()): Promise<void> {
@@ -30,7 +31,7 @@ export async function initializeRuntimeMode(
 ): Promise<RuntimeMode> {
   const result = await storage.get([RUNTIME_MODE_KEY])
   if (isRuntimeMode(result[RUNTIME_MODE_KEY])) return result[RUNTIME_MODE_KEY]
-  const mode: RuntimeMode = reason === "install" ? "standalone" : "backend"
+  const mode: RuntimeMode = DEFAULT_RUNTIME_MODE
   await saveRuntimeMode(mode, storage)
   return mode
 }

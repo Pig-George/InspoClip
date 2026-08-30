@@ -17,10 +17,10 @@ function createStorage(initial: Record<string, unknown> = {}): StorageAreaLike &
 }
 
 describe("runtime mode settings", () => {
-  test("keeps existing installations on backend mode when no choice was stored", async () => {
+  test("defaults installations without a stored choice to standalone mode", async () => {
     const local = createStorage()
 
-    await expect(loadRuntimeMode(local)).resolves.toBe("backend")
+    await expect(loadRuntimeMode(local)).resolves.toBe("standalone")
   })
 
   test("initializes a new installation in standalone mode", async () => {
@@ -30,11 +30,11 @@ describe("runtime mode settings", () => {
     expect(local.data).toEqual({ runtimeMode: "standalone" })
   })
 
-  test("initializes an upgraded installation in backend mode", async () => {
+  test("initializes an upgraded installation in standalone mode when no choice was stored", async () => {
     const local = createStorage()
 
-    await expect(initializeRuntimeMode("update", local)).resolves.toBe("backend")
-    expect(local.data).toEqual({ runtimeMode: "backend" })
+    await expect(initializeRuntimeMode("update", local)).resolves.toBe("standalone")
+    expect(local.data).toEqual({ runtimeMode: "standalone" })
   })
 
   test("preserves an explicit choice during extension updates", async () => {
@@ -56,6 +56,6 @@ describe("runtime mode settings", () => {
   test("ignores invalid stored values", async () => {
     const local = createStorage({ runtimeMode: "automatic" })
 
-    await expect(loadRuntimeMode(local)).resolves.toBe("backend")
+    await expect(loadRuntimeMode(local)).resolves.toBe("standalone")
   })
 })
