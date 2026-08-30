@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest"
 
 import {
   getAnalysisCompletionSteps,
+  getAnalysisStackScale,
   getNextAnalysisProgress,
   normalizeAnalysisProgress
 } from "./analysis-progress"
@@ -30,5 +31,12 @@ describe("analysis progress helpers", () => {
     expect(normalizeAnalysisProgress(-4)).toBe(0)
     expect(normalizeAnalysisProgress(48.6)).toBe(49)
     expect(normalizeAnalysisProgress(180)).toBe(100)
+  })
+
+  test("reduces later stacked task cards while preserving a readable minimum scale", () => {
+    expect(getAnalysisStackScale(0)).toBe(1)
+    expect(getAnalysisStackScale(1)).toBeLessThan(getAnalysisStackScale(0))
+    expect(getAnalysisStackScale(4)).toBeLessThan(getAnalysisStackScale(1))
+    expect(getAnalysisStackScale(100)).toBe(0.82)
   })
 })

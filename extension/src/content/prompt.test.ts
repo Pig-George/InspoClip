@@ -34,7 +34,6 @@ describe("content prompt helpers", () => {
 
     expect(tracker.isActive(historyEntry)).toBe(false)
   })
-
   test("extracts a refreshed bilingual prompt from an image analysis response", () => {
     expect(extractPromptFromImageAnalysis({
       terms: ["glass card"],

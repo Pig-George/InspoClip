@@ -3,6 +3,7 @@ import type { PlasmoCSConfig } from "plasmo"
 
 import {
   getAnalysisCompletionSteps,
+  getAnalysisStackScale,
   getNextAnalysisProgress,
   normalizeAnalysisProgress
 } from "../src/content/analysis-progress"
@@ -39,7 +40,7 @@ import {
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive, shouldExpandContentRoot } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
-import { dataUrlToBlob } from "../src/content/image"
+import { createImagePreviewUrl, dataUrlToBlob } from "../src/content/image"
 import { renderSafeMarkdown } from "../src/content/markdown"
 import { createObjectUrlVideoSource, jumpVideoToTime, revokeObjectUrlVideoSource } from "../src/content/media"
 import {
@@ -56,12 +57,26 @@ import {
   setVideoPromptInflight,
   videoPromptRequestKey
 } from "../src/content/video-prompt-state"
-import { pollVideoJob as pollVideoJobWithRetry } from "../src/video"
+import { blobToDataUrl, sendRuntimeCommand } from "../src/runtime/command-client"
+import { isDevelopmentBuild } from "../src/runtime/build-mode"
+import {
+  createExtensionLogRecorder,
+  installExtensionErrorLogging,
+  type ExtensionLogStorage
+} from "../src/runtime/extension-logger"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
   run_at: "document_idle"
 };
+
+const contentLogStorage = chrome.storage.local as unknown as ExtensionLogStorage
+const recordContentLog = createExtensionLogRecorder(contentLogStorage, isDevelopmentBuild)
+installExtensionErrorLogging({
+  source: "content",
+  enabled: isDevelopmentBuild,
+  storage: contentLogStorage
+})
 
 // InspoClip Content Script — injected into web pages
 // Shows analysis notification and result modal on the page itself
@@ -92,6 +107,11 @@ export const config: PlasmoCSConfig = {
   // State
   let currentToast = null;
   let toastTimer = null;
+  let currentImagePreview = null;
+  let analysisToastStack = null;
+  let analysisToastCollapseTimer = null;
+  const analysisToastTasks = new Map();
+  let analysisToastTaskSequence = 0;
   let currentModal = null;
   let currentTab = null;
   let currentCtxMenu = null;
@@ -105,7 +125,6 @@ export const config: PlasmoCSConfig = {
   let analysisHistory = []; // [{ kind: 'image'|'video', data/detail, previewUrl, blob, timestamp, saved }]
   let historyIndex = -1;
   let savedImageHashes = new Set(); // Track which analyses have been saved
-  let serverUrl = 'http://localhost:3001';
   let locale = (navigator.language || 'en').startsWith('zh') ? 'zh' : 'en';
   let promptLangMode = 'auto';
   let videoPromptLangMode = 'auto';
@@ -122,9 +141,7 @@ export const config: PlasmoCSConfig = {
     }));
   }
 
-  // Load server URL
-  chrome.storage.sync.get(['serverUrl', 'lang', 'areaRecordingDelaySeconds'], (result) => {
-    if (result.serverUrl) serverUrl = result.serverUrl;
+  chrome.storage.sync.get(['lang', 'areaRecordingDelaySeconds'], (result) => {
     if (result.lang) locale = result.lang;
     areaRecordingDelaySeconds = normalizeAreaRecordingDelay(result.areaRecordingDelaySeconds);
   });
@@ -219,18 +236,13 @@ export const config: PlasmoCSConfig = {
     overlay.appendChild(selection);
     container.appendChild(overlay);
     areaOverlay = overlay;
-    const recordingSource = createAreaRecordingSource(
-      recordingSourceId,
-      () => crypto.randomUUID?.() || `area-source-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      (sourceId) => sendRuntimeMessage({ type: 'PREPARE_AREA_RECORDING', sourceId })
-    );
-    preparedAreaRecordingSource = recordingSource;
-    recordingSource.promise.catch((error) => {
-      if (!isExtensionContextInvalidatedError(error)) return;
-      if (areaOverlay !== overlay || preparedAreaRecordingSource !== recordingSource) return;
-      removeAreaOverlay();
-      showExtensionContextRecovery();
-    });
+    if (recordingSourceId) {
+      preparedAreaRecordingSource = createAreaRecordingSource(
+        recordingSourceId,
+        () => crypto.randomUUID?.() || `area-source-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        (sourceId) => sendRuntimeMessage({ type: 'PREPARE_AREA_RECORDING', sourceId })
+      );
+    }
     syncContentRootInteractivity();
 
     let startX = 0, startY = 0;
@@ -606,31 +618,21 @@ export const config: PlasmoCSConfig = {
         );
 
         const ext = croppedBlob.type === 'image/png' ? '.png' : '.jpg';
-        const formData = new FormData();
-        formData.append('image', croppedBlob, 'area' + ext);
-
-        const res = await fetch(`${serverUrl}/api/images/analyze`, { method: 'POST', body: formData });
-        if (!res.ok) throw new Error('Analysis failed');
-        const data = await res.json();
+        const data = await analyzeImageWithRuntime(croppedBlob, 'area' + ext);
 
         // Check similarity
         try {
-          const simForm = new FormData();
-          simForm.append('image', croppedBlob, 'check' + ext);
-          const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, { method: 'POST', body: simForm });
-          if (simRes.ok) {
-            const simData = await simRes.json();
-            data.similarImages = simData.similar || [];
-          }
+          const simData = await checkImageSimilarityWithRuntime(croppedBlob, 'check' + ext);
+          data.similarImages = simData.similar || [];
         } catch { data.similarImages = []; }
 
         capturedBlob = croppedBlob;
-        lastPreviewUrl = URL.createObjectURL(croppedBlob);
+        lastPreviewUrl = createImagePreviewUrl(croppedBlob);
         analyzedData = data;
         pushImageHistory(data, lastPreviewUrl, croppedBlob);
 
         await analysisProgress.complete();
-        transitionToModal(data, lastPreviewUrl);
+        transitionToModal(data, lastPreviewUrl, analysisProgress);
       } else {
         // Save mode — check similarity then upload
         capturedBlob = croppedBlob;
@@ -666,7 +668,7 @@ export const config: PlasmoCSConfig = {
 
     const recordingId = crypto.randomUUID?.() || `area-recording-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const recordingRect = getAreaRecordingInnerRect(rect);
-    const preparedSource = preparedAreaRecordingSource;
+    let preparedSource = preparedAreaRecordingSource;
     const visualViewport = window.visualViewport;
     const viewport = {
       width: window.innerWidth,
@@ -687,7 +689,14 @@ export const config: PlasmoCSConfig = {
     };
 
     try {
-      if (!preparedSource) throw new Error(locale === 'zh' ? '录屏权限未准备好，请重新从 InspoClip 启动框选' : 'Recording permission is not ready. Please start area capture from InspoClip again.');
+      if (!preparedSource) {
+        preparedSource = createAreaRecordingSource(
+          undefined,
+          () => crypto.randomUUID?.() || `area-source-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          (sourceId) => sendRuntimeMessage({ type: 'PREPARE_AREA_RECORDING', sourceId })
+        );
+        preparedAreaRecordingSource = preparedSource;
+      }
       overlay.classList.add('inspoclip-area-overlay-recording');
       syncContentRootInteractivity();
       await preparedSource.promise;
@@ -946,12 +955,89 @@ export const config: PlasmoCSConfig = {
     setTimeout(removeToast, 5000);
   }
 
+  function ensureAnalysisToastStack() {
+    if (analysisToastStack) return analysisToastStack;
+
+    const stack = document.createElement('div');
+    stack.className = 'inspoclip-analysis-stack';
+    stack.setAttribute('role', 'status');
+    stack.setAttribute('aria-live', 'polite');
+    stack.addEventListener('pointerenter', () => {
+      if (analysisToastCollapseTimer) {
+        clearTimeout(analysisToastCollapseTimer);
+        analysisToastCollapseTimer = null;
+      }
+      stack.classList.add('is-expanded');
+    });
+    stack.addEventListener('pointerleave', () => {
+      if (analysisToastCollapseTimer) clearTimeout(analysisToastCollapseTimer);
+      analysisToastCollapseTimer = setTimeout(() => {
+        stack.classList.remove('is-expanded');
+        analysisToastCollapseTimer = null;
+      }, 180);
+    });
+    container.appendChild(stack);
+    analysisToastStack = stack;
+    return stack;
+  }
+
+  function syncAnalysisToastStack() {
+    if (!analysisToastStack) return;
+    const tasks = Array.from(analysisToastTasks.values());
+    const stackDepth = tasks.length;
+    tasks.forEach((task, index) => {
+      task.element.style.zIndex = String(stackDepth - index);
+      task.element.style.setProperty('--inspoclip-analysis-stack-scale', String(getAnalysisStackScale(index)));
+    });
+  }
+
+  function removeAnalysisToastTask(taskId) {
+    const task = analysisToastTasks.get(taskId);
+    if (!task || task.removing) return;
+    task.removing = true;
+    task.element.classList.add('inspoclip-toast-leaving');
+    setTimeout(() => {
+      analysisToastTasks.delete(taskId);
+      task.element.remove();
+      syncAnalysisToastStack();
+      if (analysisToastTasks.size === 0 && analysisToastStack) {
+        const stack = analysisToastStack;
+        analysisToastStack = null;
+        if (analysisToastCollapseTimer) {
+          clearTimeout(analysisToastCollapseTimer);
+          analysisToastCollapseTimer = null;
+        }
+        stack.remove();
+      }
+    }, 220);
+  }
+
   function createAnalysisToastProgress(message) {
     let progress = 4;
     let completed = false;
     let cancelled = false;
+    const taskId = `analysis-${++analysisToastTaskSequence}`;
+    // Replace the short-lived upload notice with the persistent analysis item.
+    removeToast();
+    const stack = ensureAnalysisToastStack();
+    const element = document.createElement('div');
+    element.className = 'inspoclip-toast inspoclip-toast-loading';
+    element.innerHTML = `
+      <div class="inspoclip-toast-icon"></div>
+      <span class="inspoclip-toast-text"></span>
+    `;
+    const task = { id: taskId, element, message, removing: false };
+    analysisToastTasks.set(taskId, task);
+    stack.appendChild(element);
+    syncToastElement(element, message, 'loading', progress);
+    requestAnimationFrame(() => element.classList.add('inspoclip-toast-visible'));
+    syncAnalysisToastStack();
 
-    const publish = () => showToast(message, 'loading', progress);
+    const publish = () => {
+      task.message = message;
+      syncToastElement(element, message, 'loading', progress, true);
+      syncAnalysisToastStack();
+    };
     const advance = () => {
       const nextProgress = getNextAnalysisProgress(progress);
       if (nextProgress === progress) return;
@@ -979,24 +1065,24 @@ export const config: PlasmoCSConfig = {
         }
       },
       cancel() {
+        if (completed) return;
         cancelled = true;
         window.clearInterval(timerId);
+        removeAnalysisToastTask(taskId);
+      },
+      dismiss() {
+        window.clearInterval(timerId);
+        removeAnalysisToastTask(taskId);
+      },
+      getElement() {
+        return element;
       }
     };
   }
 
   async function analyzeRecordedAreaVideo(videoBlob, durationMs) {
     showToast(locale === 'zh' ? '正在上传录屏...' : 'Uploading recording...', 'loading');
-    const formData = new FormData();
-    formData.append('video', videoBlob, 'area-recording.webm');
-    formData.append('source', 'extension');
-    formData.append('draft', 'true');
-    if (Number.isFinite(durationMs) && durationMs > 0) {
-      formData.append('durationMs', String(Math.round(durationMs)));
-    }
-    const uploadRes = await fetch(`${serverUrl}/api/videos`, { method: 'POST', body: formData });
-    if (!uploadRes.ok) throw new Error(await readableError(uploadRes, 'Video upload failed'));
-    const uploadResult = await uploadRes.json();
+    const uploadResult = await startVideoWithRuntime(videoBlob, 'area-recording.webm', durationMs);
 
     const analysisProgress = createAnalysisToastProgress(
       locale === 'zh' ? '正在理解录屏...' : 'Understanding recording...'
@@ -1007,12 +1093,10 @@ export const config: PlasmoCSConfig = {
       });
       if (job.status === 'failed') throw new Error(job.errorMessage || 'Video analysis failed');
 
-      const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
-      if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
-      const detail = await detailRes.json();
+      const detail = await getVideoDetailWithRuntime(uploadResult.videoId);
       await analysisProgress.complete();
       pushVideoHistory(detail);
-      transitionToVideoModal(detail, window.innerWidth - 20, 20);
+      transitionToVideoModal(detail, window.innerWidth - 20, 20, analysisProgress);
     } finally {
       analysisProgress.cancel();
     }
@@ -1085,19 +1169,9 @@ export const config: PlasmoCSConfig = {
 
       // Check similarity
       const ext = blob.type === 'image/png' ? '.png' : '.jpg';
-      const checkForm = new FormData();
-      checkForm.append('image', blob, 'check' + ext);
-
-      const checkRes = await fetch(`${serverUrl}/api/images/check-similarity`, {
-        method: 'POST',
-        body: checkForm,
-      });
-
       let similar = [];
-      if (checkRes.ok) {
-        const checkData = await checkRes.json();
-        similar = checkData.similar || [];
-      }
+      const checkData = await checkImageSimilarityWithRuntime(blob, 'check' + ext);
+      similar = checkData.similar || [];
 
       if (similar.length > 0) {
         // Show confirmation dialog
@@ -1161,7 +1235,8 @@ export const config: PlasmoCSConfig = {
     similar.slice(0, 3).forEach((img, i) => {
       const imgEl = dialog.querySelector(`img[data-idx="${i}"]`);
       if (!imgEl) return;
-      fetch(`${serverUrl}/api/uploads/${img.filePath}`)
+      getContentUrlWithRuntime('image', img.filePath)
+        .then((contentUrl) => fetch(contentUrl))
         .then((res) => {
           if (!res.ok) throw new Error('Not found');
           return res.blob();
@@ -1213,21 +1288,8 @@ export const config: PlasmoCSConfig = {
       const monday = getMonday(now);
       const dateStr = formatDate(monday);
 
-      const weekRes = await fetch(`${serverUrl}/api/weeks/${dateStr}`);
-      if (!weekRes.ok) throw new Error('Failed to get week');
-      const weekData = await weekRes.json();
-
       const ext = blob.type === 'image/png' ? '.png' : '.jpg';
-      const formData = new FormData();
-      formData.append('image', blob, 'screenshot' + ext);
-      formData.append('weekId', weekData.week.id);
-      formData.append('dayOfWeek', String(dayOfWeek));
-
-      const uploadRes = await fetch(`${serverUrl}/api/images`, { method: 'POST', body: formData });
-      if (!uploadRes.ok) {
-        const errText = await uploadRes.text().catch(() => '');
-        throw new Error(errText || `HTTP ${uploadRes.status}`);
-      }
+      await saveImageWithRuntime(blob, 'screenshot' + ext, dateStr, dayOfWeek);
 
       showToast(locale === 'zh' ? '✓ 已保存到 InspoClip' : '✓ Saved to InspoClip', 'success');
       toastTimer = setTimeout(removeToast, 3500);
@@ -1246,57 +1308,44 @@ export const config: PlasmoCSConfig = {
     capturedBlob = null;
     currentAssetResult = null;
 
+    const isFullPageAnalysis = !imageUrl;
     const analysisProgress = createAnalysisToastProgress(
-      locale === 'zh' ? '正在分析...' : 'Analyzing...'
+      locale === 'zh'
+        ? (isFullPageAnalysis ? '正在分析页面...' : '正在分析...')
+        : (isFullPageAnalysis ? 'Analyzing page...' : 'Analyzing...')
     );
 
     try {
       // Get image blob
+      let blob;
       if (imageUrl) {
         try {
           const res = await fetch(imageUrl);
-          capturedBlob = await res.blob();
+          blob = await res.blob();
         } catch {
-          capturedBlob = await captureTabAsBlob();
+          blob = await captureTabAsBlob();
         }
       } else {
-        capturedBlob = await captureTabAsBlob();
+        blob = await captureTabAsBlob();
       }
 
       // Send to server
-      const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
-      const formData = new FormData();
-      formData.append('image', capturedBlob, 'analyze' + ext);
-
-      const res = await fetch(`${serverUrl}/api/images/analyze`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error('Analysis failed');
-      analyzedData = await res.json();
+      const ext = blob.type === 'image/png' ? '.png' : '.jpg';
+      const data = await analyzeImageWithRuntime(blob, 'analyze' + ext);
 
       // Check for similar images
       try {
-        const simForm = new FormData();
-        simForm.append('image', capturedBlob, 'check' + ext);
-        const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, {
-          method: 'POST',
-          body: simForm,
-        });
-        if (simRes.ok) {
-          const simData = await simRes.json();
-          analyzedData.similarImages = simData.similar || [];
-        }
+        const simData = await checkImageSimilarityWithRuntime(blob, 'check' + ext);
+        data.similarImages = simData.similar || [];
       } catch {
-        analyzedData.similarImages = [];
+        data.similarImages = [];
       }
 
       // Phase 2: Save to history and transition toast → modal
-      lastPreviewUrl = imageUrl ? URL.createObjectURL(capturedBlob) : null;
-      pushImageHistory(analyzedData, lastPreviewUrl, capturedBlob);
+      const previewUrl = createImagePreviewUrl(blob);
+      pushImageHistory(data, previewUrl, blob);
       await analysisProgress.complete();
-      transitionToModal(analyzedData, lastPreviewUrl);
+      transitionToModal(data, previewUrl, analysisProgress);
     } catch (err) {
       analysisProgress.cancel();
       showToast(locale === 'zh' ? `分析失败: ${err.message}` : `Analysis failed: ${err.message}`, 'error');
@@ -1309,8 +1358,6 @@ export const config: PlasmoCSConfig = {
     analyzedData = null;
     capturedBlob = null;
     currentAssetResult = null;
-
-    if (asset.serverUrl) serverUrl = asset.serverUrl;
 
     try {
       if (asset.assetKind === 'image') {
@@ -1333,31 +1380,21 @@ export const config: PlasmoCSConfig = {
       locale === 'zh' ? '正在分析素材...' : 'Analyzing asset...'
     );
     try {
-      capturedBlob = dataUrlToBlob(asset.dataUrl);
-      const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
-      const formData = new FormData();
-      formData.append('image', capturedBlob, asset.fileName || 'asset' + ext);
-
-      const res = await fetch(`${serverUrl}/api/images/analyze`, { method: 'POST', body: formData });
-      if (!res.ok) throw new Error(await readableError(res, 'Analysis failed'));
-      analyzedData = await res.json();
+      const blob = dataUrlToBlob(asset.dataUrl);
+      const ext = blob.type === 'image/png' ? '.png' : '.jpg';
+      const data = await analyzeImageWithRuntime(blob, asset.fileName || 'asset' + ext);
 
       try {
-        const simForm = new FormData();
-        simForm.append('image', capturedBlob, 'check' + ext);
-        const simRes = await fetch(`${serverUrl}/api/images/check-similarity`, { method: 'POST', body: simForm });
-        if (simRes.ok) {
-          const simData = await simRes.json();
-          analyzedData.similarImages = simData.similar || [];
-        }
+        const simData = await checkImageSimilarityWithRuntime(blob, 'check' + ext);
+        data.similarImages = simData.similar || [];
       } catch {
-        analyzedData.similarImages = [];
+        data.similarImages = [];
       }
 
-      lastPreviewUrl = URL.createObjectURL(capturedBlob);
-      pushImageHistory(analyzedData, lastPreviewUrl, capturedBlob);
+      const previewUrl = createImagePreviewUrl(blob);
+      pushImageHistory(data, previewUrl, blob);
       await analysisProgress.complete();
-      transitionToModal(analyzedData, lastPreviewUrl);
+      transitionToModal(data, previewUrl, analysisProgress);
     } finally {
       analysisProgress.cancel();
     }
@@ -1370,13 +1407,7 @@ export const config: PlasmoCSConfig = {
       uploadResult = await uploadVideoUrlFromBackground(asset.videoUrl);
     } else {
       const videoBlob = dataUrlToBlob(asset.dataUrl);
-      const formData = new FormData();
-      formData.append('video', videoBlob, asset.fileName || 'asset-video.mp4');
-      formData.append('source', 'extension');
-      formData.append('draft', 'true');
-      const res = await fetch(`${serverUrl}/api/videos`, { method: 'POST', body: formData });
-      if (!res.ok) throw new Error(await readableError(res, 'Video upload failed'));
-      uploadResult = await res.json();
+      uploadResult = await startVideoWithRuntime(videoBlob, asset.fileName || 'asset-video.mp4');
     }
 
     const analysisProgress = createAnalysisToastProgress(
@@ -1388,36 +1419,46 @@ export const config: PlasmoCSConfig = {
       });
       if (job.status === 'failed') throw new Error(job.errorMessage || 'Video analysis failed');
 
-      const detailRes = await fetch(`${serverUrl}/api/videos/${uploadResult.videoId}`);
-      if (!detailRes.ok) throw new Error(await readableError(detailRes, 'Failed to load video analysis'));
-      const detail = await detailRes.json();
+      const detail = await getVideoDetailWithRuntime(uploadResult.videoId);
       await analysisProgress.complete();
       pushVideoHistory(detail);
-      transitionToVideoModal(detail, window.innerWidth - 20, 20);
+      transitionToVideoModal(detail, window.innerWidth - 20, 20, analysisProgress);
     } finally {
       analysisProgress.cancel();
     }
   }
 
   async function uploadVideoUrlFromBackground(videoUrl) {
-    const response = await chrome.runtime.sendMessage({ type: 'UPLOAD_VIDEO_URL', url: videoUrl, serverUrl, draft: true });
-    if (!response?.success) throw new Error(response?.error || 'Video upload failed');
-    return response;
+    const job = await sendRuntimeCommand({
+      type: 'runtime.analysis.video.url.start',
+      payload: { videoUrl, draft: true }
+    });
+    return job.result || { videoId: job.assetId, jobId: job.id, status: job.status };
   }
 
   async function pollVideoJob(jobId, onUpdate) {
-    return pollVideoJobWithRetry(fetch, serverUrl, jobId, { onUpdate });
-  }
-
-  async function readableError(response, fallback) {
-    const text = await response.text().catch(() => '');
-    if (!text) return fallback;
-    try {
-      const json = JSON.parse(text);
-      return json.error || fallback;
-    } catch {
-      return text.slice(0, 240) || fallback;
+    let consecutiveErrors = 0;
+    let successfulPolls = 0;
+    while (successfulPolls < 240) {
+      try {
+        const job = await sendRuntimeCommand({
+          type: 'runtime.analysis.job.get',
+          payload: { jobId }
+        });
+        const rawJob = job?.result || job;
+        consecutiveErrors = 0;
+        successfulPolls += 1;
+        onUpdate?.(rawJob);
+        if (['completed', 'failed', 'cancelled'].includes(rawJob.status)) return rawJob;
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      } catch (error) {
+        if (!error?.detail?.retryable || consecutiveErrors >= 6) throw error;
+        const delay = Math.min(5000, 1500 * 2 ** consecutiveErrors);
+        consecutiveErrors += 1;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
     }
+    throw new Error('Video analysis timed out');
   }
 
   async function captureTabAsBlob() {
@@ -1433,6 +1474,7 @@ export const config: PlasmoCSConfig = {
   // ---- Toast ----
 
   function showToast(message, type = 'loading', progress = null) {
+    if (type === 'error') void recordContentLog({ source: 'content', level: 'error', error: message });
     // Clear any pending removal timer
     if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
 
@@ -1467,7 +1509,18 @@ export const config: PlasmoCSConfig = {
 
   // ---- Transition Toast → Modal ----
 
-  function transitionToModal(data, previewUrl) {
+  function transitionToModal(data, previewUrl, analysisProgress = null) {
+    if (analysisProgress?.getElement) {
+      const progressElement = analysisProgress.getElement();
+      const toastRect = progressElement.getBoundingClientRect();
+      const originX = toastRect.right;
+      const originY = toastRect.top;
+      progressElement.style.opacity = '0';
+      progressElement.style.transform = 'translateX(20px) scale(0.8)';
+      analysisProgress.dismiss();
+      setTimeout(() => showModal(data, previewUrl, originX, originY), 220);
+      return;
+    }
     if (!currentToast) {
       // No toast — show modal directly from top-right
       showModal(data, previewUrl, window.innerWidth - 20, 20);
@@ -1491,7 +1544,18 @@ export const config: PlasmoCSConfig = {
     }, 300);
   }
 
-  function transitionToVideoModal(detail, originX, originY) {
+  function transitionToVideoModal(detail, originX, originY, analysisProgress = null) {
+    if (analysisProgress?.getElement) {
+      const progressElement = analysisProgress.getElement();
+      const toastRect = progressElement.getBoundingClientRect();
+      const toastOriginX = toastRect.right;
+      const toastOriginY = toastRect.top;
+      progressElement.style.opacity = '0';
+      progressElement.style.transform = 'translateX(20px) scale(0.8)';
+      analysisProgress.dismiss();
+      setTimeout(() => showVideoModal(detail, toastOriginX, toastOriginY), 220);
+      return;
+    }
     if (!currentToast) {
       showVideoModal(detail, originX, originY);
       return;
@@ -1511,8 +1575,10 @@ export const config: PlasmoCSConfig = {
 
   function localizedText(value) {
     if (!value) return '';
-    if (typeof value === 'string') return value;
-    return locale === 'zh' ? (value.zh || value.en || '') : (value.en || value.zh || '');
+    const text = typeof value === 'string'
+      ? value
+      : locale === 'zh' ? (value.zh || value.en || '') : (value.en || value.zh || '');
+    return /langchain[_.\s-]*core[_.\s-]*messages/i.test(String(text)) ? '' : String(text);
   }
 
   function escapeHtml(value) {
@@ -1685,13 +1751,20 @@ export const config: PlasmoCSConfig = {
         return;
       }
       setGenerating(false);
-      const params = new URLSearchParams({ purpose: videoPromptPurpose });
-      if (videoPromptTarget.trim()) params.set('target', videoPromptTarget.trim());
-      const res = await fetch(`${serverUrl}/api/videos/${videoId}/prompts?${params.toString()}`);
-      if (res.ok) {
-        const output = await res.json();
+      try {
+        const result = await sendRuntimeCommand({
+          type: 'runtime.prompt.generate',
+          payload: {
+            assetId: videoId,
+            purpose: videoPromptPurpose,
+            target: videoPromptTarget.trim(),
+            regenerate: false
+          }
+        });
+        const output = result.content;
         if (isCurrentPrompt(key)) renderVideoPromptOutput(modal, output);
-      } else if (res.status === 404) {
+      } catch (error) {
+        if (!['BACKEND_HTTP_404', 'LOCAL_PROMPT_NOT_FOUND'].includes(error?.detail?.code)) throw error;
         if (isCurrentPrompt(key)) renderVideoPromptOutput(modal, null);
       }
     };
@@ -1703,15 +1776,15 @@ export const config: PlasmoCSConfig = {
         watchPromptPromise(key, existing);
         return;
       }
-      const body = { purpose: videoPromptPurpose, target: videoPromptTarget.trim() };
-      const promise = fetch(`${serverUrl}/api/videos/${videoId}/prompts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }).then(async (res) => {
-        if (!res.ok) throw new Error(await readableError(res, 'Prompt generation failed'));
-        return res.json();
-      });
+      const promise = sendRuntimeCommand({
+        type: 'runtime.prompt.generate',
+        payload: {
+          assetId: videoId,
+          purpose: videoPromptPurpose,
+          target: videoPromptTarget.trim(),
+          regenerate: true
+        }
+      }).then((result) => result.content);
 
       setVideoPromptInflight(key, promise);
       try {
@@ -1773,7 +1846,7 @@ export const config: PlasmoCSConfig = {
     const analysis = detail.analysis || {};
     const stages = Array.isArray(analysis.stages) ? analysis.stages : [];
     const title = localizedText(detail.summary) || localizedText(analysis.summary) || video.originalName || (locale === 'zh' ? '视频分析结果' : 'Video Analysis Result');
-    const videoSrc = `${serverUrl}/api/videos/${video.id}/content`;
+    const videoSrcPromise = getContentUrlWithRuntime('video', video.id);
     const vw = window.innerWidth;
     const targetX = Math.max(20, vw - 460 - 20);
 
@@ -1801,7 +1874,7 @@ export const config: PlasmoCSConfig = {
         </div>
 
         <div class="inspoclip-video-preview">
-          <video controls preload="metadata" data-video-src="${escapeHtml(videoSrc)}"></video>
+          <video controls preload="metadata"></video>
           <div class="inspoclip-video-preview-status">${locale === 'zh' ? '正在加载视频预览...' : 'Loading video preview...'}</div>
         </div>
 
@@ -1891,7 +1964,8 @@ export const config: PlasmoCSConfig = {
     const previewVideo = modal.querySelector('.inspoclip-video-preview video');
     const previewStatus = modal.querySelector('.inspoclip-video-preview-status');
     if (previewVideo) {
-      createObjectUrlVideoSource(videoSrc)
+      videoSrcPromise
+        .then((videoSrc) => createObjectUrlVideoSource(videoSrc))
         .then((objectUrl) => {
           if (currentModal !== modal) {
             revokeObjectUrlVideoSource(objectUrl);
@@ -1929,9 +2003,10 @@ export const config: PlasmoCSConfig = {
         saveBtn.disabled = true;
         saveBtn.textContent = locale === 'zh' ? '保存中...' : 'Saving...';
         try {
-          const res = await fetch(`${serverUrl}/api/videos/${video.id}/save`, { method: 'POST' });
-          if (!res.ok) throw new Error(await readableError(res, 'Save failed'));
-          const saved = await res.json();
+          const saved = await sendRuntimeCommand({
+            type: 'runtime.asset.video.save',
+            payload: { assetId: video.id }
+          });
           detail.video = saved.video || { ...video, isSaved: true };
           currentAssetResult = { kind: 'video', detail };
           const entry = currentHistoryEntry();
@@ -1951,7 +2026,8 @@ export const config: PlasmoCSConfig = {
               saveBtn.style.width = '0';
               saveBtn.style.opacity = '0';
               saveBtn.style.padding = '0';
-              saveBtn.style.margin = '0';
+              saveBtn.style.marginLeft = '0';
+              saveBtn.style.marginRight = '0';
               saveBtn.style.borderWidth = '0';
             });
             setTimeout(() => saveBtn.remove(), 400);
@@ -1970,6 +2046,44 @@ export const config: PlasmoCSConfig = {
   }
 
   // ---- Modal ----
+
+  function showImagePreview(source) {
+    if (!source) return;
+    removeImagePreview();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'inspoclip-image-lightbox';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', locale === 'zh' ? '图片预览' : 'Image preview');
+
+    const image = document.createElement('img');
+    image.src = source;
+    image.alt = locale === 'zh' ? '分析图片预览' : 'Analyzed image preview';
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'inspoclip-image-lightbox-close';
+    closeButton.setAttribute('aria-label', locale === 'zh' ? '关闭预览' : 'Close preview');
+    closeButton.textContent = '×';
+    closeButton.addEventListener('click', removeImagePreview);
+
+    overlay.append(image, closeButton);
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) removeImagePreview();
+    });
+    container.appendChild(overlay);
+    currentImagePreview = overlay;
+    requestAnimationFrame(() => overlay.classList.add('inspoclip-image-lightbox-visible'));
+  }
+
+  function removeImagePreview() {
+    if (!currentImagePreview) return;
+    const overlay = currentImagePreview;
+    currentImagePreview = null;
+    overlay.classList.remove('inspoclip-image-lightbox-visible');
+    setTimeout(() => overlay.remove(), 220);
+  }
 
   function showModal(data, previewUrl, originX, originY) {
     removeModal(false);
@@ -2024,7 +2138,7 @@ export const config: PlasmoCSConfig = {
           </div>
         </div>
 
-        ${previewUrl ? `<div class="inspoclip-preview"><img src="${previewUrl}" /></div>` : ''}
+        ${previewUrl ? `<div class="inspoclip-preview"><button type="button" class="inspoclip-preview-trigger" title="${locale === 'zh' ? '点击预览图片' : 'Preview image'}" aria-label="${locale === 'zh' ? '点击预览图片' : 'Preview image'}"><img src="${escapeHtml(previewUrl)}" alt="${locale === 'zh' ? '分析图片' : 'Analyzed image'}" /></button></div>` : ''}
 
         <div class="inspoclip-modal-body">
           <!-- Terms -->
@@ -2084,16 +2198,13 @@ export const config: PlasmoCSConfig = {
       data.similarImages.slice(0, 4).forEach((img) => {
         const thumbEl = modal.querySelector(`img[data-fp="${img.filePath}"]`);
         if (!thumbEl) return;
-        chrome.runtime.sendMessage(
-          { type: 'FETCH_IMAGE', url: `${serverUrl}/api/uploads/${img.filePath}` },
-          (response) => {
-            if (response?.dataUrl) {
-              thumbEl.src = response.dataUrl;
-            } else {
-              thumbEl.style.display = 'none';
-            }
-          }
-        );
+        getContentUrlWithRuntime('image', img.filePath)
+          .then((url) => chrome.runtime.sendMessage({ type: 'FETCH_IMAGE', url }))
+          .then((response) => {
+            if (response?.dataUrl) thumbEl.src = response.dataUrl;
+            else thumbEl.style.display = 'none';
+          })
+          .catch(() => { thumbEl.style.display = 'none'; });
       });
     }
 
@@ -2111,6 +2222,8 @@ export const config: PlasmoCSConfig = {
     modal.querySelector('.inspoclip-modal-close').addEventListener('click', removeModal);
     modal.querySelector('.inspoclip-close-btn').addEventListener('click', removeModal);
     modal.addEventListener('click', (e) => { if (e.target === modal) removeModal(); });
+    const previewTrigger = modal.querySelector('.inspoclip-preview-trigger');
+    if (previewTrigger) previewTrigger.addEventListener('click', () => showImagePreview(previewUrl));
 
     // History navigation
     const prevBtn = modal.querySelector('#inspoclip-prev');
@@ -2239,18 +2352,10 @@ export const config: PlasmoCSConfig = {
         const monday = getMonday(now);
         const dateStr = formatDate(monday);
 
-        const weekRes = await fetch(`${serverUrl}/api/weeks/${dateStr}`);
-        if (!weekRes.ok) throw new Error('Failed to get week');
-        const weekData = await weekRes.json();
-
         const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
-        const formData = new FormData();
-        formData.append('image', capturedBlob, 'screenshot' + ext);
-        formData.append('weekId', weekData.week.id);
-        formData.append('dayOfWeek', String(dayOfWeek));
-
-        const uploadRes = await fetch(`${serverUrl}/api/images`, { method: 'POST', body: formData });
-        if (!uploadRes.ok) throw new Error('Upload failed');
+        const currentEntry = currentHistoryEntry();
+        const analysis = currentEntry?.kind === 'image' ? currentEntry.data : analyzedData;
+        await saveImageWithRuntime(capturedBlob, 'screenshot' + ext, dateStr, dayOfWeek, analysis);
 
         // Mark current analysis as saved
         if (historyIndex >= 0 && analysisHistory[historyIndex]) {
@@ -2271,7 +2376,8 @@ export const config: PlasmoCSConfig = {
             btn.style.width = '0';
             btn.style.opacity = '0';
             btn.style.padding = '0';
-            btn.style.margin = '0';
+            btn.style.marginLeft = '0';
+            btn.style.marginRight = '0';
             btn.style.borderWidth = '0';
           });
           setTimeout(() => btn.remove(), 400);
@@ -2289,12 +2395,19 @@ export const config: PlasmoCSConfig = {
 
     // ESC to close
     const escHandler = (e) => {
-      if (e.key === 'Escape') { removeModal(); document.removeEventListener('keydown', escHandler); }
+      if (e.key !== 'Escape') return;
+      if (currentImagePreview) {
+        removeImagePreview();
+        return;
+      }
+      removeModal();
+      document.removeEventListener('keydown', escHandler);
     };
     document.addEventListener('keydown', escHandler);
   }
 
   function removeModal(showFloating = true) {
+    removeImagePreview();
     if (currentModal) {
       const overlay = currentModal;
       revokeObjectUrlVideoSource(currentVideoPreviewUrl);

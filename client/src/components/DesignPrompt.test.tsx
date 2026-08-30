@@ -39,6 +39,18 @@ describe('DesignPrompt', () => {
 
     await waitFor(() => expect(generateDesignPrompt).toHaveBeenCalledWith('image-1', true));
     expect(screen.queryByText('Generating...')).not.toBeInTheDocument();
-    expect(regenerate.querySelector('svg')).toHaveClass('animate-spin');
+    expect(regenerate.querySelector('svg')).toHaveClass('workspace-prompt-action-spinner');
+  });
+
+  it('uses the shared prompt state shell and shared output layout', async () => {
+    render(
+      <LanguageProvider>
+        <DesignPrompt imageId="image-1" />
+      </LanguageProvider>,
+    );
+
+    expect(await screen.findByText('Existing prompt')).toBeInTheDocument();
+    expect(document.querySelector('.workspace-prompt-result')).toBeInTheDocument();
+    expect(document.querySelector('.workspace-prompt-output')).toBeInTheDocument();
   });
 });

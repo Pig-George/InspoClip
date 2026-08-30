@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search } from 'lucide-react';
 import { ImageCard } from './ImageCard';
 import { VideoCard } from './video/VideoCard';
@@ -8,6 +7,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { fetchTags } from '@/lib/api';
 import type { Image as ImageType, Tag } from '@/types';
 import type { WeekVideo } from '@/types/video';
+import { WorkspaceSearchDialog } from '@inspoclip/workspace-ui';
 
 interface SearchDialogProps {
   open: boolean;
@@ -64,88 +64,39 @@ export function SearchDialog({ open, onClose, onOpenVideo }: SearchDialogProps) 
   const filteredVideos = videoResults.filter((v) => !selectedTag || v.tags?.some((t) => t.id === selectedTag));
   const hasResults = filteredImages.length > 0 || filteredVideos.length > 0;
 
+  if (!open) return null;
+
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          ref={overlayRef}
-          data-dialog-overlay
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[70] flex items-start justify-center pt-20 bg-black/30"
-          onClick={onClose}
+    <WorkspaceSearchDialog
+      backdropRef={overlayRef}
+      inputRef={inputRef}
+      value={query}
+      onChange={(value) => { setQuery(value); void doSearch(value); }}
+      onClose={onClose}
+      placeholder={locale === 'zh' ? '搜索术语关键词...' : 'Search term keywords...'}
+      label={locale === 'zh' ? '搜索术语关键词' : 'Search term keywords'}
+      closeLabel={locale === 'zh' ? '关闭' : 'Close'}
+      inputIcon={<Search />}
+      closeIcon={<X />}
+      filters={allTags.length > 0 ? allTags.map((tag) => (
+        <button
+          key={tag.id}
+          onClick={() => setSelectedTag(selectedTag === tag.id ? null : tag.id)}
+          className={`px-2 py-0.5 rounded-full text-xs font-heading transition-opacity ${selectedTag === tag.id ? 'ring-2 ring-[var(--accent)]' : 'opacity-70 hover:opacity-100'}`}
+          style={{ backgroundColor: tag.color + '20', color: tag.color }}
         >
-          <motion.div
-            initial={{ scale: 0.95, y: -10 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.95, y: -10 }}
-            className="w-full max-w-lg mx-4 max-h-[70vh] flex flex-col rounded-2xl bg-[var(--card)]
-              border border-[var(--card-border)] shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Search input */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--card-border)]">
-              <Search className="w-5 h-5 text-[var(--text-muted)] flex-shrink-0" />
-              <input
-                ref={inputRef}
-                autoFocus
-                type="text"
-                value={query}
-                onChange={(e) => { setQuery(e.target.value); doSearch(e.target.value); }}
-                placeholder={locale === 'zh' ? '搜索术语关键词...' : 'Search term keywords...'}
-                className="flex-1 bg-transparent text-[var(--text)] placeholder:text-[var(--text-muted)]
-                  focus:outline-none font-handwriting text-lg"
-              />
-              <button onClick={onClose} className="p-1 rounded-full hover:bg-[var(--muted)]">
-                <X className="w-5 h-5 text-[var(--text-muted)]" />
-              </button>
-            </div>
-
-            {/* Tag filter */}
-            {allTags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 px-4 py-2 border-b border-[var(--card-border)]">
-                {allTags.map((tag) => (
-                  <button
-                    key={tag.id}
-                    onClick={() => setSelectedTag(selectedTag === tag.id ? null : tag.id)}
-                    className={`px-2 py-0.5 rounded-full text-xs font-heading transition-opacity ${
-                      selectedTag === tag.id ? 'ring-2 ring-[var(--accent)]' : 'opacity-70 hover:opacity-100'
-                    }`}
-                    style={{ backgroundColor: tag.color + '20', color: tag.color }}
-                  >
-                    #{tag.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Results */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {loading && (
-                <p className="text-center text-sm text-[var(--text-muted)] py-8">
-                  {locale === 'zh' ? '搜索中...' : 'Searching...'}
-                </p>
-              )}
-              {!loading && query && !hasResults && (
-                <p className="text-center text-sm text-[var(--text-muted)] py-8">
-                  {locale === 'zh' ? '未找到匹配结果' : 'No results found'}
-                </p>
-              )}
-              {!loading && hasResults && (
-                <div className="grid grid-cols-2 gap-3">
-                  {filteredImages.map((img) => (
-                    <ImageCard key={img.id} image={img} onRefresh={() => doSearch(query)} />
-                  ))}
-                  {filteredVideos.map((v) => (
-                    <VideoCard key={v.id} video={v} onOpen={(vid, jid) => { onClose(); onOpenVideo?.(vid, jid); }} onRefresh={() => doSearch(query)} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        </motion.div>
+          #{tag.name}
+        </button>
+      )) : null}
+    >
+      {loading && <p className="workspace-search-state">{locale === 'zh' ? '搜索中...' : 'Searching...'}</p>}
+      {!loading && query && !hasResults && <p className="workspace-search-state">{locale === 'zh' ? '未找到匹配结果' : 'No results found'}</p>}
+      {!loading && hasResults && (
+        <div className="workspace-search-result-grid">
+          {filteredImages.map((img) => <ImageCard key={img.id} image={img} onRefresh={() => void doSearch(query)} />)}
+          {filteredVideos.map((video) => <VideoCard key={video.id} video={video} onOpen={(id, jobId) => { onClose(); onOpenVideo?.(id, jobId); }} onRefresh={() => void doSearch(query)} />)}
+        </div>
       )}
-    </AnimatePresence>
+    </WorkspaceSearchDialog>
   );
 }

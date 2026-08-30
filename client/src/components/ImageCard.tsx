@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, AlertTriangle, X, Check } from 'lucide-react';
-import { DecorElement } from './DecorElement';
 import { TermTag } from './TermTag';
 import { TagManager } from './TagManager';
 import { ColorPalette } from './ColorPalette';
@@ -13,6 +12,7 @@ import { toast } from '@/components/Toast';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { useLanguage } from '@/context/LanguageContext';
 import type { Image as ImageType } from '@/types';
+import { WorkspaceAssetCard, WorkspaceBilingualTermList, WorkspaceConfirmDialog, WorkspaceDetailDialog, WorkspaceDetailSection, WorkspaceMediaPreview, type WorkspaceBilingualTerm } from '@inspoclip/workspace-ui';
 
 interface ImageCardProps {
   image: ImageType;
@@ -22,6 +22,13 @@ interface ImageCardProps {
 
 const MENU_W = 120;
 const MENU_H = 36;
+
+function toBilingualTerm(id: string, keyword: string): WorkspaceBilingualTerm {
+  const divider = keyword.indexOf(' / ');
+  return divider === -1
+    ? { id, en: keyword, zh: keyword }
+    : { id, en: keyword.slice(0, divider), zh: keyword.slice(divider + 3) };
+}
 
 export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -59,14 +66,11 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
     return () => clearTimeout(timer);
   }, [image.id]);
 
-  // Close modals on Escape
+  // Confirmation dialogs are still owned by this card; detail dialogs handle Escape in the shared shell.
   useEffect(() => {
     if (!showConfirm && !showDetail) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowConfirm(false);
-        setShowDetail(false);
-      }
+      if (e.key === 'Escape' && showConfirm) setShowConfirm(false);
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
@@ -137,38 +141,27 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1, rotate: (image.decoration.length % 5) - 2 }}
+      animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{
         duration: 0.35 + (image.id.charCodeAt(0) % 10) * 0.04,
         delay: animDelay + (image.id.charCodeAt(1) % 8) * 0.05,
       }}
-      className="polaroid relative inline-block w-full rounded-sm cursor-pointer group/card"
-      onContextMenu={handleContextMenu}
-      onClick={() => setShowDetail(true)}
+      className="contents"
     >
-      {/* Decoration */}
-      <DecorElement type={image.decoration} />
-
-      {/* Image */}
-      <div className="relative overflow-hidden rounded-sm aspect-[4/3] bg-gray-200">
-        <img
-          src={image.thumbnailPath ? thumbnailUrl(image.thumbnailPath) : imageUrl(image.filePath)}
-          alt="Design screenshot"
-          className="w-full h-full object-cover"
-          loading="lazy"
-        />
-      </div>
-
-      {/* Terms */}
-      <div
-        data-testid="image-card-terms"
-        className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex w-[calc(100%-0.75rem)] max-w-[calc(100%-0.75rem)] flex-wrap justify-center gap-1"
+      <WorkspaceAssetCard
+        kind="image"
+        title={image.filePath || 'Design screenshot'}
+        alt="Design screenshot"
+        mediaSrc={image.thumbnailPath ? thumbnailUrl(image.thumbnailPath) : imageUrl(image.filePath)}
+        decoration={image.decoration}
+        rotation={(image.decoration.length % 5) - 2}
+        termContent={<div data-testid="image-card-terms" className="workspace-card-term-overlay">{image.terms.length > 0 ? <TermTag terms={image.terms} onRefresh={onRefresh} /> : null}</div>}
+        element="div"
+        onClick={() => setShowDetail(true)}
+        onContextMenu={handleContextMenu}
+        ariaLabel={`打开图片详情 ${image.filePath || 'Design screenshot'}`}
       >
-        {image.terms.length > 0 && (
-          <TermTag terms={image.terms} onRefresh={onRefresh} />
-        )}
-      </div>
 
       {/* Context menu — portaled to body */}
       {createPortal(
@@ -200,138 +193,50 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
       {createPortal(
         <AnimatePresence>
           {showDetail && (
-            <motion.div
+            <WorkspaceDetailDialog
               ref={detailOverlayRef}
-              data-dialog-overlay
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
-              onClick={(e) => { if (e.target === e.currentTarget) setShowDetail(false); }}
               onDragOver={(e) => e.preventDefault()}
+              title={t('ImageDetail')}
+              closeLabel={locale === 'zh' ? '关闭' : 'Close'}
+              onClose={() => setShowDetail(false)}
+              closeButtonClassName="workspace-dialog-close"
+              closeButton={<X />}
+              media={<WorkspaceMediaPreview kind="image" src={imageUrl(image.filePath)} alt="Design screenshot" mediaClassName="workspace-detail-media" />}
             >
-            <motion.div
-              initial={{ scale: 0.95, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 10 }}
-              className="w-full max-w-4xl max-h-[85vh] flex rounded-2xl bg-[var(--card)]
-                border border-[var(--card-border)] shadow-2xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-              onDragStart={(e) => e.stopPropagation()}
-              onDrag={(e) => e.stopPropagation()}
-              onDragEnd={(e) => e.stopPropagation()}
-            >
-              {/* Left: Image */}
-              <div className="flex-1 min-w-0 bg-gray-200/50 flex items-center justify-center p-4">
-                <img
-                  src={imageUrl(image.filePath)}
-                  alt="Design screenshot"
-                  className="max-w-full max-h-[80vh] object-contain rounded-lg"
-                />
-              </div>
-
-              {/* Right: Details */}
-              <div className="w-[320px] flex-shrink-0 flex flex-col border-l border-[var(--card-border)]">
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--card-border)]">
-                  <h2 className="text-base font-heading font-semibold text-[var(--text)]">
-                    {t('ImageDetail')}
-                  </h2>
-                  <button
-                    onClick={() => setShowDetail(false)}
-                    className="p-1 rounded-full hover:bg-[var(--muted)] transition-colors"
-                  >
-                    <X className="w-4 h-4 text-[var(--text-muted)]" />
-                  </button>
-                </div>
-
-                {/* Scrollable content */}
-                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                <>
                   {/* Terms */}
-                  <div>
-                    <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">
-                      {locale === 'zh' ? '设计术语' : 'Design Terms'}
-                    </h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      {image.terms.length > 0 ? (
-                        image.terms.map((term) => {
-                          const [en, zh] = (() => {
-                            const idx = term.keyword.indexOf(' / ');
-                            if (idx === -1) return [term.keyword, term.keyword] as [string, string];
-                            return [term.keyword.slice(0, idx), term.keyword.slice(idx + 3)] as [string, string];
-                          })();
-                          const same = en === zh;
-                          return (
-                            <div
-                              key={term.id}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs
-                                bg-[var(--accent)]/10 text-[var(--accent)] font-term"
-                            >
-                              <button
-                                onClick={() => handleDetailCopy(term.id + '-en', en)}
-                                className="hover:underline cursor-pointer inline-flex items-center gap-0.5"
-                              >
-                                {detailCopiedId === term.id + '-en' && (
-                                  <Check className="w-3 h-3 text-green-500" />
-                                )}
-                                {en}
-                              </button>
-                              {!same && (
-                                <>
-                                  <span className="opacity-40">/</span>
-                                  <button
-                                    onClick={() => handleDetailCopy(term.id + '-zh', zh)}
-                                    className="hover:underline cursor-pointer inline-flex items-center gap-0.5"
-                                  >
-                                    {detailCopiedId === term.id + '-zh' && (
-                                      <Check className="w-3 h-3 text-green-500" />
-                                    )}
-                                    {zh}
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <span className="text-xs text-[var(--text-muted)]">No terms</span>
-                      )}
-                    </div>
-                  </div>
+                  <WorkspaceDetailSection title={locale === 'zh' ? '设计术语' : 'Design Terms'}>
+                    <WorkspaceBilingualTermList
+                      terms={image.terms.map((term) => toBilingualTerm(term.id, term.keyword))}
+                      copiedId={detailCopiedId}
+                      copiedIcon={<Check className="w-3 h-3 text-green-500" />}
+                      emptyLabel={locale === 'zh' ? '暂无术语' : 'No terms'}
+                      onCopy={handleDetailCopy}
+                    />
+                  </WorkspaceDetailSection>
 
                   {/* Tags */}
-                  <div>
-                    <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">
-                      {locale === 'zh' ? '标签' : 'Tags'}
-                    </h3>
+                  <WorkspaceDetailSection title={locale === 'zh' ? '标签' : 'Tags'}>
                     <TagManager
                       imageId={image.id}
                       imageTags={image.tags || []}
                       onTagsChange={onRefresh}
                     />
-                  </div>
+                  </WorkspaceDetailSection>
 
                   {/* Colors */}
                   {image.colors && image.colors.length > 0 && (
-                    <div>
-                      <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">
-                        {t('ColorPalette')}
-                      </h3>
+                    <WorkspaceDetailSection title={t('ColorPalette')}>
                       <ColorPalette colors={image.colors} />
-                    </div>
+                    </WorkspaceDetailSection>
                   )}
 
                   {/* AI Prompt */}
-                  <div>
-                    <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">
-                      AI Prompt
-                    </h3>
+                  <WorkspaceDetailSection title="AI Prompt">
                     <DesignPrompt imageId={image.id} />
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
+                  </WorkspaceDetailSection>
+                </>
+            </WorkspaceDetailDialog>
         )}
       </AnimatePresence>,
         document.body
@@ -341,60 +246,22 @@ export function ImageCard({ image, onRefresh, animDelay = 0 }: ImageCardProps) {
       {createPortal(
         <AnimatePresence>
           {showConfirm && (
-            <motion.div
+            <WorkspaceConfirmDialog
               ref={confirmOverlayRef}
-              data-dialog-overlay
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[85] flex items-center justify-center bg-black/30"
-              onClick={() => setShowConfirm(false)}
-            >
-            <motion.div
-              initial={{ scale: 0.9, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 10 }}
-              className="w-full max-w-sm mx-4 rounded-2xl bg-[var(--card)] border border-[var(--card-border)] shadow-2xl p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-400/15 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-400" />
-                </div>
-                <div>
-                  <h3 className="text-base font-heading font-semibold text-[var(--text)]">
-                    {t('ConfirmDelete')}
-                  </h3>
-                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                    {t('ConfirmDeleteDesc')}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  onClick={() => setShowConfirm(false)}
-                  disabled={deleting}
-                  className="px-4 py-2 rounded-lg text-sm font-heading text-[var(--text-muted)]
-                    hover:bg-[var(--muted)] transition-colors disabled:opacity-50"
-                >
-                  {t('Cancel')}
-                </button>
-                <button
-                  onClick={handleConfirmDelete}
-                  disabled={deleting}
-                  className="px-4 py-2 rounded-lg text-sm font-heading text-white
-                    bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50"
-                >
-                  {deleting ? t('Saving') : t('Confirm')}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
+              title={t('ConfirmDelete')}
+              description={t('ConfirmDeleteDesc')}
+              cancelLabel={t('Cancel')}
+              confirmLabel={deleting ? t('Saving') : t('Confirm')}
+              icon={<AlertTriangle />}
+              pending={deleting}
+              onCancel={() => setShowConfirm(false)}
+              onConfirm={handleConfirmDelete}
+            />
+          )}
       </AnimatePresence>,
         document.body
       )}
+      </WorkspaceAssetCard>
     </motion.div>
   );
 }

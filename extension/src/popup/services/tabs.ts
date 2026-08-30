@@ -99,3 +99,15 @@ export async function openOrFocusApp(appUrl: string): Promise<void> {
 
   await chrome.tabs.create({ url: appUrl })
 }
+
+export async function openOrFocusLocalTimeline(): Promise<void> {
+  const timelineUrl = chrome.runtime.getURL("tabs/timeline.html")
+  const tabs = await chrome.tabs.query({})
+  const existing = tabs.find((tab) => tab.url === timelineUrl)
+  if (existing?.id && existing.windowId) {
+    await chrome.tabs.update(existing.id, { active: true })
+    await chrome.windows.update(existing.windowId, { focused: true })
+    return
+  }
+  await chrome.tabs.create({ url: timelineUrl })
+}

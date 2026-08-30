@@ -31,6 +31,7 @@ export const translations = {
 
   // Uploader
   PasteOrDrop: { zh: '粘贴 / 拖放 / 点击上传', en: 'Paste / Drop / Click' },
+  UploadingToToday: { zh: '正在上传到今天...', en: 'Uploading to today...' },
   EmptyPage: { zh: '今日灵感为空~', en: 'No inspiration today~' },
   Analyzing: { zh: '分析中...', en: 'Analyzing...' },
 

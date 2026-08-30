@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ImageCard } from './ImageCard';
 import type { Image } from '@/types';
 
@@ -32,6 +32,8 @@ function makeImage(term: string): Image {
 }
 
 describe('ImageCard', () => {
+  afterEach(() => vi.useRealTimers());
+
   it('constrains the bottom term tag to the card width', () => {
     render(
       <div className="w-24">
@@ -43,8 +45,33 @@ describe('ImageCard', () => {
     );
 
     const terms = screen.getByTestId('image-card-terms');
-    expect(terms).toHaveClass('w-[calc(100%-0.75rem)]');
-    expect(terms).toHaveClass('max-w-[calc(100%-0.75rem)]');
-    expect(screen.getByText('ExtremelyLongMotionDesignKeywordThatShouldNotOverflow')).toHaveClass('min-w-0');
+    expect(terms.closest('.workspace-polaroid')).toHaveClass('workspace-asset-card');
+    expect(screen.getByTestId('image-card-terms')).toHaveClass('workspace-card-term-overlay');
+    expect(terms).toHaveClass('workspace-card-term-overlay');
+    expect(screen.getByText('ExtremelyLongMotionDesignKeywordThatShouldNotOverflow')).toHaveClass('workspace-card-term-part');
+  });
+
+  it('keeps the detail dialog mounted through its close animation', () => {
+    vi.useFakeTimers();
+    render(<ImageCard image={makeImage('Motion')} onRefresh={() => undefined} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '打开图片详情 image.png' }));
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+
+    expect(screen.getByRole('dialog')).toHaveClass('is-closing');
+
+    act(() => vi.advanceTimersByTime(180));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('uses the compact size for copied detail term icons', async () => {
+    render(<ImageCard image={makeImage('Motion')} onRefresh={() => undefined} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '打开图片详情 image.png' }));
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: 'Motion' })[1]);
+    });
+
+    expect(document.querySelector('.workspace-design-term-check svg')).toHaveClass('w-3', 'h-3');
   });
 });

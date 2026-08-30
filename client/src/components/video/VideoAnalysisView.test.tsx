@@ -64,14 +64,14 @@ describe('VideoAnalysisView', () => {
     renderWithLocale(<VideoAnalysisView open videoId="video-a" initialJobId="job-a" onBack={onBack} />);
 
     const dialog = await screen.findByRole('dialog', { name: '视频动效分析' });
-    expect(dialog).toHaveClass('max-w-4xl');
-    expect(dialog).toHaveClass('overflow-hidden');
+    expect(dialog).toHaveClass('workspace-dialog');
     expect(screen.getByText('紧凑的 UI 转场')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /打开面板/ })).toBeInTheDocument();
+    expect(document.querySelectorAll('.workspace-detail-section').length).toBeGreaterThanOrEqual(2);
     expect(document.querySelector('[data-dialog-overlay]')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '关闭' }));
-    expect(onBack).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
   });
 
   it('uses English copy throughout the video detail dialog when the UI locale is English', async () => {

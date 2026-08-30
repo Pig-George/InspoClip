@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .workspace-detail-heading { margin: 0 0 8px; color: var(--text-muted); font-family: "Caveat", "Gaegu", cursive; font-size: 12px; line-height: 16px; letter-spacing: .025em; text-transform: uppercase; }
+}

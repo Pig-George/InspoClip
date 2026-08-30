@@ -38,6 +38,7 @@ describe('createLangChainProvider', () => {
       apiKey: 'test-key',
       maxTokens: 8192,
       temperature: 0.7,
+      timeout: 90_000,
       configuration: { baseURL: 'https://example.test/v1' },
     });
   });
@@ -60,6 +61,7 @@ describe('createLangChainProvider', () => {
       apiKey: 'test-key',
       maxTokens: 300,
       temperature: 0.7,
+      timeout: 90_000,
       configuration: { baseURL: 'https://example.test/v1' },
     });
     expect(imageInvoke).toHaveBeenCalledOnce();

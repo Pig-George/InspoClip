@@ -17,6 +17,7 @@ export interface InvokerOptions {
   apiKey: string;
   maxTokens: number;
   temperature: number;
+  timeout: number;
   configuration: {
     baseURL: string;
     fetch?: typeof fetch;
@@ -151,6 +152,7 @@ export function createLangChainProvider(
     apiKey: validatedConfig.apiKey,
     maxTokens: DEFAULT_MAX_TOKENS,
     temperature: 0.7,
+    timeout: MODEL_REQUEST_TIMEOUT_MS,
     configuration: {
       baseURL: validatedConfig.baseURL,
       ...clientConfiguration,
@@ -161,6 +163,7 @@ export function createLangChainProvider(
     apiKey: validatedConfig.apiKey,
     maxTokens: IMAGE_MAX_TOKENS,
     temperature: 0.7,
+    timeout: MODEL_REQUEST_TIMEOUT_MS,
     configuration: {
       baseURL: validatedConfig.baseURL,
       ...clientConfiguration,

@@ -17,6 +17,7 @@ export function PopupApp() {
         connectionLabel={popup.connectionLabel}
         connectionState={popup.connectionState}
         locale={popup.locale}
+        runtimeMode={popup.runtimeMode}
         t={popup.t}
         onOpenSettings={() => popup.setSettingsOpen(true)}
         onTestConnection={popup.testServerConnection}
@@ -48,23 +49,31 @@ export function PopupApp() {
         />
       </main>
 
-      <Footer t={popup.t} version={version} onOpenApp={popup.openApp} />
+      <Footer t={popup.t} onOpenApp={popup.openWorkspace} />
       <StatusBanner status={popup.status} />
 
       <SettingsSection
         appUrl={popup.appUrl}
+        developmentDiagnostics={popup.developmentDiagnostics}
+        modelSettings={popup.modelSettings}
         open={popup.settingsOpen}
+        version={version}
         recordingShortcut={popup.recordingShortcut}
+        runtimeMode={popup.runtimeMode}
         serverUrl={popup.serverUrl}
         shortcutAnalyze={popup.shortcutAnalyze}
         shortcutSave={popup.shortcutSave}
+        storageUsageLabel={popup.storageUsageLabel}
         t={popup.t}
         onAppUrlChange={popup.setAppUrl}
+        onClearDevelopmentDiagnostics={popup.clearDevelopmentDiagnostics}
+        onModelSettingsChange={popup.setModelSettings}
         onClose={() => popup.setSettingsOpen(false)}
         onSaveSettings={async () => {
           await popup.saveSettings()
           popup.setSettingsOpen(false)
         }}
+        onRuntimeModeChange={popup.setRuntimeMode}
         onServerUrlChange={popup.setServerUrl}
         onSetShortcutAnalyze={popup.setShortcutAnalyze}
         onSetShortcutSave={popup.setShortcutSave}

@@ -69,8 +69,8 @@ describe('VideoPromptPanel', () => {
 
     renderWithLocale('en');
 
-    const promptContainer = (await screen.findByText(longText)).closest('.prose-video-prompt');
-    expect(promptContainer).toHaveClass('min-w-0', 'max-w-full', '[overflow-wrap:anywhere]');
+    const promptContainer = (await screen.findByText(longText)).closest('.workspace-prompt-markdown');
+    expect(promptContainer).toHaveClass('workspace-prompt-markdown');
   });
 
   it('uses only the regenerate button spinner while refreshing an existing prompt', async () => {
@@ -85,13 +85,14 @@ describe('VideoPromptPanel', () => {
 
     await waitFor(() => expect(generateVideoOutput).toHaveBeenCalledWith('v', 'general', '', true));
     expect(screen.queryByText('Generating…')).not.toBeInTheDocument();
-    expect(regenerate.querySelector('svg')).toHaveClass('animate-spin');
+    expect(regenerate.querySelector('svg')).toHaveClass('workspace-prompt-action-spinner');
   });
 
   it('renders as an integrated sidebar section', () => {
     renderWithLocale();
 
-    const section = screen.getByLabelText('复刻输出');
+    const section = screen.getByRole('region');
+    expect(section).toHaveClass('pt-4');
     expect(section).toHaveClass('border-t');
     expect(screen.getByText('用途')).toBeInTheDocument();
   });
@@ -99,7 +100,7 @@ describe('VideoPromptPanel', () => {
   it('localizes the prompt output controls in English', async () => {
     renderWithLocale('en');
 
-    expect(screen.getByLabelText('Replication output')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Replication output' })).toBeInTheDocument();
     expect(screen.getByText('Purpose')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'General' })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Generate output' })).toBeInTheDocument();
@@ -117,6 +118,15 @@ describe('VideoPromptPanel', () => {
     expect(generateVideoOutput).toHaveBeenCalledWith('v', 'general', '', false);
     expect(setInflight).toHaveBeenCalledWith('v', 'general', expect.any(Promise));
     expect(await screen.findByText('生成中文')).toBeInTheDocument();
+  });
+
+  it('uses the shared prompt state shell while output is unavailable', async () => {
+    vi.mocked(fetchVideoOutput).mockResolvedValue(null);
+
+    renderWithLocale();
+
+    expect(await screen.findByRole('button', { name: '生成输出' })).toBeInTheDocument();
+    expect(document.querySelector('.workspace-prompt-result')).toBeInTheDocument();
   });
 
   it('switches purpose and reloads existing output', async () => {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest"
 
-import { getManifestContentScriptFiles, getTabAccessErrorMessage, getTabDisplayLabel, isInjectableTabUrl, requestAreaCaptureSession } from "./tabs"
+import { getManifestContentScriptFiles, getTabAccessErrorMessage, getTabDisplayLabel, isInjectableTabUrl, openOrFocusLocalTimeline, requestAreaCaptureSession } from "./tabs"
 
 describe("popup tab messaging helpers", () => {
   afterEach(() => {
@@ -66,5 +66,26 @@ describe("popup tab messaging helpers", () => {
     })
 
     await expect(requestAreaCaptureSession("save")).rejects.toThrow("permission denied")
+  })
+
+  test("opens or focuses the extension local timeline", async () => {
+    const update = vi.fn().mockResolvedValue(undefined)
+    const create = vi.fn().mockResolvedValue(undefined)
+    const focus = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal("chrome", {
+      runtime: { getURL: vi.fn(() => "chrome-extension://id/tabs/timeline.html") },
+      tabs: {
+        query: vi.fn().mockResolvedValue([{ id: 7, windowId: 2, url: "chrome-extension://id/tabs/timeline.html" }]),
+        update,
+        create
+      },
+      windows: { update: focus }
+    })
+
+    await openOrFocusLocalTimeline()
+
+    expect(update).toHaveBeenCalledWith(7, { active: true })
+    expect(focus).toHaveBeenCalledWith(2, { focused: true })
+    expect(create).not.toHaveBeenCalled()
   })
 })

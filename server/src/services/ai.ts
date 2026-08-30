@@ -4,6 +4,7 @@ import { loadModelConfig, type ModelConfig } from '../ai/config.js';
 import { createLangChainProvider } from '../ai/langchain-provider.js';
 import type { ModelProvider } from '../ai/provider.js';
 import { AiService } from '../ai/service.js';
+import { IMAGE_ANALYSIS_TIMEOUT_MS, withRequestTimeout } from '../ai/request-timeout.js';
 
 async function getConfig(): Promise<ModelConfig> {
   let values: Record<string, string> = {};
@@ -48,11 +49,17 @@ async function createService(): Promise<AiService> {
 }
 
 export async function generateTerms(imagePath: string): Promise<string[]> {
-  return (await createService()).generateTerms(imagePath);
+  return withRequestTimeout(
+    (await createService()).generateTerms(imagePath),
+    IMAGE_ANALYSIS_TIMEOUT_MS,
+  );
 }
 
 export async function generateDesignPrompt(
   imagePath: string,
 ): Promise<{ en: string; zh: string }> {
-  return (await createService()).generateDesignPrompt(imagePath);
+  return withRequestTimeout(
+    (await createService()).generateDesignPrompt(imagePath),
+    IMAGE_ANALYSIS_TIMEOUT_MS,
+  );
 }

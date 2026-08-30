@@ -1,4 +1,4 @@
-export const DEFAULT_SERVER_URL = "http://localhost:3001"
+export const DEFAULT_SERVER_URL = "http://127.0.0.1:3001"
 
 export const CONTEXT_MENUS = [
   { id: "inspoclip-save-image", title: "Save Image to InspoClip", contexts: ["image"] },

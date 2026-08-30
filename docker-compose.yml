@@ -55,7 +55,9 @@ services:
       start_period: 10s
 
   client:
-    build: ./client
+    build:
+      context: .
+      dockerfile: client/Dockerfile
     restart: unless-stopped
     depends_on:
       - server

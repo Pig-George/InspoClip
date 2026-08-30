@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check } from 'lucide-react';
 import { deleteTerm } from '@/lib/api';
 import type { Term } from '@/types';
+import { WorkspaceCardTermTag } from '@inspoclip/workspace-ui';
 
 interface TermTagProps {
   terms: Term[];
@@ -115,45 +116,19 @@ export function TermTag({ terms, onRefresh }: TermTagProps) {
   return (
     <>
       {/* Collapsed tag */}
-      <div
-        ref={triggerRef}
+      <WorkspaceCardTermTag
+        containerRef={triggerRef}
         onClick={(e) => e.stopPropagation()}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-term
-          bg-[var(--accent)]/15 text-[var(--accent)] cursor-pointer min-w-0 max-w-full overflow-hidden"
-      >
-        <motion.button
-          onClick={(e) => { e.stopPropagation(); handleCopy(firstTerm.id + '-en', firstEn); }}
-          className="min-w-0 truncate hover:underline"
-          whileTap={{ scale: 0.95 }}
-        >
-          {copiedId === firstTerm.id + '-en' ? (
-            <Check className="w-3 h-3 text-green-500 inline" />
-          ) : (
-            firstEn
-          )}
-        </motion.button>
-        {!isSameLang && (
-          <>
-            <span className="opacity-40 flex-shrink-0">/</span>
-            <motion.button
-              onClick={(e) => { e.stopPropagation(); handleCopy(firstTerm.id + '-zh', firstZh); }}
-              className="min-w-0 truncate hover:underline"
-              whileTap={{ scale: 0.95 }}
-            >
-              {copiedId === firstTerm.id + '-zh' ? (
-                <Check className="w-3 h-3 text-green-500 inline" />
-              ) : (
-                firstZh
-              )}
-            </motion.button>
-          </>
-        )}
-        {remaining > 0 && (
-          <span className="text-[10px] opacity-60 flex-shrink-0 ml-0.5">+{remaining}</span>
-        )}
-      </div>
+        className="cursor-pointer"
+        en={copiedId === firstTerm.id + '-en' ? <Check className="w-3 h-3 text-green-500 inline" /> : firstEn}
+        zh={copiedId === firstTerm.id + '-zh' ? <Check className="w-3 h-3 text-green-500 inline" /> : firstZh}
+        showZh={!isSameLang}
+        remaining={remaining}
+        onSelectEn={(e) => { e.stopPropagation(); void handleCopy(firstTerm.id + '-en', firstEn); }}
+        onSelectZh={(e) => { e.stopPropagation(); void handleCopy(firstTerm.id + '-zh', firstZh); }}
+      />
 
       {/* Tooltip — portaled to body to escape all stacking contexts */}
       {createPortal(
