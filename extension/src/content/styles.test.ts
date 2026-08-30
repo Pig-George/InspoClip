@@ -97,4 +97,110 @@ describe("content styles", () => {
     expect(styles).not.toContain("conic-gradient")
     expect(styles).not.toContain(".inspoclip-spinner")
   })
+
+  test("overlaps progress cards and smoothly expands them with a stable interaction state", () => {
+    const styles = getContentStyles()
+
+    expect(styles).toContain(".inspoclip-analysis-stack")
+    expect(styles).toMatch(/\.inspoclip-analysis-stack\s*\{[^}]*flex-direction:\s*column/s)
+    expect(styles).toMatch(/\.inspoclip-analysis-stack\s*\{[^}]*gap:\s*0/s)
+    expect(styles).toMatch(/\.inspoclip-analysis-stack\s*\{[^}]*width:\s*fit-content/s)
+    expect(styles).toMatch(/\.inspoclip-analysis-stack\s*\{[^}]*max-width:\s*calc\(100vw - 40px\)/s)
+    expect(styles).toMatch(/\.inspoclip-analysis-stack \.inspoclip-toast \+ \.inspoclip-toast\s*\{[^}]*margin-top:\s*-32px/s)
+    expect(styles).toMatch(/\.inspoclip-analysis-stack\.is-expanded \.inspoclip-toast \+ \.inspoclip-toast[\s\S]*margin-top:\s*8px/s)
+    expect(styles).not.toContain(".inspoclip-analysis-stack-summary")
+    expect(styles).toMatch(/\.inspoclip-analysis-stack \.inspoclip-toast\s*\{[^}]*position:\s*relative\s*!important/s)
+    expect(styles).toMatch(/\.inspoclip-analysis-stack\s*\{[^}]*align-items:\s*center/s)
+    expect(styles).toMatch(/\.inspoclip-analysis-stack \.inspoclip-toast\s*\{[^}]*align-self:\s*center/s)
+    expect(styles).toMatch(/margin-top \.48s cubic-bezier\(\.22,\.8,\.24,1\)/)
+    expect(styles).toMatch(/box-shadow \.48s cubic-bezier\(\.22,\.8,\.24,1\)/)
+    expect(styles).toContain("scale(var(--inspoclip-analysis-stack-scale, 1))")
+    expect(styles).toMatch(/\.inspoclip-analysis-stack\.is-expanded \.inspoclip-toast\.inspoclip-toast-visible[\s\S]*scale\(1\)/)
+    expect(styles).toContain("cubic-bezier(.22,.8,.24,1)")
+  })
+
+  test("restores the original loading text animation timing", () => {
+    const styles = getContentStyles()
+
+    expect(styles).toMatch(/inspoclip-toast-char-jump 1\.5s ease-in-out infinite/)
+    expect(styles).toContain("--inspoclip-toast-char-index) * 50ms")
+    expect(styles).toMatch(/9%\s*\{[^}]*translateY\(-2\.5px\)/s)
+  })
+
+  test("supports an interactive full-size image preview", () => {
+    const styles = getContentStyles()
+
+    expect(styles).toMatch(/\.inspoclip-preview img\s*\{[^}]*cursor:\s*zoom-in/s)
+    expect(styles).toContain(".inspoclip-image-lightbox")
+    expect(styles).toMatch(/\.inspoclip-image-lightbox\s*\{[^}]*z-index:\s*2147483647/s)
+    expect(styles).toMatch(/\.inspoclip-image-lightbox img\s*\{[^}]*object-fit:\s*contain/s)
+  })
+
+  test("lets saved primary actions release footer spacing without a layout jump", () => {
+    const styles = getContentStyles()
+    const footerRule = styles.match(/\.inspoclip-modal-footer\s*\{([^}]*)\}/s)?.[1] || ""
+    const footerActionRule = styles.match(/\.inspoclip-modal-footer \.inspoclip-btn\s*\{([^}]*)\}/s)?.[1] || ""
+
+    expect(footerRule).toMatch(/gap:\s*0;/)
+    expect(footerActionRule).toMatch(/margin:\s*0 4px;/)
+  })
+
+  test("aligns in-page detail controls with shared workspace buttons", () => {
+    const styles = getContentStyles()
+    const iconRule = styles.match(/\.inspoclip-copy-all\s*\{([^}]*)\}/s)?.[1] || ""
+    const iconHoverRule = styles.match(/\.inspoclip-copy-all:hover:not\(:disabled\)\s*\{([^}]*)\}/s)?.[1] || ""
+    const languageGroupRule = styles.match(/\.inspoclip-lang-group\s*\{([^}]*)\}/s)?.[1] || ""
+    const languageRule = styles.match(/\.inspoclip-lang-btn\s*\{([^}]*)\}/s)?.[1] || ""
+    const languageActiveRule = styles.match(/\.inspoclip-lang-btn\.active\s*\{([^}]*)\}/s)?.[1] || ""
+
+    expect(iconRule).toMatch(/width:\s*22px;/)
+    expect(iconRule).toMatch(/height:\s*22px;/)
+    expect(iconRule).toMatch(/border:\s*0;/)
+    expect(iconRule).toMatch(/border-radius:\s*4px;/)
+    expect(iconRule).toMatch(/background:\s*transparent;/)
+    expect(iconRule).toMatch(/color:\s*var\(--text-muted\);/)
+    expect(iconHoverRule).toMatch(/background:\s*var\(--muted\);/)
+    expect(iconHoverRule).not.toMatch(/border-color:/)
+
+    expect(languageGroupRule).toMatch(/padding:\s*2px;/)
+    expect(languageGroupRule).toMatch(/border-radius:\s*5px;/)
+    expect(languageGroupRule).toMatch(/background:\s*color-mix\(in srgb, var\(--muted\) 84%, transparent\);/)
+    expect(languageRule).toMatch(/min-width:\s*25px;/)
+    expect(languageRule).toMatch(/height:\s*20px;/)
+    expect(languageRule).toMatch(/font-size:\s*9px;/)
+    expect(languageActiveRule).toMatch(/background:\s*var\(--card\);/)
+    expect(languageActiveRule).toMatch(/color:\s*var\(--accent\);/)
+
+    const purposeGroupRule = styles.match(/\.inspoclip-video-purpose-group\s*\{([^}]*)\}/s)?.[1] || ""
+    const purposeRule = styles.match(/\.inspoclip-video-purpose-btn\s*\{([^}]*)\}/s)?.[1] || ""
+    const purposeActiveRule = styles.match(/\.inspoclip-video-purpose-btn\.active\s*\{([^}]*)\}/s)?.[1] || ""
+    const generateRule = styles.match(/\.inspoclip-video-prompt-generate\s*\{([^}]*)\}/s)?.[1] || ""
+    const sectionRule = styles.match(/\.inspoclip-video-prompt-section\s*\{([^}]*)\}/s)?.[1] || ""
+
+    expect(purposeGroupRule).toMatch(/display:\s*flex;/)
+    expect(purposeGroupRule).toMatch(/flex-wrap:\s*wrap;/)
+    expect(purposeRule).toMatch(/border:\s*1px solid #e2c9a8;/)
+    expect(purposeRule).toMatch(/border-radius:\s*999px;/)
+    expect(purposeRule).toMatch(/background:\s*#fff8ef;/)
+    expect(purposeActiveRule).toMatch(/background:\s*#c0784a;/)
+    expect(purposeActiveRule).toMatch(/color:\s*#fff;/)
+    expect(generateRule).toMatch(/min-height:\s*26px;/)
+    expect(generateRule).toMatch(/padding:\s*6px 10px;/)
+    expect(sectionRule).toMatch(/background:\s*linear-gradient\(135deg, #fffaf2, #f7ead6\);/)
+    expect(sectionRule).toMatch(/border:\s*1px solid #ead8ba;/)
+    expect(sectionRule).toMatch(/border-radius:\s*14px;/)
+
+    const stageRule = styles.match(/\.inspoclip-video-stage\s*\{([^}]*)\}/s)?.[1] || ""
+    const stageTitleRule = styles.match(/\.inspoclip-video-stage-head\s*\{([^}]*)\}/s)?.[1] || ""
+    const stageTimeRule = styles.match(/\.inspoclip-video-stage-head em\s*\{([^}]*)\}/s)?.[1] || ""
+
+    expect(stageRule).toMatch(/padding:\s*10px;/)
+    expect(stageRule).toMatch(/border:\s*1px solid #ead8ba;/)
+    expect(stageRule).toMatch(/border-radius:\s*12px;/)
+    expect(stageRule).toMatch(/background:\s*linear-gradient\(135deg, #fffaf2, #f7ead6\);/)
+    expect(stageTitleRule).toMatch(/font-size:\s*12px;/)
+    expect(stageTitleRule).toMatch(/font-weight:\s*700;/)
+    expect(stageTimeRule).toMatch(/font-size:\s*10px;/)
+    expect(stageTimeRule).toMatch(/white-space:\s*nowrap;/)
+  })
 })

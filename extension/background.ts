@@ -1,20 +1,31 @@
 import { CONTEXT_MENUS } from "./src/background/constants"
+import { runBackgroundBootstrap } from "./src/background/bootstrap"
 import { captureAndUpload } from "./src/background/capture"
 import { fetchImageAsDataUrl, sendContentMessage } from "./src/background/messages"
 import offscreenDocumentUrl from "url:./offscreen.html"
-import { getExtensionRelativeUrl, getOffscreenDocumentOptions, getTabCaptureStreamOptions, normalizeTabCaptureErrorMessage, prepareTabCaptureSource, startAreaCaptureWithPreparedSource } from "./src/background/offscreen-recording"
+import { getExtensionRelativeUrl, getOffscreenDocumentOptions, getTabCaptureStreamOptions, normalizeTabCaptureErrorMessage, openAreaCaptureSelector, prepareTabCaptureSource } from "./src/background/offscreen-recording"
+import { sendOffscreenMessageWithRetry } from "./src/background/offscreen-messaging"
 import { openVideoInApp, saveVideoFromUrl } from "./src/background/video"
 import { createCommandRouter } from "./src/runtime/command-router"
 import { isExtensionCommand } from "./src/runtime/contracts"
 import { getBackgroundRuntime } from "./src/runtime/background-runtime"
 import { initializeRuntimeMode } from "./src/runtime/settings"
+import { isDevelopmentBuild } from "./src/runtime/build-mode"
+import { createExtensionLogRecorder, installExtensionErrorLogging, type ExtensionLogInput, type ExtensionLogStorage } from "./src/runtime/extension-logger"
+import { shouldRecordRuntimeCommandFailure } from "./src/runtime/command-error-policy"
 
 const OFFSCREEN_DOCUMENT_PATH = getExtensionRelativeUrl(offscreenDocumentUrl)
+let recordBackgroundLog: (input: ExtensionLogInput) => Promise<void> = async () => undefined
+
+function recordBackgroundError(error: unknown, context?: Record<string, unknown>): void {
+  void recordBackgroundLog({ source: "background", level: "error", error, context })
+}
 let creatingOffscreenDocument: Promise<void> | null = null
 const runtimeCommandRouter = createCommandRouter(getBackgroundRuntime)
 
 chrome.runtime.onInstalled.addListener((details) => {
   void initializeRuntimeMode(details.reason).catch((error) => {
+    recordBackgroundError(error, { event: "runtime.initialize", reason: details.reason })
     console.error("Failed to initialize InspoClip runtime mode:", error)
   })
   CONTEXT_MENUS.forEach((item) => chrome.contextMenus.create(item))
@@ -39,6 +50,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       const result = await saveVideoFromUrl(info.srcUrl)
       await openVideoInApp(result.videoId)
     } catch (err) {
+      recordBackgroundError(err, { event: "context-menu.save-video" })
       const message = err instanceof Error ? err.message : "Video upload failed"
       console.error("Failed to save video:", err)
       chrome.notifications.create({ type: "basic", iconUrl: "assets/icon128.png", title: "InspoClip", message })
@@ -78,7 +90,9 @@ async function ensureOffscreenDocument(): Promise<void> {
 }
 
 function sendOffscreenMessage<T = Record<string, unknown>>(message: Record<string, unknown>): Promise<T> {
-  return chrome.runtime.sendMessage(message)
+  return sendOffscreenMessageWithRetry(message, {
+    send: (nextMessage) => chrome.runtime.sendMessage(nextMessage)
+  })
 }
 
 function getMediaStreamId(options: chrome.tabCapture.GetMediaStreamOptions): Promise<string> {
@@ -102,27 +116,51 @@ function releasePreparedSource(sourceId: string): Promise<unknown> {
 }
 
 function startAreaCaptureSession(tabId: number, mode: "analyze" | "save"): Promise<void> {
-  return startAreaCaptureWithPreparedSource(tabId, mode, {
-    createSourceId: () => crypto.randomUUID(),
-    prepareSource: (currentTabId, sourceId) =>
-      prepareTabCaptureSource(currentTabId, sourceId, {
-        getStreamId: getMediaStreamId,
-        ensureOffscreenDocument,
-        sendOffscreenMessage
-      }),
-    sendContentMessage,
-    releaseSource: releasePreparedSource
+  return openAreaCaptureSelector(tabId, mode, {
+    sendContentMessage: async (currentTabId, message) => {
+      try {
+        return await sendContentMessage(currentTabId, message)
+      } catch (error) {
+        recordBackgroundError(error, { event: "area-capture.content-open" })
+        throw error
+      }
+    }
   })
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (isExtensionCommand(message)) {
     runtimeCommandRouter.dispatch(message)
+      .then((response) => {
+        if (response && response.ok === false && shouldRecordRuntimeCommandFailure(message.type, response.error, message.payload)) {
+          recordBackgroundError(response.error, { event: "runtime.command", command: message.type })
+        }
+        sendResponse(response)
+      })
+      .catch((error) => {
+        recordBackgroundError(error, { event: "runtime.command" })
+        sendResponse({
+          ok: false,
+          error: { code: "UNKNOWN_ERROR", message: error instanceof Error ? error.message : "Runtime command failed", retryable: false }
+        })
+      })
+    return true
+  }
+
+  if (message.type === "REQUEST_STANDALONE_VIDEO_FRAMES") {
+    ;(async () => {
+      await ensureOffscreenDocument()
+      return sendOffscreenMessage({
+        type: "EXTRACT_OFFSCREEN_VIDEO_FRAMES",
+        dataUrl: message.dataUrl,
+        frameCount: message.frameCount
+      })
+    })()
       .then((response) => sendResponse(response))
-      .catch((error) => sendResponse({
-        ok: false,
-        error: { code: "UNKNOWN_ERROR", message: error instanceof Error ? error.message : "Runtime command failed", retryable: false }
-      }))
+      .catch((error) => {
+        recordBackgroundError(error, { event: "standalone-video.extract-frames" })
+        sendResponse({ success: false, error: error instanceof Error ? error.message : "Video frame extraction failed" })
+      })
     return true
   }
 
@@ -134,7 +172,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return { success: true }
     })()
       .then((response) => sendResponse(response))
-      .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to prepare area capture" }))
+      .catch((err) => {
+        recordBackgroundError(err, { event: "area-capture.prepare" })
+        sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to prepare area capture" })
+      })
     return true
   }
 
@@ -147,6 +188,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 85 })
         sendResponse({ dataUrl })
       } catch (err) {
+        recordBackgroundError(err, { event: "capture-tab" })
         sendResponse({ error: err instanceof Error ? err.message : "Capture failed" })
       }
     })
@@ -174,7 +216,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
     })()
       .then((response) => sendResponse(response))
-      .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to start recording" }))
+      .catch((err) => {
+        recordBackgroundError(err, { event: "recording.start" })
+        sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to start recording" })
+      })
     return true
   }
 
@@ -193,7 +238,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
     })()
       .then((response) => sendResponse(response))
-      .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to prepare recording" }))
+      .catch((err) => {
+        recordBackgroundError(err, { event: "recording.prepare" })
+        sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to prepare recording" })
+      })
     return true
   }
 
@@ -203,7 +251,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sourceId: message.sourceId
     })
       .then((response) => sendResponse(response))
-      .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to release recording source" }))
+      .catch((err) => {
+        recordBackgroundError(err, { event: "recording.release" })
+        sendResponse({ success: false, error: err instanceof Error ? err.message : "Failed to release recording source" })
+      })
     return true
   }
 
@@ -223,14 +274,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       recordingId: message.recordingId
     })
       .then((response) => sendResponse(response))
-      .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Recording command failed" }))
+      .catch((err) => {
+        recordBackgroundError(err, { event: "recording.command", command: message.type })
+        sendResponse({ success: false, error: err instanceof Error ? err.message : "Recording command failed" })
+      })
     return true
   }
 
   if (message.type === "CAPTURE_AND_UPLOAD") {
     captureAndUpload(message.dayOfWeek)
       .then((result) => sendResponse({ success: true, ...result }))
-      .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Upload failed" }))
+      .catch((err) => {
+        recordBackgroundError(err, { event: "capture-and-upload" })
+        sendResponse({ success: false, error: err instanceof Error ? err.message : "Upload failed" })
+      })
     return true
   }
 
@@ -247,6 +304,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         await sendContentMessage(tabs[0].id, { type: imageUrl ? "ANALYZE_IMAGE" : "ANALYZE_PAGE", imageUrl })
         sendResponse({ ok: true })
       } catch (err) {
+        recordBackgroundError(err, { event: "trigger-analyze" })
         sendResponse({ error: err instanceof Error ? err.message : "Failed to trigger analysis" })
       }
     })
@@ -256,7 +314,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "UPLOAD_VIDEO_URL") {
     saveVideoFromUrl(message.url, { draft: message.draft === true })
       .then((result) => sendResponse({ success: true, ...result }))
-      .catch((err) => sendResponse({ success: false, error: err instanceof Error ? err.message : "Upload failed" }))
+      .catch((err) => {
+        recordBackgroundError(err, { event: "upload-video-url" })
+        sendResponse({ success: false, error: err instanceof Error ? err.message : "Upload failed" })
+      })
     return true
   }
+})
+
+// Register all message listeners before optional diagnostics setup. A logging
+// failure must never leave the Service Worker without a request receiver.
+runBackgroundBootstrap(() => {
+  const backgroundLogStorage = chrome.storage.local as unknown as ExtensionLogStorage
+  recordBackgroundLog = createExtensionLogRecorder(backgroundLogStorage, isDevelopmentBuild)
+  installExtensionErrorLogging({
+    source: "background",
+    enabled: isDevelopmentBuild,
+    storage: backgroundLogStorage,
+    captureConsole: false
+  })
 })

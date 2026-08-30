@@ -1,3 +1,5 @@
+import { CONTENT_RUNTIME_MARKER } from "../content/bootstrap"
+
 type ManifestContentScript = { js?: string[] }
 type RuntimeManifest = { content_scripts?: ManifestContentScript[] }
 
@@ -19,6 +21,13 @@ function isInjectableTabUrl(url?: string): boolean {
 async function injectContentScripts(tabId: number): Promise<void> {
   const files = getManifestContentScriptFiles(chrome.runtime.getManifest())
   if (files.length === 0) throw new Error("No content scripts configured")
+  // A browser extension reload can invalidate the old listener while leaving its
+  // page-scoped bootstrap marker behind. Reset it before reinjecting the bundle.
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    args: [CONTENT_RUNTIME_MARKER],
+    func: (marker: string) => { delete (globalThis as Record<string, unknown>)[marker] }
+  })
   await chrome.scripting.executeScript({ target: { tabId }, files })
 }
 

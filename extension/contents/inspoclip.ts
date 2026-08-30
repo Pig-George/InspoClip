@@ -3,6 +3,7 @@ import type { PlasmoCSConfig } from "plasmo"
 
 import {
   getAnalysisCompletionSteps,
+  getAnalysisStackScale,
   getNextAnalysisProgress,
   normalizeAnalysisProgress
 } from "../src/content/analysis-progress"
@@ -39,10 +40,14 @@ import {
 import { claimContentRuntime, removeExistingContentRoot, setContentRootInteractive, shouldExpandContentRoot } from "../src/content/bootstrap"
 import { getCopyButtonIcon, getCopyButtonTitle } from "../src/content/copy"
 import { formatDate, getMonday } from "../src/content/date"
-import { dataUrlToBlob } from "../src/content/image"
+import { createImagePreviewUrl, dataUrlToBlob } from "../src/content/image"
 import { renderSafeMarkdown } from "../src/content/markdown"
 import { createObjectUrlVideoSource, jumpVideoToTime, revokeObjectUrlVideoSource } from "../src/content/media"
-import { getPromptText as resolvePromptText } from "../src/content/prompt"
+import {
+  createPromptRegenerationTracker,
+  extractPromptFromImageAnalysis,
+  getPromptText as resolvePromptText
+} from "../src/content/prompt"
 import { matchShortcut } from "../src/content/shortcut"
 import { getContentStyles } from "../src/content/styles"
 import { syncToastElement } from "../src/content/toast"
@@ -53,11 +58,25 @@ import {
   videoPromptRequestKey
 } from "../src/content/video-prompt-state"
 import { blobToDataUrl, sendRuntimeCommand } from "../src/runtime/command-client"
+import { isDevelopmentBuild } from "../src/runtime/build-mode"
+import {
+  createExtensionLogRecorder,
+  installExtensionErrorLogging,
+  type ExtensionLogStorage
+} from "../src/runtime/extension-logger"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
   run_at: "document_idle"
 };
+
+const contentLogStorage = chrome.storage.local as unknown as ExtensionLogStorage
+const recordContentLog = createExtensionLogRecorder(contentLogStorage, isDevelopmentBuild)
+installExtensionErrorLogging({
+  source: "content",
+  enabled: isDevelopmentBuild,
+  storage: contentLogStorage
+})
 
 // InspoClip Content Script — injected into web pages
 // Shows analysis notification and result modal on the page itself
@@ -88,6 +107,11 @@ export const config: PlasmoCSConfig = {
   // State
   let currentToast = null;
   let toastTimer = null;
+  let currentImagePreview = null;
+  let analysisToastStack = null;
+  let analysisToastCollapseTimer = null;
+  const analysisToastTasks = new Map();
+  let analysisToastTaskSequence = 0;
   let currentModal = null;
   let currentTab = null;
   let currentCtxMenu = null;
@@ -107,6 +131,7 @@ export const config: PlasmoCSConfig = {
   let videoPromptPurpose = 'general';
   let videoPromptTarget = '';
   let areaRecordingDelaySeconds = DEFAULT_AREA_RECORDING_DELAY_SECONDS;
+  const imagePromptRegenerationTracker = createPromptRegenerationTracker();
 
   async function serializedBlobPayload(blob, filename) {
     return {
@@ -131,13 +156,14 @@ export const config: PlasmoCSConfig = {
     });
   }
 
-  async function saveImageWithRuntime(blob, filename, weekStart, dayOfWeek) {
+  async function saveImageWithRuntime(blob, filename, weekStart, dayOfWeek, analysis) {
     return sendRuntimeCommand({
       type: 'runtime.asset.image.save',
       payload: {
         ...(await serializedBlobPayload(blob, filename)),
         weekStart,
-        dayOfWeek
+        dayOfWeek,
+        ...(analysis !== undefined ? { analysis } : {})
       }
     });
   }
@@ -159,7 +185,16 @@ export const config: PlasmoCSConfig = {
   }
 
   async function getContentUrlWithRuntime(kind, reference) {
-    return sendRuntimeCommand({ type: 'runtime.asset.content.url', payload: { kind, reference } });
+    try {
+      return await sendRuntimeCommand({ type: 'runtime.asset.content.url', payload: { kind, reference } });
+    } catch (error) {
+      if (error?.detail?.code !== 'LOCAL_CONTENT_URL_UNAVAILABLE') throw error;
+      const content = await sendRuntimeCommand({
+        type: 'runtime.asset.content.read',
+        payload: { assetId: reference }
+      });
+      return content.dataUrl;
+    }
   }
 
   function syncContentRootInteractivity() {
@@ -265,18 +300,13 @@ export const config: PlasmoCSConfig = {
     overlay.appendChild(selection);
     container.appendChild(overlay);
     areaOverlay = overlay;
-    const recordingSource = createAreaRecordingSource(
-      recordingSourceId,
-      () => crypto.randomUUID?.() || `area-source-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      (sourceId) => sendRuntimeMessage({ type: 'PREPARE_AREA_RECORDING', sourceId })
-    );
-    preparedAreaRecordingSource = recordingSource;
-    recordingSource.promise.catch((error) => {
-      if (!isExtensionContextInvalidatedError(error)) return;
-      if (areaOverlay !== overlay || preparedAreaRecordingSource !== recordingSource) return;
-      removeAreaOverlay();
-      showExtensionContextRecovery();
-    });
+    if (recordingSourceId) {
+      preparedAreaRecordingSource = createAreaRecordingSource(
+        recordingSourceId,
+        () => crypto.randomUUID?.() || `area-source-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        (sourceId) => sendRuntimeMessage({ type: 'PREPARE_AREA_RECORDING', sourceId })
+      );
+    }
     syncContentRootInteractivity();
 
     let startX = 0, startY = 0;
@@ -661,12 +691,12 @@ export const config: PlasmoCSConfig = {
         } catch { data.similarImages = []; }
 
         capturedBlob = croppedBlob;
-        lastPreviewUrl = URL.createObjectURL(croppedBlob);
+        lastPreviewUrl = createImagePreviewUrl(croppedBlob);
         analyzedData = data;
         pushImageHistory(data, lastPreviewUrl, croppedBlob);
 
         await analysisProgress.complete();
-        transitionToModal(data, lastPreviewUrl);
+        transitionToModal(data, lastPreviewUrl, analysisProgress);
       } else {
         // Save mode — check similarity then upload
         capturedBlob = croppedBlob;
@@ -702,7 +732,7 @@ export const config: PlasmoCSConfig = {
 
     const recordingId = crypto.randomUUID?.() || `area-recording-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const recordingRect = getAreaRecordingInnerRect(rect);
-    const preparedSource = preparedAreaRecordingSource;
+    let preparedSource = preparedAreaRecordingSource;
     const visualViewport = window.visualViewport;
     const viewport = {
       width: window.innerWidth,
@@ -723,7 +753,14 @@ export const config: PlasmoCSConfig = {
     };
 
     try {
-      if (!preparedSource) throw new Error(locale === 'zh' ? '录屏权限未准备好，请重新从 InspoClip 启动框选' : 'Recording permission is not ready. Please start area capture from InspoClip again.');
+      if (!preparedSource) {
+        preparedSource = createAreaRecordingSource(
+          undefined,
+          () => crypto.randomUUID?.() || `area-source-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          (sourceId) => sendRuntimeMessage({ type: 'PREPARE_AREA_RECORDING', sourceId })
+        );
+        preparedAreaRecordingSource = preparedSource;
+      }
       overlay.classList.add('inspoclip-area-overlay-recording');
       syncContentRootInteractivity();
       await preparedSource.promise;
@@ -982,12 +1019,89 @@ export const config: PlasmoCSConfig = {
     setTimeout(removeToast, 5000);
   }
 
+  function ensureAnalysisToastStack() {
+    if (analysisToastStack) return analysisToastStack;
+
+    const stack = document.createElement('div');
+    stack.className = 'inspoclip-analysis-stack';
+    stack.setAttribute('role', 'status');
+    stack.setAttribute('aria-live', 'polite');
+    stack.addEventListener('pointerenter', () => {
+      if (analysisToastCollapseTimer) {
+        clearTimeout(analysisToastCollapseTimer);
+        analysisToastCollapseTimer = null;
+      }
+      stack.classList.add('is-expanded');
+    });
+    stack.addEventListener('pointerleave', () => {
+      if (analysisToastCollapseTimer) clearTimeout(analysisToastCollapseTimer);
+      analysisToastCollapseTimer = setTimeout(() => {
+        stack.classList.remove('is-expanded');
+        analysisToastCollapseTimer = null;
+      }, 180);
+    });
+    container.appendChild(stack);
+    analysisToastStack = stack;
+    return stack;
+  }
+
+  function syncAnalysisToastStack() {
+    if (!analysisToastStack) return;
+    const tasks = Array.from(analysisToastTasks.values());
+    const stackDepth = tasks.length;
+    tasks.forEach((task, index) => {
+      task.element.style.zIndex = String(stackDepth - index);
+      task.element.style.setProperty('--inspoclip-analysis-stack-scale', String(getAnalysisStackScale(index)));
+    });
+  }
+
+  function removeAnalysisToastTask(taskId) {
+    const task = analysisToastTasks.get(taskId);
+    if (!task || task.removing) return;
+    task.removing = true;
+    task.element.classList.add('inspoclip-toast-leaving');
+    setTimeout(() => {
+      analysisToastTasks.delete(taskId);
+      task.element.remove();
+      syncAnalysisToastStack();
+      if (analysisToastTasks.size === 0 && analysisToastStack) {
+        const stack = analysisToastStack;
+        analysisToastStack = null;
+        if (analysisToastCollapseTimer) {
+          clearTimeout(analysisToastCollapseTimer);
+          analysisToastCollapseTimer = null;
+        }
+        stack.remove();
+      }
+    }, 220);
+  }
+
   function createAnalysisToastProgress(message) {
     let progress = 4;
     let completed = false;
     let cancelled = false;
+    const taskId = `analysis-${++analysisToastTaskSequence}`;
+    // Replace the short-lived upload notice with the persistent analysis item.
+    removeToast();
+    const stack = ensureAnalysisToastStack();
+    const element = document.createElement('div');
+    element.className = 'inspoclip-toast inspoclip-toast-loading';
+    element.innerHTML = `
+      <div class="inspoclip-toast-icon"></div>
+      <span class="inspoclip-toast-text"></span>
+    `;
+    const task = { id: taskId, element, message, removing: false };
+    analysisToastTasks.set(taskId, task);
+    stack.appendChild(element);
+    syncToastElement(element, message, 'loading', progress);
+    requestAnimationFrame(() => element.classList.add('inspoclip-toast-visible'));
+    syncAnalysisToastStack();
 
-    const publish = () => showToast(message, 'loading', progress);
+    const publish = () => {
+      task.message = message;
+      syncToastElement(element, message, 'loading', progress, true);
+      syncAnalysisToastStack();
+    };
     const advance = () => {
       const nextProgress = getNextAnalysisProgress(progress);
       if (nextProgress === progress) return;
@@ -1015,8 +1129,17 @@ export const config: PlasmoCSConfig = {
         }
       },
       cancel() {
+        if (completed) return;
         cancelled = true;
         window.clearInterval(timerId);
+        removeAnalysisToastTask(taskId);
+      },
+      dismiss() {
+        window.clearInterval(timerId);
+        removeAnalysisToastTask(taskId);
+      },
+      getElement() {
+        return element;
       }
     };
   }
@@ -1037,7 +1160,7 @@ export const config: PlasmoCSConfig = {
       const detail = await getVideoDetailWithRuntime(uploadResult.videoId);
       await analysisProgress.complete();
       pushVideoHistory(detail);
-      transitionToVideoModal(detail, window.innerWidth - 20, 20);
+      transitionToVideoModal(detail, window.innerWidth - 20, 20, analysisProgress);
     } finally {
       analysisProgress.cancel();
     }
@@ -1249,40 +1372,44 @@ export const config: PlasmoCSConfig = {
     capturedBlob = null;
     currentAssetResult = null;
 
+    const isFullPageAnalysis = !imageUrl;
     const analysisProgress = createAnalysisToastProgress(
-      locale === 'zh' ? '正在分析...' : 'Analyzing...'
+      locale === 'zh'
+        ? (isFullPageAnalysis ? '正在分析页面...' : '正在分析...')
+        : (isFullPageAnalysis ? 'Analyzing page...' : 'Analyzing...')
     );
 
     try {
       // Get image blob
+      let blob;
       if (imageUrl) {
         try {
           const res = await fetch(imageUrl);
-          capturedBlob = await res.blob();
+          blob = await res.blob();
         } catch {
-          capturedBlob = await captureTabAsBlob();
+          blob = await captureTabAsBlob();
         }
       } else {
-        capturedBlob = await captureTabAsBlob();
+        blob = await captureTabAsBlob();
       }
 
       // Send to server
-      const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
-      analyzedData = await analyzeImageWithRuntime(capturedBlob, 'analyze' + ext);
+      const ext = blob.type === 'image/png' ? '.png' : '.jpg';
+      const data = await analyzeImageWithRuntime(blob, 'analyze' + ext);
 
       // Check for similar images
       try {
-        const simData = await checkImageSimilarityWithRuntime(capturedBlob, 'check' + ext);
-        analyzedData.similarImages = simData.similar || [];
+        const simData = await checkImageSimilarityWithRuntime(blob, 'check' + ext);
+        data.similarImages = simData.similar || [];
       } catch {
-        analyzedData.similarImages = [];
+        data.similarImages = [];
       }
 
       // Phase 2: Save to history and transition toast → modal
-      lastPreviewUrl = imageUrl ? URL.createObjectURL(capturedBlob) : null;
-      pushImageHistory(analyzedData, lastPreviewUrl, capturedBlob);
+      const previewUrl = createImagePreviewUrl(blob);
+      pushImageHistory(data, previewUrl, blob);
       await analysisProgress.complete();
-      transitionToModal(analyzedData, lastPreviewUrl);
+      transitionToModal(data, previewUrl, analysisProgress);
     } catch (err) {
       analysisProgress.cancel();
       showToast(locale === 'zh' ? `分析失败: ${err.message}` : `Analysis failed: ${err.message}`, 'error');
@@ -1317,21 +1444,21 @@ export const config: PlasmoCSConfig = {
       locale === 'zh' ? '正在分析素材...' : 'Analyzing asset...'
     );
     try {
-      capturedBlob = dataUrlToBlob(asset.dataUrl);
-      const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
-      analyzedData = await analyzeImageWithRuntime(capturedBlob, asset.fileName || 'asset' + ext);
+      const blob = dataUrlToBlob(asset.dataUrl);
+      const ext = blob.type === 'image/png' ? '.png' : '.jpg';
+      const data = await analyzeImageWithRuntime(blob, asset.fileName || 'asset' + ext);
 
       try {
-        const simData = await checkImageSimilarityWithRuntime(capturedBlob, 'check' + ext);
-        analyzedData.similarImages = simData.similar || [];
+        const simData = await checkImageSimilarityWithRuntime(blob, 'check' + ext);
+        data.similarImages = simData.similar || [];
       } catch {
-        analyzedData.similarImages = [];
+        data.similarImages = [];
       }
 
-      lastPreviewUrl = URL.createObjectURL(capturedBlob);
-      pushImageHistory(analyzedData, lastPreviewUrl, capturedBlob);
+      const previewUrl = createImagePreviewUrl(blob);
+      pushImageHistory(data, previewUrl, blob);
       await analysisProgress.complete();
-      transitionToModal(analyzedData, lastPreviewUrl);
+      transitionToModal(data, previewUrl, analysisProgress);
     } finally {
       analysisProgress.cancel();
     }
@@ -1359,7 +1486,7 @@ export const config: PlasmoCSConfig = {
       const detail = await getVideoDetailWithRuntime(uploadResult.videoId);
       await analysisProgress.complete();
       pushVideoHistory(detail);
-      transitionToVideoModal(detail, window.innerWidth - 20, 20);
+      transitionToVideoModal(detail, window.innerWidth - 20, 20, analysisProgress);
     } finally {
       analysisProgress.cancel();
     }
@@ -1411,6 +1538,7 @@ export const config: PlasmoCSConfig = {
   // ---- Toast ----
 
   function showToast(message, type = 'loading', progress = null) {
+    if (type === 'error') void recordContentLog({ source: 'content', level: 'error', error: message });
     // Clear any pending removal timer
     if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
 
@@ -1445,7 +1573,18 @@ export const config: PlasmoCSConfig = {
 
   // ---- Transition Toast → Modal ----
 
-  function transitionToModal(data, previewUrl) {
+  function transitionToModal(data, previewUrl, analysisProgress = null) {
+    if (analysisProgress?.getElement) {
+      const progressElement = analysisProgress.getElement();
+      const toastRect = progressElement.getBoundingClientRect();
+      const originX = toastRect.right;
+      const originY = toastRect.top;
+      progressElement.style.opacity = '0';
+      progressElement.style.transform = 'translateX(20px) scale(0.8)';
+      analysisProgress.dismiss();
+      setTimeout(() => showModal(data, previewUrl, originX, originY), 220);
+      return;
+    }
     if (!currentToast) {
       // No toast — show modal directly from top-right
       showModal(data, previewUrl, window.innerWidth - 20, 20);
@@ -1469,7 +1608,18 @@ export const config: PlasmoCSConfig = {
     }, 300);
   }
 
-  function transitionToVideoModal(detail, originX, originY) {
+  function transitionToVideoModal(detail, originX, originY, analysisProgress = null) {
+    if (analysisProgress?.getElement) {
+      const progressElement = analysisProgress.getElement();
+      const toastRect = progressElement.getBoundingClientRect();
+      const toastOriginX = toastRect.right;
+      const toastOriginY = toastRect.top;
+      progressElement.style.opacity = '0';
+      progressElement.style.transform = 'translateX(20px) scale(0.8)';
+      analysisProgress.dismiss();
+      setTimeout(() => showVideoModal(detail, toastOriginX, toastOriginY), 220);
+      return;
+    }
     if (!currentToast) {
       showVideoModal(detail, originX, originY);
       return;
@@ -1489,8 +1639,10 @@ export const config: PlasmoCSConfig = {
 
   function localizedText(value) {
     if (!value) return '';
-    if (typeof value === 'string') return value;
-    return locale === 'zh' ? (value.zh || value.en || '') : (value.en || value.zh || '');
+    const text = typeof value === 'string'
+      ? value
+      : locale === 'zh' ? (value.zh || value.en || '') : (value.en || value.zh || '');
+    return /langchain[_.\s-]*core[_.\s-]*messages/i.test(String(text)) ? '' : String(text);
   }
 
   function escapeHtml(value) {
@@ -1676,7 +1828,7 @@ export const config: PlasmoCSConfig = {
         const output = result.content;
         if (isCurrentPrompt(key)) renderVideoPromptOutput(modal, output);
       } catch (error) {
-        if (error?.detail?.code !== 'BACKEND_HTTP_404') throw error;
+        if (!['BACKEND_HTTP_404', 'LOCAL_PROMPT_NOT_FOUND'].includes(error?.detail?.code)) throw error;
         if (isCurrentPrompt(key)) renderVideoPromptOutput(modal, null);
       }
     };
@@ -1938,7 +2090,8 @@ export const config: PlasmoCSConfig = {
               saveBtn.style.width = '0';
               saveBtn.style.opacity = '0';
               saveBtn.style.padding = '0';
-              saveBtn.style.margin = '0';
+              saveBtn.style.marginLeft = '0';
+              saveBtn.style.marginRight = '0';
               saveBtn.style.borderWidth = '0';
             });
             setTimeout(() => saveBtn.remove(), 400);
@@ -1958,8 +2111,50 @@ export const config: PlasmoCSConfig = {
 
   // ---- Modal ----
 
+  function showImagePreview(source) {
+    if (!source) return;
+    removeImagePreview();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'inspoclip-image-lightbox';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', locale === 'zh' ? '图片预览' : 'Image preview');
+
+    const image = document.createElement('img');
+    image.src = source;
+    image.alt = locale === 'zh' ? '分析图片预览' : 'Analyzed image preview';
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'inspoclip-image-lightbox-close';
+    closeButton.setAttribute('aria-label', locale === 'zh' ? '关闭预览' : 'Close preview');
+    closeButton.textContent = '×';
+    closeButton.addEventListener('click', removeImagePreview);
+
+    overlay.append(image, closeButton);
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) removeImagePreview();
+    });
+    container.appendChild(overlay);
+    currentImagePreview = overlay;
+    requestAnimationFrame(() => overlay.classList.add('inspoclip-image-lightbox-visible'));
+  }
+
+  function removeImagePreview() {
+    if (!currentImagePreview) return;
+    const overlay = currentImagePreview;
+    currentImagePreview = null;
+    overlay.classList.remove('inspoclip-image-lightbox-visible');
+    setTimeout(() => overlay.remove(), 220);
+  }
+
   function showModal(data, previewUrl, originX, originY) {
     removeModal(false);
+
+    const historyEntry = currentHistoryEntry();
+    const promptRegenerationActive = historyEntry?.kind === 'image'
+      && imagePromptRegenerationTracker.isActive(historyEntry);
 
     const modal = document.createElement('div');
     modal.className = 'inspoclip-modal-overlay';
@@ -2007,7 +2202,7 @@ export const config: PlasmoCSConfig = {
           </div>
         </div>
 
-        ${previewUrl ? `<div class="inspoclip-preview"><img src="${previewUrl}" /></div>` : ''}
+        ${previewUrl ? `<div class="inspoclip-preview"><button type="button" class="inspoclip-preview-trigger" title="${locale === 'zh' ? '点击预览图片' : 'Preview image'}" aria-label="${locale === 'zh' ? '点击预览图片' : 'Preview image'}"><img src="${escapeHtml(previewUrl)}" alt="${locale === 'zh' ? '分析图片' : 'Analyzed image'}" /></button></div>` : ''}
 
         <div class="inspoclip-modal-body">
           <!-- Terms -->
@@ -2040,6 +2235,7 @@ export const config: PlasmoCSConfig = {
                   <button class="inspoclip-lang-btn" data-lang="both">EN/中</button>
                 </div>
                 <button class="inspoclip-copy-all" data-type="prompt" title="${getCopyButtonTitle(locale)}" aria-label="${getCopyButtonTitle(locale)}">${getCopyButtonIcon()}</button>
+                <button class="inspoclip-copy-all inspoclip-prompt-regenerate ${promptRegenerationActive ? 'is-loading' : ''}" title="${locale === 'zh' ? '重新生成' : 'Regenerate'}" aria-label="${locale === 'zh' ? '重新生成' : 'Regenerate'}" ${promptRegenerationActive ? 'disabled aria-busy="true"' : ''}>${getPromptRegenerateIcon()}</button>
               </div>
             </div>
             <div class="inspoclip-prompt" id="inspoclip-prompt"></div>
@@ -2090,6 +2286,8 @@ export const config: PlasmoCSConfig = {
     modal.querySelector('.inspoclip-modal-close').addEventListener('click', removeModal);
     modal.querySelector('.inspoclip-close-btn').addEventListener('click', removeModal);
     modal.addEventListener('click', (e) => { if (e.target === modal) removeModal(); });
+    const previewTrigger = modal.querySelector('.inspoclip-preview-trigger');
+    if (previewTrigger) previewTrigger.addEventListener('click', () => showImagePreview(previewUrl));
 
     // History navigation
     const prevBtn = modal.querySelector('#inspoclip-prev');
@@ -2136,6 +2334,57 @@ export const config: PlasmoCSConfig = {
       });
     });
 
+    const regeneratePromptBtn = modal.querySelector('.inspoclip-prompt-regenerate');
+    if (regeneratePromptBtn) {
+      regeneratePromptBtn.addEventListener('click', async () => {
+        const entry = currentHistoryEntry();
+        if (entry?.kind === 'image' && imagePromptRegenerationTracker.isActive(entry)) return;
+
+        const sourceBlob = entry?.kind === 'image'
+          ? entry.blob
+          : capturedBlob;
+        if (!sourceBlob) {
+          showToast(locale === 'zh' ? '无法重新获取 Prompt：原始图片不可用' : 'Cannot regenerate Prompt: the original image is unavailable', 'error');
+          return;
+        }
+
+        regeneratePromptBtn.disabled = true;
+        regeneratePromptBtn.classList.add('is-loading');
+        regeneratePromptBtn.setAttribute('aria-busy', 'true');
+        try {
+          const ext = sourceBlob.type === 'image/png' ? '.png' : '.jpg';
+          const request = analyzeImageWithRuntime(sourceBlob, `prompt-refresh${ext}`);
+          const refreshed = entry?.kind === 'image'
+            ? await imagePromptRegenerationTracker.start(entry, request)
+            : await request;
+          const prompt = extractPromptFromImageAnalysis(refreshed);
+          if (!prompt) throw new Error(locale === 'zh' ? '模型未返回有效 Prompt' : 'The model did not return a valid Prompt');
+
+          data.prompt = prompt;
+          if (entry?.kind === 'image') entry.data.prompt = prompt;
+          if (currentModal === modal && currentHistoryEntry() === entry) renderPrompt(prompt);
+        } catch (error) {
+          if (currentModal === modal && currentHistoryEntry() === entry) {
+            const message = error?.message || String(error);
+            showToast(locale === 'zh' ? `重新生成失败: ${message}` : `Regeneration failed: ${message}`, 'error');
+          }
+        } finally {
+          const visibleModal = currentModal;
+          if (visibleModal && currentHistoryEntry() === entry) {
+            const visibleButton = visibleModal.querySelector('.inspoclip-prompt-regenerate');
+            if (visibleButton) {
+              visibleButton.disabled = false;
+              visibleButton.classList.remove('is-loading');
+              visibleButton.removeAttribute('aria-busy');
+            }
+            if (visibleModal !== modal && entry?.kind === 'image') {
+              renderPrompt(entry.data.prompt);
+            }
+          }
+        }
+      });
+    }
+
     // Upload button — check similar images first
     const uploadBtn = modal.querySelector('.inspoclip-upload-btn');
     if (uploadBtn) {
@@ -2164,7 +2413,9 @@ export const config: PlasmoCSConfig = {
         const dateStr = formatDate(monday);
 
         const ext = capturedBlob.type === 'image/png' ? '.png' : '.jpg';
-        await saveImageWithRuntime(capturedBlob, 'screenshot' + ext, dateStr, dayOfWeek);
+        const currentEntry = currentHistoryEntry();
+        const analysis = currentEntry?.kind === 'image' ? currentEntry.data : analyzedData;
+        await saveImageWithRuntime(capturedBlob, 'screenshot' + ext, dateStr, dayOfWeek, analysis);
 
         // Mark current analysis as saved
         if (historyIndex >= 0 && analysisHistory[historyIndex]) {
@@ -2185,7 +2436,8 @@ export const config: PlasmoCSConfig = {
             btn.style.width = '0';
             btn.style.opacity = '0';
             btn.style.padding = '0';
-            btn.style.margin = '0';
+            btn.style.marginLeft = '0';
+            btn.style.marginRight = '0';
             btn.style.borderWidth = '0';
           });
           setTimeout(() => btn.remove(), 400);
@@ -2203,12 +2455,19 @@ export const config: PlasmoCSConfig = {
 
     // ESC to close
     const escHandler = (e) => {
-      if (e.key === 'Escape') { removeModal(); document.removeEventListener('keydown', escHandler); }
+      if (e.key !== 'Escape') return;
+      if (currentImagePreview) {
+        removeImagePreview();
+        return;
+      }
+      removeModal();
+      document.removeEventListener('keydown', escHandler);
     };
     document.addEventListener('keydown', escHandler);
   }
 
   function removeModal(showFloating = true) {
+    removeImagePreview();
     if (currentModal) {
       const overlay = currentModal;
       revokeObjectUrlVideoSource(currentVideoPreviewUrl);
@@ -2450,6 +2709,17 @@ export const config: PlasmoCSConfig = {
 
   function getPromptText(prompt) {
     return resolvePromptText(prompt, promptLangMode, locale);
+  }
+
+  function getPromptRegenerateIcon() {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M21 12a9 9 0 0 0-15.5-6.5L3 8" />
+        <path d="M3 3v5h5" />
+        <path d="M3 12a9 9 0 0 0 15.5 6.5L21 16" />
+        <path d="M21 21v-5h-5" />
+      </svg>
+    `;
   }
 
   function renderPrompt(prompt) {

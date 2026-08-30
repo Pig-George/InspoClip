@@ -1,5 +1,11 @@
 export const ANALYSIS_RUNNING_PROGRESS_LIMIT = 92
 
+export function getAnalysisStackScale(value: unknown): number {
+  const numericValue = typeof value === "number" ? value : Number(value)
+  const stackIndex = Number.isFinite(numericValue) ? Math.max(0, Math.floor(numericValue)) : 0
+  return Math.max(0.82, Number((1 - stackIndex * 0.035).toFixed(3)))
+}
+
 export function normalizeAnalysisProgress(value: unknown): number {
   const numericValue = typeof value === "number" ? value : Number(value)
   if (!Number.isFinite(numericValue)) return 0

@@ -35,6 +35,20 @@ describe("content toast helpers", () => {
     expect(icon.innerHTML).toBe("✓")
   })
 
+  test("preserves visibility when updating a concurrent progress toast", () => {
+    const icon = { innerHTML: "", querySelector: () => null }
+    const text = { innerHTML: "" }
+    const toast = {
+      className: "inspoclip-toast inspoclip-toast-loading inspoclip-toast-visible",
+      dataset: { type: "loading", message: "Analyzing..." },
+      querySelector: (selector: string) => selector === ".inspoclip-toast-icon" ? icon : text
+    }
+
+    syncToastElement(toast, "Analyzing next step", "loading", 42, true)
+
+    expect(toast.className).toContain("inspoclip-toast-visible")
+  })
+
   test("extracts and clamps percentage progress from loading messages", () => {
     expect(getToastProgress("Understanding video... 42%")).toBe(42)
     expect(getToastProgress("正在理解视频... 125%")).toBe(100)

@@ -21,7 +21,11 @@ type AreaCaptureMode = "analyze" | "save"
 type AreaCaptureMessage = {
   type: "START_AREA_CAPTURE"
   mode: AreaCaptureMode
-  recordingSourceId: string
+  recordingSourceId?: string
+}
+
+type OpenAreaCaptureDependencies = {
+  sendContentMessage(tabId: number, message: Pick<AreaCaptureMessage, "type" | "mode">): Promise<unknown>
 }
 
 type StartAreaCaptureDependencies = {
@@ -65,11 +69,19 @@ export async function startAreaCaptureWithPreparedSource(
   }
 }
 
+export async function openAreaCaptureSelector(
+  tabId: number,
+  mode: AreaCaptureMode,
+  dependencies: OpenAreaCaptureDependencies
+): Promise<void> {
+  await dependencies.sendContentMessage(tabId, { type: "START_AREA_CAPTURE", mode })
+}
+
 export function getOffscreenDocumentOptions(url: string): chrome.offscreen.CreateParameters {
   return {
     url,
-    reasons: ["USER_MEDIA"],
-    justification: "Record and crop the active tab area for InspoClip video analysis"
+    reasons: ["USER_MEDIA", "BLOBS"],
+    justification: "Record, crop, and decode local video for InspoClip analysis"
   }
 }
 
