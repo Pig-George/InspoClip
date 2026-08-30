@@ -2,6 +2,7 @@
   "extends": "plasmo/templates/tsconfig.base",
   "compilerOptions": {
     "baseUrl": ".",
+    "moduleResolution": "bundler",
     "paths": {
       "~/*": [
         "src/*"
