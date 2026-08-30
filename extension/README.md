@@ -43,7 +43,7 @@ Firefox packaging is handled by Plasmo browser targets. The current default buil
 
 - **Right-click** on any image or page → "Save to InspoClip"
 - **Click** the extension icon → "Capture This Page"
-- Configure your InspoClip server URL in the popup settings
+- Configure the runtime mode in popup settings: **Local mode** or **Backend service**
 - Right-click a webpage video and choose **Save and analyze video with InspoClip**
 - Or select a local MP4/MOV/WebM file or paste a public video URL in the popup
 - The popup shows analysis progress; use **View full analysis** for the timeline and prompt outputs
@@ -52,4 +52,12 @@ Protected, cross-origin, and `blob:` video URLs may not be downloadable by the e
 
 ## Requirements
 
-- InspoClip server running (default: http://localhost:3001)
+### Local mode
+
+Local mode does not require an InspoClip server. Configure an AI provider in popup settings, including the API endpoint, model name, and API key. Supported presets are Alibaba Cloud Model Studio, OpenAI, OpenRouter, and other OpenAI-compatible services. Video analysis for non-Bailian providers uses the configured 4–48 frame sample count when full-video input is unavailable.
+
+Images, videos, analysis results, and prompt jobs are stored in the browser using IndexedDB and OPFS. Local mode data is isolated from backend mode data and is not copied automatically when switching modes. Browser extension uninstall or cleared site data can remove local assets, so export backups regularly.
+
+### Backend service mode
+
+Run the InspoClip server (default: `http://localhost:3001`) and configure its URL in popup settings. Backend mode keeps the extension connected to the server workspace and uses the server's configured AI provider.
