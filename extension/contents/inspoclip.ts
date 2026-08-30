@@ -57,7 +57,15 @@ import {
   setVideoPromptInflight,
   videoPromptRequestKey
 } from "../src/content/video-prompt-state"
-import { blobToDataUrl, sendRuntimeCommand } from "../src/runtime/command-client"
+import { sendRuntimeCommand } from "../src/runtime/command-client"
+import {
+  analyzeImageWithRuntime,
+  checkImageSimilarityWithRuntime,
+  getContentUrlWithRuntime,
+  getVideoDetailWithRuntime,
+  saveImageWithRuntime,
+  startVideoWithRuntime
+} from "../src/content/runtime-actions"
 import { isDevelopmentBuild } from "../src/runtime/build-mode"
 import {
   createExtensionLogRecorder,
