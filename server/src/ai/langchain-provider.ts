@@ -42,6 +42,7 @@ type OpenAICompatibleVideoPart = {
 
 const DEFAULT_MAX_TOKENS = 8192;
 const IMAGE_MAX_TOKENS = 300;
+const MODEL_REQUEST_TIMEOUT_MS = 90_000;
 const JSON_OBJECT_RESPONSE_FORMAT = { type: 'json_object' } as const;
 
 const defaultInvokerFactory: InvokerFactory = (options) => {
