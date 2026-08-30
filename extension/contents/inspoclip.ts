@@ -1869,7 +1869,7 @@ installExtensionErrorLogging({
       ">
         <div class="inspoclip-modal-header">
           <div class="inspoclip-modal-title-row">
-            <h3>${locale === 'zh' ? '视频分析结果' : 'Video Analysis Result'}</h3>
+            <h3>${locale === 'zh' ? '视频详情' : 'Video Detail'}</h3>
           </div>
           <div class="inspoclip-modal-actions">
             ${analysisHistory.length > 1 ? `
@@ -2120,7 +2120,7 @@ installExtensionErrorLogging({
       ">
         <div class="inspoclip-modal-header">
           <div class="inspoclip-modal-title-row">
-            <h3>${locale === 'zh' ? '分析结果' : 'Analysis Result'}</h3>
+            <h3>${locale === 'zh' ? '图片详情' : 'Image Detail'}</h3>
             ${data.similarImages && data.similarImages.length > 0 ? `
               <div class="inspoclip-similar-badge" id="inspoclip-similar-badge">
                 <span class="inspoclip-similar-icon">🔍</span>
