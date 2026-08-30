@@ -53,17 +53,12 @@ router.post('/analyze', upload.single('image'), async (req: Request, res: Respon
       return;
     }
 
-    // Run all analyses in parallel
-    const [terms, colors] = await Promise.all([
+    // Keep independent analysis work concurrent so a slow prompt request cannot delay terminology.
+    const [terms, colors, prompt] = await Promise.all([
       generateTerms(file.path).catch(() => ['design element']),
       extractColors(file.path).catch(() => []),
+      generateDesignPrompt(file.path).catch(() => ({ en: '', zh: '' })),
     ]);
-
-    // Generate prompt
-    let prompt = { en: '', zh: '' };
-    try {
-      prompt = await generateDesignPrompt(file.path);
-    } catch { /* ignore */ }
 
     // Clean up temp file
     const fs = await import('fs/promises');

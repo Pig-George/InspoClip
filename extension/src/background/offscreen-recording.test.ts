@@ -5,6 +5,7 @@ import {
   getOffscreenDocumentOptions,
   getTabCaptureStreamOptions,
   normalizeTabCaptureErrorMessage,
+  openAreaCaptureSelector,
   prepareTabCaptureSource,
   startAreaCaptureWithPreparedSource
 } from "./offscreen-recording"
@@ -19,8 +20,8 @@ describe("offscreen recording helpers", () => {
   test("creates the offscreen document options", () => {
     expect(getOffscreenDocumentOptions("offscreen.html")).toEqual({
       url: "offscreen.html",
-      reasons: ["USER_MEDIA"],
-      justification: "Record and crop the active tab area for InspoClip video analysis"
+      reasons: ["USER_MEDIA", "BLOBS"],
+      justification: "Record, crop, and decode local video for InspoClip analysis"
     })
   })
 
@@ -74,6 +75,16 @@ describe("offscreen recording helpers", () => {
     })
 
     expect(calls).toEqual(["prepare:42:source-1", "content:42:source-1"])
+  })
+
+  test("opens the area selector without creating a recording source", async () => {
+    const sendContentMessage = async (tabId: number, message: unknown) => {
+      expect(tabId).toBe(42)
+      expect(message).toEqual({ type: "START_AREA_CAPTURE", mode: "analyze" })
+      return { ok: true }
+    }
+
+    await expect(openAreaCaptureSelector(42, "analyze", { sendContentMessage })).resolves.toBeUndefined()
   })
 
   test("releases a prepared source when the selector cannot be opened", async () => {

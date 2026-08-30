@@ -1,6 +1,6 @@
 import { useLanguage } from '@/context/LanguageContext';
 import type { Locale } from '@/i18n/translations';
-import { localizedText } from '@/lib/localized-text';
+import { WorkspaceStageList, type WorkspaceStageItem } from '@inspoclip/workspace-ui';
 import type { VideoStage } from '@/types/video';
 
 interface VideoTimelineProps {
@@ -9,56 +9,33 @@ interface VideoTimelineProps {
   locale?: Locale;
 }
 
-const timelineCopy = {
-  zh: {
-    ariaLabel: '视频阶段时间线',
-    stepSeparator: ' → ',
-    actionSeparator: '：',
-  },
-  en: {
-    ariaLabel: 'Video stage timeline',
-    stepSeparator: ' → ',
-    actionSeparator: ': ',
-  },
-} as const;
-
 export function VideoTimeline({ stages, onSelect, locale: localeOverride }: VideoTimelineProps) {
   const { locale: currentLocale } = useLanguage();
   const locale = localeOverride ?? currentLocale;
-  const copy = timelineCopy[locale];
+  const sharedStages: WorkspaceStageItem[] = stages.map((stage, index) => ({
+    id: `${stage.startTime}-${index}`,
+    title: stage.title,
+    startSeconds: stage.startTime,
+    endSeconds: stage.endTime,
+    initialState: stage.initialState,
+    trigger: stage.trigger,
+    resultState: stage.resultState,
+    actions: stage.actions.map((action) => ({
+      subject: action.subject,
+      action: action.action,
+      durationMs: action.durationMs,
+      easing: action.easing,
+    })),
+    data: stage,
+  }));
 
   return (
-    <div className="space-y-2" aria-label={copy.ariaLabel}>
-      {stages.map((stage, index) => (
-        <button
-          key={`${stage.startTime}-${index}`}
-          onClick={() => onSelect(stage)}
-          className="w-full rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-3 text-left hover:border-[var(--accent)]"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <strong className="text-sm text-[var(--text)]">
-              {index + 1}. {localizedText(stage.title, locale)}
-            </strong>
-            <span className="shrink-0 text-xs text-[var(--text-muted)]">
-              {stage.startTime.toFixed(1)}s - {stage.endTime.toFixed(1)}s
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            {localizedText(stage.initialState, locale)}
-            {copy.stepSeparator}
-            {localizedText(stage.trigger, locale)}
-            {copy.stepSeparator}
-            {localizedText(stage.resultState, locale)}
-          </p>
-          {stage.actions.map((action, actionIndex) => (
-            <p key={actionIndex} className="mt-1 text-xs text-[var(--text)]">
-              {localizedText(action.subject, locale)}
-              {copy.actionSeparator}
-              {localizedText(action.action, locale)} · {action.durationMs}ms · {action.easing}
-            </p>
-          ))}
-        </button>
-      ))}
-    </div>
+    <WorkspaceStageList
+      stages={sharedStages}
+      locale={locale}
+      onSelect={(_, index) => onSelect(stages[index])}
+      stepSeparator=" → "
+      actionSeparator={locale === 'zh' ? '：' : ': '}
+    />
   );
 }

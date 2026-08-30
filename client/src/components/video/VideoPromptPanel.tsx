@@ -6,6 +6,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { generateVideoOutput, fetchVideoOutput } from '@/lib/video-api';
 import { getInflight, setInflight } from '@/lib/video-prompt-cache';
 import type { VideoPromptOutput, VideoPurpose } from '@/types/video';
+import { WorkspacePromptOutput, WorkspaceReplicationPromptPanel } from '@inspoclip/workspace-ui';
 
 type LangMode = 'auto' | 'en' | 'zh' | 'both';
 
@@ -69,11 +70,9 @@ const promptCopy = {
 } as const;
 
 const purposeValues: VideoPurpose[] = ['general', 'video-generation', 'frontend', 'motion-design', 'storyboard', 'json'];
-const languageModeValues: LangMode[] = ['auto', 'en', 'zh', 'both'];
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_ATTEMPTS = 100; // 5 minutes max
-const promptContentClassName = 'prose-video-prompt min-w-0 max-w-full break-words [overflow-wrap:anywhere]';
 
 export function VideoPromptPanel({ videoId }: { videoId: string }) {
   const [purpose, setPurpose] = useState<VideoPurpose>('general');
@@ -212,147 +211,55 @@ export function VideoPromptPanel({ videoId }: { videoId: string }) {
     : display.showEn ? display.en : display.zh;
 
   return (
-    <section aria-label={copy.title} className="border-t border-[var(--card-border)] pt-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-xs font-heading uppercase tracking-wide text-[var(--text-muted)]">{copy.title}</h3>
-          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{copy.description}</p>
-        </div>
-      </div>
-
-      <div className="space-y-3 rounded-xl border border-[var(--card-border)] bg-[var(--muted)]/35 p-3">
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-heading text-[var(--text-muted)]">{copy.purpose}</span>
-          </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            {purposeValues.map((value) => (
-              <button
-                key={value}
-                onClick={() => {
-                  setPurpose(value);
-                  setTarget('');
-                  setOutput(null);
-                }}
-                className={`rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
-                  purpose === value
-                    ? 'bg-[var(--accent)] text-white shadow-sm'
-                    : 'bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)]'
-                }`}
-              >
-                {copy.purposes[value]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {purpose !== 'general' && purpose !== 'json' && (
-          <input
-            aria-label={copy.targetPlatform}
-            value={target}
-            onChange={(event) => {
-              setTarget(event.target.value);
-              setOutput(null);
-            }}
-            placeholder={copy.targetPlaceholder}
-            className="w-full rounded-lg border border-[var(--card-border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]"
-          />
-        )}
-      </div>
-
-      {(loading || generating) && !output && (
-        <div className="mt-3 flex items-center gap-2 text-sm text-[var(--text-muted)]">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          {generating ? copy.generating : copy.loading}
-        </div>
-      )}
-
-      {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
-
-      {!output && !loading && !generating && (
-        <button
-          onClick={() => handleGenerate(false)}
-          className="mt-3 flex items-center gap-1.5 rounded-full bg-[var(--accent)]/10 px-3 py-1.5 text-xs font-heading text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          {copy.generate}
-        </button>
-      )}
-
-      {output && (
-        <div className="mt-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center rounded-md bg-[var(--muted)] p-0.5">
-              {languageModeValues.map((value) => (
-                <button
-                  key={value}
-                  onClick={() => setLangMode(value)}
-                  className={`rounded px-1.5 py-0.5 text-[10px] font-heading transition-colors ${
-                    langMode === value
-                      ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-                  }`}
-                >
-                  {copy.languageModes[value]}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => handleCopy(copyText)}
-                className="rounded p-1 transition-colors hover:bg-[var(--muted)]"
-                title={copied ? copy.copied : copy.copy}
-                aria-label={copied ? copy.copied : copy.copy}
-              >
-                {copied
-                  ? <Check className="h-3.5 w-3.5 text-green-500" />
-                  : <Copy className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                }
-              </button>
-              <button
-                onClick={() => handleGenerate(true)}
-                disabled={generating}
-                className="rounded p-1 transition-colors hover:bg-[var(--muted)] disabled:opacity-40"
-                title={copy.regenerate}
-                aria-label={copy.regenerate}
-              >
-                <RefreshCw className={`h-3.5 w-3.5 text-[var(--text-muted)] ${generating ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-          </div>
-
-          {isJson ? (
-            <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border border-[var(--card-border)] bg-[var(--muted)]/35 p-3 font-mono text-xs leading-5 text-[var(--text)]">
-              {formatJson(display.showEn ? display.en : display.zh)}
-            </pre>
-          ) : (
-            <div className="space-y-2 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-3">
-              {display.showEn && (
-                <div className={promptContentClassName}>
-                  <ReactMarkdown>{display.en}</ReactMarkdown>
-                </div>
-              )}
-              {display.showEn && display.showZh && (
-                <div className="border-t border-[var(--accent)]/10" />
-              )}
-              {display.showZh && (
-                <div className={promptContentClassName}>
-                  <ReactMarkdown>{display.zh}</ReactMarkdown>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </section>
+    <WorkspaceReplicationPromptPanel
+      title={copy.title}
+      description={copy.description}
+      purposes={purposeValues.map((value) => ({ value, label: copy.purposes[value] }))}
+      selectedPurpose={purpose}
+      onPurposeChange={(value) => {
+        setPurpose(value as VideoPurpose);
+        setTarget('');
+        setOutput(null);
+      }}
+      showTarget={purpose !== 'general' && purpose !== 'json'}
+      target={target}
+      onTargetChange={(value) => {
+        setTarget(value);
+        setOutput(null);
+      }}
+      loading={loading || generating}
+      hasOutput={Boolean(output)}
+      onGenerate={() => handleGenerate(false)}
+      error={error || undefined}
+      labels={{
+        purpose: copy.purpose,
+        target: copy.targetPlatform,
+        targetPlaceholder: copy.targetPlaceholder,
+        generate: copy.generate,
+        generating: generating ? copy.generating : copy.loading,
+      }}
+      loadingIcon={<Loader2 className="workspace-prompt-loading-icon" />}
+      generateIcon={<Sparkles />}
+    >
+      {output ? <WorkspacePromptOutput
+            language={langMode}
+            onLanguageChange={setLangMode}
+            onCopy={() => handleCopy(copyText)}
+            onRegenerate={() => handleGenerate(true)}
+            copyState={copied}
+            generating={generating}
+            labels={{ auto: copy.languageModes.auto, en: copy.languageModes.en, zh: copy.languageModes.zh, both: copy.languageModes.both, copy: copy.copy, copied: copy.copied, regenerate: copy.regenerate }}
+            icons={{ copy: <Copy />, copied: <Check />, regenerate: <RefreshCw /> }}
+            contentEn={display.en}
+            contentZh={display.zh}
+            showEn={display.showEn}
+            showZh={display.showZh}
+            isJson={isJson}
+            contentClassName="workspace-prompt-markdown"
+            renderContent={(content) => <ReactMarkdown>{content}</ReactMarkdown>}
+      /> : null}
+    </WorkspaceReplicationPromptPanel>
   );
-}
 
-function formatJson(content: string): string {
-  try {
-    return JSON.stringify(JSON.parse(content), null, 2);
-  } catch {
-    return content;
-  }
+  return null;
 }

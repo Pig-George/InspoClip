@@ -1,7 +1,8 @@
 import { getExtensionDayOfWeek, getMonday, formatDate } from "./date"
 import { dataUrlToBlob } from "./image"
+import { getBackgroundRuntime } from "../runtime/background-runtime"
 
-export async function captureAndUpload(serverUrl: string, dayOfWeek?: number) {
+export async function captureAndUpload(dayOfWeek?: number): Promise<Record<string, unknown>> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   if (!tab?.windowId) throw new Error("No active tab")
 
@@ -9,19 +10,15 @@ export async function captureAndUpload(serverUrl: string, dayOfWeek?: number) {
   const actualDayOfWeek = dayOfWeek ?? getExtensionDayOfWeek(now)
   const dateStr = formatDate(getMonday(now))
 
-  const weekRes = await fetch(`${serverUrl}/api/weeks/${dateStr}`)
-  if (!weekRes.ok) throw new Error("Failed to get week")
-  const weekData = await weekRes.json()
-
   const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 85 })
   const blob = dataUrlToBlob(dataUrl)
   const ext = blob.type === "image/png" ? ".png" : ".jpg"
-  const formData = new FormData()
-  formData.append("image", blob, "screenshot" + ext)
-  formData.append("weekId", weekData.week.id)
-  formData.append("dayOfWeek", String(actualDayOfWeek))
-
-  const uploadRes = await fetch(`${serverUrl}/api/images`, { method: "POST", body: formData })
-  if (!uploadRes.ok) throw new Error("Upload failed")
-  return uploadRes.json()
+  const runtime = await getBackgroundRuntime()
+  return runtime.assets.saveImage({
+    blob,
+    filename: "screenshot" + ext,
+    mimeType: blob.type,
+    weekStart: dateStr,
+    dayOfWeek: actualDayOfWeek
+  }) as Promise<Record<string, unknown>>
 }

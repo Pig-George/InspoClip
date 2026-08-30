@@ -136,6 +136,70 @@
       transform-origin: center bottom;
     }
 
+    /* Concurrent analysis progress stack */
+    .inspoclip-analysis-stack {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 2147483646;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      width: fit-content;
+      max-width: calc(100vw - 40px);
+      pointer-events: auto;
+    }
+
+    .inspoclip-analysis-stack .inspoclip-toast {
+      position: relative !important;
+      top: auto;
+      right: auto;
+      align-self: center;
+      flex: 0 0 auto;
+      width: max-content;
+      max-width: 320px;
+      pointer-events: auto;
+      transform: translateX(30px) scale(var(--inspoclip-analysis-stack-scale, 1));
+      transform-origin: top center;
+      transition: margin-top .48s cubic-bezier(.22,.8,.24,1),
+        opacity .32s cubic-bezier(.22,.8,.24,1),
+        transform .48s cubic-bezier(.22,.8,.24,1),
+        box-shadow .48s cubic-bezier(.22,.8,.24,1);
+      will-change: margin-top, opacity, transform;
+    }
+
+    .inspoclip-analysis-stack .inspoclip-toast.inspoclip-toast-visible {
+      transform: translateX(0) scale(var(--inspoclip-analysis-stack-scale, 1));
+    }
+
+    .inspoclip-analysis-stack .inspoclip-toast + .inspoclip-toast {
+      margin-top: -32px;
+    }
+
+    .inspoclip-analysis-stack.is-expanded .inspoclip-toast + .inspoclip-toast,
+    .inspoclip-analysis-stack:focus-within .inspoclip-toast + .inspoclip-toast {
+      margin-top: 8px;
+    }
+
+    .inspoclip-analysis-stack.is-expanded .inspoclip-toast.inspoclip-toast-visible,
+    .inspoclip-analysis-stack:focus-within .inspoclip-toast.inspoclip-toast-visible {
+      transform: translateX(0) scale(1);
+    }
+
+    .inspoclip-analysis-stack .inspoclip-toast.inspoclip-toast-leaving,
+    .inspoclip-analysis-stack.is-expanded .inspoclip-toast.inspoclip-toast-leaving,
+    .inspoclip-analysis-stack:focus-within .inspoclip-toast.inspoclip-toast-leaving {
+      opacity: 0;
+      transform: translateX(16px) scale(.96);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .inspoclip-analysis-stack .inspoclip-toast {
+        transition-duration: 1ms;
+      }
+    }
+
     @keyframes inspoclip-toast-char-jump {
       0%, 18%, 100% { transform: translateY(0); }
       9% { transform: translateY(-2.5px); }
@@ -324,12 +388,77 @@
       background: #f0e6d6;
     }
 
+    .inspoclip-preview-trigger {
+      display: block;
+      width: 100%;
+      border: 0;
+      background: transparent;
+      cursor: zoom-in;
+      padding: 0;
+    }
+
     .inspoclip-preview img {
       width: 100%;
       height: auto;
       max-height: 140px;
       object-fit: cover;
       display: block;
+      cursor: zoom-in;
+      transition: transform 0.24s cubic-bezier(.22,.8,.24,1);
+    }
+
+    .inspoclip-preview-trigger:hover img,
+    .inspoclip-preview-trigger:focus-visible img { transform: scale(1.025); }
+
+    .inspoclip-preview-trigger:focus-visible {
+      outline: 2px solid #c0784a;
+      outline-offset: -2px;
+    }
+
+    .inspoclip-image-lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      display: grid;
+      place-items: center;
+      box-sizing: border-box;
+      padding: 32px;
+      background: rgba(32, 22, 18, 0.72);
+      opacity: 0;
+      pointer-events: auto;
+      transition: opacity 0.22s ease;
+    }
+
+    .inspoclip-image-lightbox-visible { opacity: 1; }
+
+    .inspoclip-image-lightbox img {
+      display: block;
+      max-width: 100%;
+      max-height: calc(100vh - 64px);
+      border-radius: 8px;
+      box-shadow: 0 18px 56px rgba(0, 0, 0, 0.38);
+      object-fit: contain;
+      transform: scale(0.96);
+      transition: transform 0.26s cubic-bezier(.22,.8,.24,1);
+    }
+
+    .inspoclip-image-lightbox-visible img { transform: scale(1); }
+
+    .inspoclip-image-lightbox-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 50%;
+      background: rgba(30, 20, 16, 0.45);
+      color: white;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
     }
 
     /* Body */
@@ -363,18 +492,18 @@
     }
 
     .inspoclip-copy-all {
-      background: #fff8ef;
-      border: 1px solid #ead8bd;
-      border-radius: 8px;
-      color: #9a6546;
+      background: transparent;
+      border: 0;
+      border-radius: 4px;
+      color: var(--text-muted);
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      height: 24px;
-      width: 24px;
-      padding: 0;
-      transition: background 0.2s, border-color 0.2s, color 0.2s;
+      height: 22px;
+      width: 22px;
+      padding: 4px;
+      transition: background 160ms ease, color 160ms ease;
     }
 
     .inspoclip-copy-all svg {
@@ -387,16 +516,28 @@
       stroke-width: 1.7;
     }
 
-    .inspoclip-copy-all:hover {
-      background: #fff;
-      border-color: #d8b184;
-      color: #c0784a;
+    .inspoclip-copy-all:hover:not(:disabled) {
+      background: var(--muted);
+      color: var(--text);
     }
 
     .inspoclip-copy-all-copied {
       background: #eef8ef;
       border-color: #b8dfbd;
       color: #3f9a4c;
+    }
+
+    .inspoclip-prompt-regenerate:disabled {
+      cursor: wait;
+      opacity: 0.6;
+    }
+
+    .inspoclip-prompt-regenerate.is-loading svg {
+      animation: inspoclip-prompt-refresh-spin 0.85s linear infinite;
+    }
+
+    @keyframes inspoclip-prompt-refresh-spin {
+      to { transform: rotate(360deg); }
     }
 
     /* Terms */
@@ -470,29 +611,33 @@
     }
 
     .inspoclip-lang-group {
-      display: flex;
-      background: #f0e6d6;
-      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      background: color-mix(in srgb, var(--muted) 84%, transparent);
+      border-radius: 5px;
       padding: 2px;
-      gap: 1px;
+      gap: 0;
     }
 
     .inspoclip-lang-btn {
-      padding: 2px 6px;
+      min-width: 25px;
+      height: 20px;
+      padding: 0 4px;
       border: none;
       background: transparent;
-      font-size: 10px;
-      font-weight: 600;
-      color: #8a7060;
+      font-size: 9px;
+      line-height: 20px;
+      font-weight: 400;
+      color: var(--text-muted);
       cursor: pointer;
-      border-radius: 4px;
-      transition: all 0.2s;
+      border-radius: 3px;
+      transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
     }
 
     .inspoclip-lang-btn.active {
-      background: white;
-      color: #c0784a;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      background: var(--card);
+      color: var(--accent);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
     }
 
     .inspoclip-prompt {
@@ -510,11 +655,13 @@
     /* Footer */
     .inspoclip-modal-footer {
       display: flex;
-      gap: 8px;
+      gap: 0;
       padding: 14px 18px;
       border-top: 1px dashed #e8d5b0;
       flex-shrink: 0;
     }
+
+    .inspoclip-modal-footer .inspoclip-btn { margin: 0 4px; }
 
     .inspoclip-btn {
       flex: 1;
@@ -1281,6 +1428,7 @@
       background: #c0784a;
       border-color: #c0784a;
       color: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,.12);
     }
 
     .inspoclip-video-prompt-target-wrap {

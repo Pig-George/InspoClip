@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getModelProviderProfile,
   isMaskedApiKey,
   loadModelConfig,
   maskApiKey,
+  normalizeModelProviderName,
   validateModelConfig,
 } from './config.js';
 import {
@@ -14,9 +16,24 @@ import {
 } from './prompts.js';
 
 describe('loadModelConfig', () => {
+  it('uses Alibaba Cloud Model Studio as the normalized default provider', () => {
+    expect(loadModelConfig({})).toMatchObject({
+      provider: 'alibaba-bailian',
+      baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    });
+  });
+
+  it('normalizes legacy provider values to the supported platform profiles', () => {
+    expect(normalizeModelProviderName('qwen')).toBe('alibaba-bailian');
+    expect(normalizeModelProviderName('gemini')).toBe('google-ai-studio');
+    expect(getModelProviderProfile('openrouter')).toMatchObject({
+      baseURL: 'https://openrouter.ai/api/v1',
+    });
+  });
+
   it('uses the Qwen video defaults', () => {
     expect(loadModelConfig({})).toEqual({
-      provider: 'openai-compatible',
+      provider: 'alibaba-bailian',
       apiKey: '',
       baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       model: 'qwen3.7-plus',

@@ -22,11 +22,11 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://inspoclip:inspoclip@postgres:5432/inspoclip
-      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      AI_PROVIDER: ${AI_PROVIDER:-alibaba-bailian}
       AI_API_KEY: ${AI_API_KEY:-sk-placeholder}
-      AI_API_BASE: ${AI_API_BASE:-https://api.openai.com/v1}
-      AI_MODEL: ${AI_MODEL:-gpt-5.4}
-      VIDEO_AI_PROVIDER: ${VIDEO_AI_PROVIDER:-openai-compatible}
+      AI_API_BASE: ${AI_API_BASE:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      AI_MODEL: ${AI_MODEL:-qwen3.7-plus}
+      VIDEO_AI_PROVIDER: ${VIDEO_AI_PROVIDER:-alibaba-bailian}
       VIDEO_AI_API_KEY: ${VIDEO_AI_API_KEY:-}
       VIDEO_AI_API_BASE: ${VIDEO_AI_API_BASE:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       VIDEO_AI_MODEL: ${VIDEO_AI_MODEL:-qwen3.7-plus}
@@ -55,7 +55,9 @@ services:
       start_period: 10s
 
   client:
-    build: ./client
+    build:
+      context: .
+      dockerfile: client/Dockerfile
     restart: unless-stopped
     depends_on:
       - server

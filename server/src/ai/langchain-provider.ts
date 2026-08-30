@@ -17,6 +17,7 @@ export interface InvokerOptions {
   apiKey: string;
   maxTokens: number;
   temperature: number;
+  timeout: number;
   configuration: {
     baseURL: string;
     fetch?: typeof fetch;
@@ -41,11 +42,14 @@ type OpenAICompatibleVideoPart = {
 
 const DEFAULT_MAX_TOKENS = 8192;
 const IMAGE_MAX_TOKENS = 300;
+const MODEL_REQUEST_TIMEOUT_MS = 90_000;
+const JSON_OBJECT_RESPONSE_FORMAT = { type: 'json_object' } as const;
 
 const defaultInvokerFactory: InvokerFactory = (options) => {
   const model = new ChatOpenAI(options);
+  const jsonModel = model.withConfig({ response_format: JSON_OBJECT_RESPONSE_FORMAT });
   return {
-    invoke: (input) => model.invoke(input as Parameters<typeof model.invoke>[0]),
+    invoke: (input) => jsonModel.invoke(input as Parameters<typeof model.invoke>[0]),
   };
 };
 
@@ -54,6 +58,32 @@ function modelContent(response: unknown): unknown {
     return (response as ModelResponse).content;
   }
   return response;
+}
+
+function jsonModelContent(response: unknown): Record<string, unknown> {
+  const content = modelContent(response);
+  if (typeof content === 'object' && content !== null && !Array.isArray(content)) {
+    return content as Record<string, unknown>;
+  }
+
+  const text = Array.isArray(content)
+    ? content
+      .map((block) => (
+        typeof block === 'object' && block !== null && 'text' in block && typeof block.text === 'string'
+          ? block.text
+          : typeof block === 'string' ? block : ''
+      ))
+      .join('')
+    : typeof content === 'string' ? content : '';
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // The error below gives callers one stable failure mode for malformed model JSON.
+  }
+  throw new Error('AI model returned an invalid JSON object response');
 }
 
 function requirePrompt(prompt: string): string {
@@ -123,6 +153,7 @@ export function createLangChainProvider(
     apiKey: validatedConfig.apiKey,
     maxTokens: DEFAULT_MAX_TOKENS,
     temperature: 0.7,
+    timeout: MODEL_REQUEST_TIMEOUT_MS,
     configuration: {
       baseURL: validatedConfig.baseURL,
       ...clientConfiguration,
@@ -133,6 +164,7 @@ export function createLangChainProvider(
     apiKey: validatedConfig.apiKey,
     maxTokens: IMAGE_MAX_TOKENS,
     temperature: 0.7,
+    timeout: MODEL_REQUEST_TIMEOUT_MS,
     configuration: {
       baseURL: validatedConfig.baseURL,
       ...clientConfiguration,
@@ -158,7 +190,7 @@ export function createLangChainProvider(
           ],
         },
       ]);
-      return modelContent(response);
+      return jsonModelContent(response);
     },
 
     async analyzeImage(input: ImageModelInput): Promise<unknown> {
@@ -173,11 +205,11 @@ export function createLangChainProvider(
           ],
         },
       ]);
-      return modelContent(response);
+      return jsonModelContent(response);
     },
 
     async generateText(input: TextModelInput): Promise<unknown> {
-      return modelContent(await invoker.invoke(requirePrompt(input.prompt)));
+      return jsonModelContent(await invoker.invoke(requirePrompt(input.prompt)));
     },
   };
 }

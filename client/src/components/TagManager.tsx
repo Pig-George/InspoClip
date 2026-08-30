@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { WorkspaceTagEditor, type WorkspaceTag } from '@inspoclip/workspace-ui';
 import { fetchTags, createTag, addTagToImage, removeTagFromImage } from '@/lib/api';
 import { addTagToVideo, removeTagFromVideo } from '@/lib/video-api';
 import { toast } from '@/components/Toast';
+import { useLanguage } from '@/context/LanguageContext';
 import type { Tag } from '@/types';
 
 interface TagManagerProps {
@@ -16,153 +15,63 @@ interface TagManagerProps {
 
 export function TagManager({ imageId, videoId, imageTags, onTagsChange }: TagManagerProps) {
   const [allTags, setAllTags] = useState<Tag[]>([]);
-  const [showPicker, setShowPicker] = useState(false);
-  const [newTagName, setNewTagName] = useState('');
-  const [pickerPos, setPickerPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const pickerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const targetId = imageId ?? videoId ?? '';
+  const { locale } = useLanguage();
 
   useEffect(() => {
-    fetchTags().then(setAllTags).catch(console.error);
+    fetchTags().then(setAllTags).catch(() => undefined);
   }, []);
 
-  useEffect(() => {
-    if (showPicker) inputRef.current?.focus();
-  }, [showPicker]);
+  const tags = useMemo(() => imageTags.map(toWorkspaceTag), [imageTags]);
+  const availableTags = useMemo(() => allTags.map(toWorkspaceTag), [allTags]);
 
-  useEffect(() => {
-    if (!showPicker) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (pickerRef.current?.contains(target)) return;
-      if (triggerRef.current?.contains(target)) return;
-      setShowPicker(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showPicker]);
-
-  useLayoutEffect(() => {
-    if (!showPicker || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    setPickerPos({ top: rect.bottom + 4, left: rect.left });
-  }, [showPicker]);
-
-  const currentTagIds = new Set(imageTags.map((t) => t.id));
-  const availableTags = allTags.filter((t) => !currentTagIds.has(t.id));
-
-  const handleAdd = async (tagId: string) => {
+  const handleAdd = async (tag: WorkspaceTag) => {
     try {
-      if (imageId) await addTagToImage(imageId, tagId);
-      else if (videoId) await addTagToVideo(videoId, tagId);
-      onTagsChange();
-    } catch {
-      toast('error', 'Failed to add tag');
-    }
-  };
-
-  const handleRemove = async (tagId: string) => {
-    try {
-      if (imageId) await removeTagFromImage(imageId, tagId);
-      else if (videoId) await removeTagFromVideo(videoId, tagId);
-      onTagsChange();
-    } catch {
-      toast('error', 'Failed to remove tag');
-    }
-  };
-
-  const handleCreateAndAdd = async () => {
-    const name = newTagName.trim();
-    if (!name) return;
-    try {
-      const tag = await createTag(name);
-      setAllTags((prev) => [...prev, tag]);
       if (imageId) await addTagToImage(imageId, tag.id);
       else if (videoId) await addTagToVideo(videoId, tag.id);
-      setNewTagName('');
       onTagsChange();
     } catch {
-      toast('error', 'Failed to create tag');
+      toast('error', locale === 'zh' ? '添加标签失败' : 'Failed to add tag');
     }
   };
 
-  return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {imageTags.map((tag) => (
-        <span
-          key={tag.id}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-heading"
-          style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
-        >
-          #{tag.name}
-          <button onClick={() => handleRemove(tag.id)} className="hover:opacity-60">
-            <X className="w-3 h-3" />
-          </button>
-        </span>
-      ))}
-      <button
-        ref={triggerRef}
-        onClick={() => setShowPicker((v) => !v)}
-        className="p-1 rounded-full hover:bg-[var(--muted)] transition-colors"
-      >
-        <Plus className="w-4 h-4 text-[var(--text-muted)]" />
-      </button>
+  const handleRemove = async (tag: WorkspaceTag) => {
+    try {
+      if (imageId) await removeTagFromImage(imageId, tag.id);
+      else if (videoId) await removeTagFromVideo(videoId, tag.id);
+      onTagsChange();
+    } catch {
+      toast('error', locale === 'zh' ? '移除标签失败' : 'Failed to remove tag');
+    }
+  };
 
-      {createPortal(
-        <AnimatePresence>
-          {showPicker && (
-            <motion.div
-              ref={pickerRef}
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.15 }}
-              className="fixed z-[90] w-64 p-2.5 rounded-lg bg-[var(--card)] border border-[var(--card-border)] shadow-xl"
-              style={{ top: pickerPos.top, left: pickerPos.left }}
-            >
-              <div className="flex gap-1 mb-2">
-                <input
-                  ref={inputRef}
-                  value={newTagName}
-                  onChange={(e) => setNewTagName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreateAndAdd()}
-                  placeholder="New tag..."
-                  className="flex-1 px-2 py-1 text-sm rounded bg-[var(--muted)] border border-[var(--card-border)] text-[var(--text)] outline-none focus:border-[var(--accent)]"
-                />
-                <button
-                  onClick={handleCreateAndAdd}
-                  disabled={!newTagName.trim()}
-                  className="px-2 py-1 text-xs rounded bg-[var(--accent)] text-white disabled:opacity-40"
-                >
-                  +
-                </button>
-              </div>
-              {availableTags.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {availableTags.map((tag) => (
-                    <button
-                      key={tag.id}
-                      onClick={() => handleAdd(tag.id)}
-                      className="px-2 py-0.5 rounded-full text-xs font-heading hover:opacity-80 transition-opacity"
-                      style={{ backgroundColor: tag.color + '20', color: tag.color }}
-                    >
-                      #{tag.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {availableTags.length === 0 && !newTagName && (
-                <p className="text-xs text-[var(--text-muted)] text-center py-1">
-                  No more tags available
-                </p>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
-    </div>
-  );
+  const handleCreate = async (label: string) => {
+    try {
+      const tag = await createTag(label);
+      setAllTags((current) => [...current, tag]);
+      if (imageId) await addTagToImage(imageId, tag.id);
+      else if (videoId) await addTagToVideo(videoId, tag.id);
+      onTagsChange();
+    } catch {
+      toast('error', locale === 'zh' ? '创建标签失败' : 'Failed to create tag');
+    }
+  };
+
+  return <WorkspaceTagEditor
+    tags={tags}
+    availableTags={availableTags}
+    labels={{
+      add: locale === 'zh' ? '添加标签' : 'Add tag',
+      remove: locale === 'zh' ? '移除' : 'Remove',
+      create: locale === 'zh' ? '添加' : 'Add',
+      placeholder: locale === 'zh' ? '输入标签' : 'Tag name',
+      empty: locale === 'zh' ? '没有更多标签' : 'No more tags'
+    }}
+    onAdd={handleAdd}
+    onRemove={handleRemove}
+    onCreate={handleCreate}
+  />;
+}
+
+function toWorkspaceTag(tag: Tag): WorkspaceTag {
+  return { id: tag.id, label: tag.name, color: tag.color };
 }

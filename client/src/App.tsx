@@ -34,7 +34,7 @@ function AppInner() {
   const [videoJobId, setVideoJobId] = useState<string | undefined>();
   const [nextWeekBlockedAttempt, setNextWeekBlockedAttempt] = useState(0);
   const pendingPasteRef = useRef<{ file: File; weekId: string; dayOfWeek: number } | null>(null);
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
 
   const openVideo = useCallback((id: string, jobId?: string) => {
     setVideoId(id);
@@ -209,7 +209,7 @@ function AppInner() {
   };
 
   return (
-    <div className="min-h-screen px-4 py-6 max-w-[1400px] mx-auto">
+    <div className="workspace-root">
       <WeekHeader
         monday={currentMonday}
         viewMode={viewMode}
@@ -288,7 +288,7 @@ function AppInner() {
       {uploading && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-4 py-2 rounded-full
           bg-[var(--accent)] text-white text-sm font-handwriting shadow-lg animate-pulse">
-          Uploading to today...
+          {t('UploadingToToday')}
         </div>
       )}
 

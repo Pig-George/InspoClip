@@ -1,0 +1,61 @@
+:root {
+  --background: #faf3e6;
+  --background-texture: #f5e6d3;
+  --card: #fdf7ef;
+  --card-alt: #faf3e8;
+  --card-border: #d4c4ac;
+  --accent: #c0784a;
+  --accent-hover: #a8633a;
+  --accent-soft: #e8c8b0;
+  --text: #4a3028;
+  --text-muted: #8b6a52;
+  --muted: #efe0ce;
+  --tape: #e8d5b0;
+  --washi-red: #e8b4b4;
+  --washi-blue: #b4c8e8;
+  --washi-green: #b8d8b8;
+  --ink: #4a3028;
+  font-family: "Gaegu", "Caveat", "Kalam", cursive;
+}
+
+:root.dark,
+:root.timeline-dark {
+  --background: #1e1812;
+  --background-texture: #251e16;
+  --card: #2a2218;
+  --card-alt: #2d241a;
+  --card-border: #3d3024;
+  --accent: #d4956a;
+  --accent-hover: #e0a87c;
+  --accent-soft: #5a4030;
+  --text: #e0d0c0;
+  --text-muted: #a09080;
+  --muted: #251f18;
+  --tape: #4a3d2e;
+  --washi-red: #5a3030;
+  --washi-blue: #304058;
+  --washi-green: #305840;
+  --ink: #c0b0a0;
+}
+
+* { border-color: var(--card-border); }
+
+body {
+  background-color: var(--background);
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(139, 106, 82, .015) 2px, rgba(139, 106, 82, .015) 4px),
+    repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(139, 106, 82, .01) 40px, rgba(139, 106, 82, .01) 42px),
+    linear-gradient(180deg, #faf3e6 0%, #f5e8d5 50%, #faf3e6 100%);
+  color: var(--text);
+  font-family: "Gaegu", "Caveat", "Kalam", cursive;
+  transition: background-color .3s, color .3s;
+}
+
+:root.dark body,
+:root.timeline-dark body {
+  background-color: var(--background);
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(160, 144, 128, .02) 2px, rgba(160, 144, 128, .02) 4px),
+    repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(160, 144, 128, .015) 40px, rgba(160, 144, 128, .015) 42px),
+    linear-gradient(180deg, #1e1812 0%, #231c14 50%, #1e1812 100%);
+}

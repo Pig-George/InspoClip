@@ -83,11 +83,13 @@ export function syncToastElement(
   toast: ToastElementLike,
   message: string,
   type: ToastType,
-  progress: number | null = null
+  progress: number | null = null,
+  preserveVisibility = false
 ): void {
   const previousType = toast.dataset.type
   const visibleMessage = getVisibleToastMessage(message)
-  toast.className = `inspoclip-toast inspoclip-toast-${type}`
+  const isVisible = preserveVisibility && toast.className.split(/\s+/u).includes("inspoclip-toast-visible")
+  toast.className = `inspoclip-toast inspoclip-toast-${type}${isVisible ? " inspoclip-toast-visible" : ""}`
   toast.dataset.type = type
 
   const icon = toast.querySelector(".inspoclip-toast-icon")

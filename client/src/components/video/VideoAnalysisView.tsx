@@ -11,6 +11,7 @@ import { TagManager } from '@/components/TagManager';
 import { VideoJobProgress } from './VideoJobProgress';
 import { VideoTimeline } from './VideoTimeline';
 import { VideoPromptPanel } from './VideoPromptPanel';
+import { WorkspaceDetailDialog, WorkspaceDetailSection, WorkspaceMediaPreview } from '@inspoclip/workspace-ui';
 
 interface VideoAnalysisViewProps {
   open?: boolean;
@@ -102,15 +103,6 @@ export function VideoAnalysisView({ open = true, videoId, initialJobId, onBack, 
     onBack();
   }, [onBack, onRefresh]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') handleBack();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, handleBack]);
-
   const selectStage = (stage: VideoStage) => {
     if (player.current) {
       player.current.currentTime = stage.startTime;
@@ -122,69 +114,42 @@ export function VideoAnalysisView({ open = true, videoId, initialJobId, onBack, 
     <AnimatePresence>
       {open && videoId && (
         <motion.div
-          ref={overlayRef}
-          data-dialog-overlay
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) handleBack();
-          }}
+          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          className="contents"
         >
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-label={copy.title}
-            initial={{ scale: 0.95, y: 10 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.95, y: 10 }}
-            className="w-full max-w-4xl max-h-[85vh] flex rounded-2xl bg-[var(--card)] border border-[var(--card-border)] shadow-2xl overflow-hidden"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex-1 min-w-0 bg-gray-200/50 flex items-center justify-center p-4">
-              <video ref={player} className="max-h-[80vh] w-full rounded-lg bg-black" controls src={videoContentUrl(videoId)} />
-            </div>
-
-            <div className="w-[320px] flex-shrink-0 flex flex-col border-l border-[var(--card-border)]">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--card-border)]">
-                <h2 className="text-base font-heading font-semibold text-[var(--text)]">{copy.title}</h2>
-                <button
-                  type="button"
-                  aria-label={copy.close}
-                  onClick={handleBack}
-                  className="p-1 rounded-full hover:bg-[var(--muted)] transition-colors"
-                >
-                  <X className="w-4 h-4 text-[var(--text-muted)]" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-                {error && <p className="text-sm text-red-500">{error}</p>}
+        <WorkspaceDetailDialog
+              ref={overlayRef}
+              title={copy.title}
+              closeLabel={copy.close}
+              onClose={handleBack}
+              closeButtonClassName="workspace-dialog-close"
+              closeButton={<X />}
+              bodyClassName="workspace-video-detail-body"
+              media={<WorkspaceMediaPreview kind="video" src={videoContentUrl(videoId)} alt={copy.title} mediaClassName="workspace-detail-media" videoRef={player} videoProps={{ controls: true, playsInline: true, preload: 'metadata' }} />}
+            >
+                {error && <p className="workspace-analysis-error">{error}</p>}
                 {job && job.status !== 'completed' && (
                   <VideoJobProgress job={job} onRetry={async () => setJob(await retryVideo(videoId))} />
                 )}
-                <div>
-                  <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">{copy.tags}</h3>
+                <WorkspaceDetailSection title={copy.tags}>
                   <TagManager videoId={videoId} imageTags={detail?.tags ?? []} onTagsChange={load} />
-                </div>
-                <div>
-                  <h3 className="text-xs font-heading text-[var(--text-muted)] mb-2 uppercase tracking-wide">{copy.stageAnalysis}</h3>
+                </WorkspaceDetailSection>
+                <WorkspaceDetailSection title={copy.stageAnalysis}>
                   {detail?.analysis ? (
                     <>
-                      <h4 className="mb-3 text-sm font-heading text-[var(--text)]">
+                      <h4 className="workspace-analysis-summary">
                         {localizedText(detail.analysis.summary, locale)}
                       </h4>
                       <VideoTimeline stages={detail.analysis.stages} onSelect={selectStage} locale={locale} />
                     </>
                   ) : (
-                    <p className="text-sm text-[var(--text-muted)]">{copy.emptyStages}</p>
+                    <p className="workspace-analysis-empty">{copy.emptyStages}</p>
                   )}
-                </div>
+                </WorkspaceDetailSection>
                 {detail?.analysis && <VideoPromptPanel videoId={videoId} />}
-              </div>
-            </div>
-          </motion.div>
+        </WorkspaceDetailDialog>
         </motion.div>
       )}
     </AnimatePresence>,

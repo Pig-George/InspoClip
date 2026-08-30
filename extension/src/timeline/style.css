@@ -1,0 +1,49 @@
+/* The standalone workspace visual system comes from @inspoclip/workspace-ui. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+html, body { min-width: 100%; min-height: 100%; margin: 0; }
+body { min-width: 0; }
+button, input { font: inherit; }
+button { color: inherit; }
+
+@media (max-width: 920px) {
+  .workspace-date-bar { grid-template-columns: 1fr auto; }
+  .workspace-date-bar > strong { display: none; }
+  .workspace-dialog-body { grid-template-columns: 1fr; }
+  .workspace-detail-media-column { position: static; }
+  .workspace-detail-media, .workspace-detail-missing { max-height: 380px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+
+.workspace-analysis-status {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 14px;
+  transform: translateX(-50%);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .16);
+  font-family: "Caveat", "Gaegu", cursive;
+  font-size: 14px;
+  white-space: nowrap;
+  animation: workspace-analysis-status-in 220ms cubic-bezier(.2,.8,.2,1) both;
+}
+.workspace-analysis-status-spinner { width: 14px; height: 14px; flex: 0 0 auto; border: 2px solid rgba(255,255,255,.42); border-top-color: #fff; border-radius: 50%; animation: workspace-analysis-status-spin .8s linear infinite; }
+.workspace-analysis-status-label { line-height: 20px; }
+.workspace-analysis-status-count { opacity: .82; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+@keyframes workspace-analysis-status-in { from { opacity: 0; transform: translate(-50%, 8px) scale(.96); } }
+@keyframes workspace-analysis-status-spin { to { transform: rotate(360deg); } }

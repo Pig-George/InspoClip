@@ -1,0 +1,64 @@
+export type ViewMode = "day" | "week" | "timeline"
+export type Locale = "zh" | "en"
+
+export type TimelineCopy = {
+  subtitle: string
+  day: string
+  week: string
+  timeline: string
+  today: string
+  ideas: string
+  all: string
+  search: string
+  refresh: string
+  loading: string
+  empty: string
+  emptyHint: string
+  image: string
+  video: string
+  openDetail: string
+  close: string
+  copy: string
+  copied: string
+  generatePrompt: string
+  regeneratePrompt: string
+  replicationTitle: string
+  replicationDescription: string
+  purposeLabel: string
+  targetLabel: string
+  targetPlaceholder: string
+  generateOutput: string
+  generatingOutput: string
+  generatingPrompt: string
+  languageAuto: string
+  languageEn: string
+  languageZh: string
+  languageBoth: string
+  uploadAssets: string
+  uploadHint: string
+  uploading: string
+  uploadFailed: string
+  pasteOrDrop: string
+  saveAsset: string
+  saved: string
+  noPrompt: string
+  stages: string
+  colors: string
+  terms: string
+  tags: string
+  overview: string
+  assets: string
+  notes: string
+  notesPlaceholder: string
+  theme: string
+  language: string
+  export: string
+  previous: string
+  next: string
+  noContent: string
+  previewUnavailable: string
+  analysisPending: string
+  stageEmpty?: string
+  analysisFailed: string
+  unknown: string
+}

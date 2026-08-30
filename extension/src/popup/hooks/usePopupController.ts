@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState } from "react"
 
-import { DEFAULT_APP_URL, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS, I18N, MAX_VIDEO_SIZE_BYTES, detectBrowserLocale } from "../constants"
+import { DEFAULT_APP_URL, DEFAULT_MODEL_SETTINGS, DEFAULT_SERVER_URL, DEFAULT_SHORTCUTS, I18N, MAX_VIDEO_SIZE_BYTES, detectBrowserLocale } from "../constants"
 import { buildAssetAnalysisMessage, detectAssetKind } from "../services/assets"
+import { clearPopupExtensionLogs, loadPopupExtensionLogs, recordPopupLog } from "../services/extension-logs"
 import { loadPopupSettings, normalizeAppUrl, normalizeServerUrl, savePopupSettings } from "../services/settings"
-import { getTabDisplayLabel, openOrFocusApp, requestAreaCaptureSession, sendCurrentTabMessage } from "../services/tabs"
-import type { CaptureMode, ConnectionState, Locale, ShortcutTarget, StatusMessage } from "../types"
+import { getTabDisplayLabel, openOrFocusApp, openOrFocusLocalTimeline, requestAreaCaptureSession, sendCurrentTabMessage } from "../services/tabs"
+import type { ExtensionLogEntry } from "../../runtime/extension-logger"
+import { isDevelopmentBuild } from "../../runtime/build-mode"
+import { sendRuntimeCommand } from "../../runtime/command-client"
+import type { CaptureMode, ConnectionState, Locale, ModelSettings, RuntimeMode, ShortcutTarget, StatusMessage, StorageUsage } from "../types"
 
 export function usePopupController() {
   const [locale, setLocale] = useState<Locale>(() => detectBrowserLocale())
   const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL)
+  const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>("backend")
+  const [modelSettings, setModelSettings] = useState<ModelSettings>(DEFAULT_MODEL_SETTINGS)
+  const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
   const [appUrl, setAppUrl] = useState(DEFAULT_APP_URL)
   const [captureMode, setCaptureMode] = useState<CaptureMode>("area")
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -21,11 +28,14 @@ export function usePopupController() {
   const [recordingShortcut, setRecordingShortcut] = useState<ShortcutTarget | null>(null)
   const [assetUrl, setAssetUrl] = useState("")
   const [currentPageLabel, setCurrentPageLabel] = useState("")
+  const [developmentDiagnostics, setDevelopmentDiagnostics] = useState<ExtensionLogEntry[]>([])
 
   const t = useMemo(() => I18N[locale], [locale])
 
   useEffect(() => {
     loadPopupSettings().then((settings) => {
+      setRuntimeMode(settings.runtimeMode)
+      setModelSettings(settings.modelSettings)
       setServerUrl(settings.serverUrl)
       setAppUrl(settings.appUrl)
       setShortcutAnalyze(settings.shortcuts.analyze)
@@ -35,14 +45,25 @@ export function usePopupController() {
   }, [])
 
   useEffect(() => {
+    if (!isDevelopmentBuild || !settingsOpen) return
+    void loadPopupExtensionLogs().then(setDevelopmentDiagnostics).catch(() => setDevelopmentDiagnostics([]))
+  }, [settingsOpen])
+
+  useEffect(() => {
     chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
       setCurrentPageLabel(getTabDisplayLabel(tab?.url))
     }).catch(() => setCurrentPageLabel(""))
   }, [])
 
   useEffect(() => {
+    if (runtimeMode === "standalone") {
+      setConnectionState("connected")
+      setConnectionLabel(I18N[locale].localModeReady)
+      void sendRuntimeCommand<StorageUsage>({ type: "runtime.storage.usage", payload: {} }).then(setStorageUsage).catch(() => setStorageUsage(null))
+      return
+    }
     void testServerConnection()
-  }, [serverUrl, locale])
+  }, [serverUrl, locale, runtimeMode])
 
   async function testServerConnection() {
     setConnectionState("testing")
@@ -77,6 +98,8 @@ export function usePopupController() {
     setAppUrl(normalizedAppUrl)
     await savePopupSettings({
       serverUrl: normalizedServerUrl,
+      runtimeMode,
+      modelSettings,
       appUrl: normalizedAppUrl,
       shortcuts: {
         analyze: shortcutAnalyze.trim(),
@@ -84,7 +107,13 @@ export function usePopupController() {
       },
       lang: locale
     })
-    await testServerConnection()
+    if (runtimeMode === "backend") {
+      await testServerConnection()
+    } else {
+      setConnectionState("connected")
+      setConnectionLabel(I18N[locale].localModeReady)
+      void sendRuntimeCommand<StorageUsage>({ type: "runtime.storage.usage", payload: {} }).then(setStorageUsage).catch(() => setStorageUsage(null))
+    }
   }
 
   async function triggerAnalyze() {
@@ -107,8 +136,18 @@ export function usePopupController() {
     await openOrFocusApp(appUrl)
   }
 
+  async function openWorkspace(event: React.MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault()
+    if (runtimeMode === "standalone") {
+      await openOrFocusLocalTimeline()
+      return
+    }
+    await openOrFocusApp(appUrl)
+  }
+
   function showStatus(message: string, type: StatusMessage["type"]) {
     setStatus({ message, type })
+    if (type === "error") void recordPopupLog({ source: "popup", level: "error", error: message })
     setTimeout(() => setStatus(null), 3000)
   }
 
@@ -119,8 +158,7 @@ export function usePopupController() {
       if (assetKind === "unsupported") throw new Error(t.unsupportedAsset)
       if (file.size > MAX_VIDEO_SIZE_BYTES) throw new Error("Video exceeds 200MB")
       await sendCurrentTabMessage({
-        ...(await buildAssetAnalysisMessage(file)),
-        serverUrl
+        ...(await buildAssetAnalysisMessage(file))
       }, t)
       setTimeout(() => window.close(), 150)
     } catch (err) {
@@ -134,13 +172,17 @@ export function usePopupController() {
         type: "START_ASSET_ANALYSIS",
         assetKind: "video",
         videoUrl: assetUrl,
-        fileName: assetUrl.split("/").pop() || "web-video.mp4",
-        serverUrl
+        fileName: assetUrl.split("/").pop() || "web-video.mp4"
       }, t)
       setTimeout(() => window.close(), 150)
     } catch (err) {
       showStatus(err instanceof Error ? err.message : "Upload failed", "error")
     }
+  }
+
+  async function clearDevelopmentDiagnostics() {
+    await clearPopupExtensionLogs()
+    setDevelopmentDiagnostics([])
   }
 
   return {
@@ -149,24 +191,33 @@ export function usePopupController() {
     captureMode,
     connectionLabel,
     connectionState,
+    developmentDiagnostics,
     currentPageLabel,
     locale,
     recordingShortcut,
     serverUrl,
+    runtimeMode,
+    modelSettings,
+    storageUsage,
+    storageUsageLabel: formatStorageUsage(storageUsage),
     settingsOpen,
     shortcutAnalyze,
     shortcutSave,
     status,
     t,
     assetUrl,
+    clearDevelopmentDiagnostics,
     handleAssetFile,
     handleAssetUrl,
     openApp,
+    openWorkspace,
     saveSettings,
     setAppUrl,
     setCaptureMode,
     setRecordingShortcut,
     setServerUrl,
+    setRuntimeMode,
+    setModelSettings,
     setSettingsOpen,
     setShortcutAnalyze,
     setShortcutSave,
@@ -175,4 +226,14 @@ export function usePopupController() {
     toggleLanguage,
     triggerAnalyze
   }
+}
+
+function formatStorageUsage(usage: StorageUsage | null): string {
+  if (!usage) return "..."
+  const format = (value: number) => {
+    if (value < 1024) return `${value} B`
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`
+  }
+  return usage.quotaBytes ? `${format(usage.usedBytes)} / ${format(usage.quotaBytes)}` : format(usage.usedBytes)
 }
