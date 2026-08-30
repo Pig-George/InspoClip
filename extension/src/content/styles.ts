@@ -16,14 +16,6 @@
     }
 
     .inspoclip-container {
-      --card: #fdf7ef;
-      --card-alt: #faf3e8;
-      --card-border: #d4c4ac;
-      --accent: #c0784a;
-      --accent-hover: #a8633a;
-      --text: #4a3028;
-      --text-muted: #8b6a52;
-      --muted: #efe0ce;
       position: fixed;
       top: 0;
       right: 0;
@@ -245,12 +237,16 @@
 
     /* Modal */
     .inspoclip-modal {
+      --card: #fdf7ef;
+      --card-alt: #faf3e8;
+      --accent: #c0784a;
+      --muted: #efe0ce;
       position: fixed;
       left: var(--target-x);
       top: var(--target-y);
       width: 380px;
       max-height: calc(100vh - 40px);
-      background: #fdf7ef;
+      background: var(--card);
       border-radius: 16px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.1);
       display: flex;
@@ -366,7 +362,7 @@
     }
 
     .inspoclip-nav-btn {
-      background: #faf3e8;
+      background: var(--card-alt);
       border: none;
       font-size: 10px;
       color: #8a7060;
@@ -377,7 +373,7 @@
       line-height: 1;
     }
 
-    .inspoclip-nav-btn:hover { background: #e8d5b0; color: #4a3028; }
+    .inspoclip-nav-btn:hover { background: var(--tape, #e8d5b0); color: var(--text); }
     .inspoclip-nav-btn:disabled { opacity: 0.3; cursor: default; }
     .inspoclip-nav-btn:disabled:hover { background: transparent; color: #8a7060; }
 
@@ -390,7 +386,7 @@
     }
 
     .inspoclip-modal-close {
-      background: #faf3e8;
+      background: var(--card-alt);
       border: none;
       font-size: 16px;
       color: #8a7060;
@@ -400,7 +396,7 @@
       transition: background 0.2s;
     }
 
-    .inspoclip-modal-close:hover { background: #e8d5b0; }
+    .inspoclip-modal-close:hover { background: var(--tape, #e8d5b0); }
 
     /* Preview */
     .inspoclip-preview {
@@ -516,7 +512,7 @@
       background: transparent;
       border: 0;
       border-radius: 4px;
-      color: #8b6a52;
+      color: var(--text-muted);
       cursor: pointer;
       display: inline-flex;
       align-items: center;
@@ -538,8 +534,8 @@
     }
 
     .inspoclip-copy-all:hover:not(:disabled) {
-      background: #efe0ce;
-      color: #4a3028;
+      background: var(--muted);
+      color: var(--text);
     }
 
     .inspoclip-copy-all-copied {
@@ -635,6 +631,7 @@
       display: inline-flex;
       align-items: center;
       background: #efe0ce;
+      background: color-mix(in srgb, var(--muted) 84%, transparent);
       border-radius: 6px;
       padding: 2px;
       gap: 0;
@@ -649,15 +646,15 @@
       font-size: 10px;
       line-height: 14px;
       font-weight: 400;
-      color: #8b6a52;
+      color: var(--text-muted);
       cursor: pointer;
       border-radius: 4px;
       transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
     }
 
     .inspoclip-lang-btn.active {
-      background: #fdf7ef;
-      color: #c0784a;
+      background: var(--card);
+      color: var(--accent);
       box-shadow: 0 1px 3px rgba(0,0,0,0.12);
     }
 
