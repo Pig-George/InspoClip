@@ -20,7 +20,7 @@ describe("popup settings storage", () => {
 
   test("loads default Qwen settings for a new standalone profile", async () => {
     await expect(loadPopupSettings()).resolves.toMatchObject({
-      runtimeMode: "backend",
+      runtimeMode: "standalone",
       modelSettings: DEFAULT_MODEL_SETTINGS,
       serverUrl: "http://127.0.0.1:3001"
     })
