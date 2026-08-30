@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WeekData } from '@/types';
-import { getInitialDayScrollTarget } from './DayView';
+import { canScrollDayContent, getDayContentScroller, getInitialDayScrollTarget } from './DayView';
 
 function makeWeek(weekStart: string, contentDays: number[]): WeekData {
   return {
@@ -65,5 +65,27 @@ describe('getInitialDayScrollTarget', () => {
     });
 
     expect(target.isoDate).toBe('2026-07-11');
+  });
+});
+
+describe('day column wheel routing', () => {
+  it('routes vertical wheel input to the scrollable day content instead of the card shell', () => {
+    const column = document.createElement('article');
+    column.dataset.dayColumn = '';
+    const content = document.createElement('div');
+    content.className = 'workspace-day-content client-day-column-content';
+    const card = document.createElement('div');
+    content.appendChild(card);
+    column.appendChild(content);
+
+    Object.defineProperties(content, {
+      clientHeight: { value: 180 },
+      scrollHeight: { value: 420 },
+      scrollTop: { value: 0, writable: true },
+    });
+
+    expect(getDayContentScroller(card)).toBe(content);
+    expect(canScrollDayContent(content, 80)).toBe(true);
+    expect(canScrollDayContent(content, -80)).toBe(false);
   });
 });

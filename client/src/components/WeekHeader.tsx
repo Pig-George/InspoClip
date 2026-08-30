@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, useAnimationControls, useReducedMotion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Settings, LayoutGrid, Columns, Search, Clock, Download } from 'lucide-react';
+import { WorkspaceIconButton, WorkspaceViewTabs } from '@inspoclip/workspace-ui';
 import { ThemeToggle } from './ThemeToggle';
 import { SettingsDialog } from './SettingsDialog';
 import { SearchDialog } from './SearchDialog';
@@ -22,7 +23,18 @@ interface WeekHeaderProps {
   onOpenVideo?: (videoId: string, jobId?: string) => void;
 }
 
-export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onNextWeek, canGoNext: canGoNextProp, nextWeekBlockedAttempt = 0, searchOpen: searchOpenProp, onSearchOpenChange, onOpenVideo }: WeekHeaderProps) {
+export function WeekHeader({
+  monday,
+  viewMode,
+  onViewModeChange,
+  onPrevWeek,
+  onNextWeek,
+  canGoNext: canGoNextProp,
+  nextWeekBlockedAttempt = 0,
+  searchOpen: searchOpenProp,
+  onSearchOpenChange,
+  onOpenVideo,
+}: WeekHeaderProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [searchOpenLocal, setSearchOpenLocal] = useState(false);
@@ -32,23 +44,24 @@ export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onN
   const nextWeekControls = useAnimationControls();
   const prefersReducedMotion = useReducedMotion();
 
-  const formatRange = (monday: Date): string => {
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    const loc = locale === 'zh' ? 'zh-CN' : 'en-US';
-    const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
-    return `${monday.toLocaleDateString(loc, opts)} - ${sunday.toLocaleDateString(loc, opts)}`;
+  const formatRange = (value: Date): string => {
+    const sunday = new Date(value);
+    sunday.setDate(value.getDate() + 6);
+    const dateLocale = locale === 'zh' ? 'zh-CN' : 'en-US';
+    const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+    return `${value.toLocaleDateString(dateLocale, options)} - ${sunday.toLocaleDateString(dateLocale, options)}`;
   };
 
-  const weekNum = getWeekNumber(monday);
-  const weekLabel = locale === 'zh'
-    ? `第 ${weekNum} 周`
-    : `Week ${weekNum}`;
-
+  const weekNumber = getWeekNumber(monday);
+  const weekLabel = locale === 'zh' ? `第 ${weekNumber} 周` : `Week ${weekNumber}`;
+  const viewLabels = {
+    day: locale === 'zh' ? '日视图' : 'Day view',
+    week: locale === 'zh' ? '周视图' : 'Week view',
+    timeline: locale === 'zh' ? '时间轴' : 'Timeline',
+  } as const;
   const showWeekNav = viewMode === 'week';
   const todayMonday = formatISODate(getMonday(new Date()));
-  const currentMondayStr = formatISODate(monday);
-  const canGoNext = canGoNextProp ?? currentMondayStr < todayMonday;
+  const canGoNext = canGoNextProp ?? formatISODate(monday) < todayMonday;
 
   useEffect(() => {
     if (nextWeekBlockedAttempt <= 0 || prefersReducedMotion) return;
@@ -65,112 +78,37 @@ export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onN
 
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
-        {/* Left: navigation + view toggle */}
-        <div className="flex items-center gap-1">
+      <div className="workspace-header-layout">
+        <div className="workspace-header-left">
           {showWeekNav && (
-            <button
-              onClick={onPrevWeek}
-              className="p-2 rounded-full hover:bg-[var(--muted)] transition-colors"
-              aria-label="Previous week"
-            >
-              <ChevronLeft className="w-6 h-6 text-[var(--accent)]" />
+            <button type="button" onClick={onPrevWeek} className="workspace-header-nav-button" aria-label="Previous week">
+              <ChevronLeft />
             </button>
           )}
-
-          {/* View mode toggle */}
-          <div className="flex items-center bg-[var(--muted)] rounded-lg p-0.5 ml-1">
-            <button
-              onClick={() => onViewModeChange('day')}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === 'day'
-                  ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-              }`}
-              title={locale === 'zh' ? '日视图' : 'Day view'}
-            >
-              <Columns className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onViewModeChange('week')}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === 'week'
-                  ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-              }`}
-              title={locale === 'zh' ? '周视图' : 'Week view'}
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onViewModeChange('timeline')}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === 'timeline'
-                  ? 'bg-[var(--card)] text-[var(--accent)] shadow-sm'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-              }`}
-              title={locale === 'zh' ? '时间轴' : 'Timeline'}
-            >
-              <Clock className="w-4 h-4" />
-            </button>
-          </div>
+          <WorkspaceViewTabs
+            value={viewMode}
+            labels={viewLabels}
+            onChange={onViewModeChange}
+            renderIcon={(mode) => mode === 'day' ? <Columns /> : mode === 'week' ? <LayoutGrid /> : <Clock />}
+          />
         </div>
 
-        {/* Center: Week info */}
-        <div className="text-center">
-          <h1 className="text-2xl font-heading font-bold text-[var(--text)]">
-            {weekLabel}
-          </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5 font-handwriting">
-            {formatRange(monday)}
-          </p>
+        <div className="workspace-header-heading">
+          <h1>{weekLabel}</h1>
+          <p>{formatRange(monday)}</p>
         </div>
 
-        {/* Right: actions */}
-        <div className="flex items-center gap-1">
-          {/* Language toggle */}
-          <button
-            onClick={toggleLocale}
-            className="px-2 py-1 rounded-md text-xs font-heading font-semibold text-[var(--accent)]
-              hover:bg-[var(--muted)] transition-colors min-w-[32px]"
-            title={locale === 'zh' ? 'Switch to English' : '切换到中文'}
-          >
+        <div className="workspace-header-actions">
+          <button type="button" onClick={toggleLocale} className="workspace-language-button" title={locale === 'zh' ? '切换到英文' : 'Switch to Chinese'}>
             {locale === 'zh' ? 'EN' : '中'}
           </button>
-
-          <button
-            onClick={() => setExportOpen(true)}
-            className="p-2 rounded-full hover:bg-[var(--muted)] transition-colors"
-            aria-label="Export"
-          >
-            <Download className="w-5 h-5 text-[var(--accent)]" />
-          </button>
-          <button
-            onClick={() => setSearchOpen(true)}
-            className="p-2 rounded-full hover:bg-[var(--muted)] transition-colors"
-            aria-label="Search"
-          >
-            <Search className="w-5 h-5 text-[var(--accent)]" />
-          </button>
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="p-2 rounded-full hover:bg-[var(--muted)] transition-colors"
-            aria-label="AI Settings"
-          >
-            <Settings className="w-5 h-5 text-[var(--accent)]" />
-          </button>
+          <WorkspaceIconButton className="workspace-icon-button" label={locale === 'zh' ? '导出' : 'Export'} onClick={() => setExportOpen(true)} icon={<Download />} />
+          <WorkspaceIconButton className="workspace-icon-button" label={locale === 'zh' ? '搜索' : 'Search'} onClick={() => setSearchOpen(true)} icon={<Search />} />
+          <WorkspaceIconButton className="workspace-icon-button" label={locale === 'zh' ? 'AI 设置' : 'AI Settings'} onClick={() => setSettingsOpen(true)} icon={<Settings />} />
           <ThemeToggle />
           {showWeekNav && (
-            <motion.button
-              onClick={onNextWeek}
-              animate={nextWeekControls}
-              aria-disabled={!canGoNext}
-              className={`p-2 rounded-full transition-colors ${
-                canGoNext ? 'hover:bg-[var(--muted)]' : 'opacity-30 cursor-not-allowed'
-              }`}
-              aria-label="Next week"
-            >
-              <ChevronRight className="w-6 h-6 text-[var(--accent)]" />
+            <motion.button type="button" onClick={onNextWeek} animate={nextWeekControls} aria-disabled={!canGoNext} className={`workspace-header-nav-button${canGoNext ? '' : ' is-disabled'}`} aria-label="Next week">
+              <ChevronRight />
             </motion.button>
           )}
         </div>
@@ -178,12 +116,7 @@ export function WeekHeader({ monday, viewMode, onViewModeChange, onPrevWeek, onN
 
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} onOpenVideo={onOpenVideo} />
-      <ExportDialog
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-        weekDate={formatISODate(monday)}
-        scope={viewMode === 'week' ? 'week' : 'all'}
-      />
+      <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} weekDate={formatISODate(monday)} scope={viewMode === 'week' ? 'week' : 'all'} />
     </>
   );
 }

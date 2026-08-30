@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { WorkspaceUploadSurface } from '@inspoclip/workspace-ui';
 import { Upload } from 'lucide-react';
 import { uploadImage, batchUploadImages, checkSimilarity } from '@/lib/api';
 import { setLastUploadedImageId } from '@/lib/events';
@@ -20,12 +20,10 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded, onOpenVideo }: Im
   const [uploading, setUploading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
-  const [dragOver, setDragOver] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [similarImages, setSimilarImages] = useState<SimilarImage[]>([]);
   const pendingFilesRef = useRef<File[]>([]);
   const { t, locale } = useLanguage();
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const doUpload = useCallback(
     async (files: File[]) => {
@@ -122,112 +120,19 @@ export function ImageUploader({ weekId, dayOfWeek, onUploaded, onOpenVideo }: Im
     pendingFilesRef.current = [];
   }, []);
 
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      const files: File[] = [];
-      for (const item of Array.from(items)) {
-        if (item.type.startsWith('image/') || item.type.startsWith('video/')) {
-          const file = item.getAsFile();
-          if (file) files.push(file);
-        }
-      }
-      if (files.length > 0) {
-        e.preventDefault();
-        e.stopPropagation();
-        handleFiles(files);
-      }
-    },
-    [handleFiles]
-  );
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      const files = e.dataTransfer?.files;
-      if (files?.length > 0) handleFiles(files);
-    },
-    [handleFiles]
-  );
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(true);
-  };
-
-  const handleDragLeave = () => setDragOver(false);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) handleFiles(files);
-    e.target.value = '';
-  };
-
   const isBatch = progress.total > 1;
   const isBusy = uploading || checking;
 
   return (
     <>
-      <div
-        onPaste={handlePaste}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        className={`relative border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-all
-          ${dragOver ? 'border-[var(--accent)] bg-[var(--accent)]/10' : 'border-[var(--card-border)] hover:border-[var(--accent)]/50'}
-        `}
-        tabIndex={0}
-      >
-        <label className="cursor-pointer flex flex-col items-center gap-1.5">
-          {isBusy ? (
-            isBatch ? (
-              <>
-                <div className="w-full h-1 bg-[var(--muted)] rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-[var(--accent)] rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(progress.current / progress.total) * 100}%` }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </div>
-                <span className="text-xs text-[var(--text-muted)] font-handwriting">
-                  {locale === 'zh' ? `上传中 ${progress.current}/${progress.total}` : `Uploading ${progress.current}/${progress.total}`}
-                </span>
-              </>
-            ) : (
-              <>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 1 }}
-                  className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full"
-                />
-                <span className="text-xs text-[var(--text-muted)] font-handwriting">
-                  {checking
-                    ? (locale === 'zh' ? '检测相似图片中...' : 'Checking for duplicates...')
-                    : t('Analyzing')}
-                </span>
-              </>
-            )
-          ) : (
-            <>
-              <Upload className="w-4 h-4 text-[var(--text-muted)]" />
-              <span className="text-xs text-[var(--text-muted)] font-handwriting">
-                {t('PasteOrDrop')}
-              </span>
-            </>
-          )}
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            onChange={handleInputChange}
-            className="hidden"
-          />
-        </label>
-      </div>
+      <WorkspaceUploadSurface
+        label={t('PasteOrDrop')}
+        busyLabel={checking ? (locale === 'zh' ? '检测相似图片中...' : 'Checking for duplicates...') : t('Analyzing')}
+        busy={isBusy}
+        progress={isBatch ? progress : undefined}
+        onFiles={handleFiles}
+        icon={<Upload />}
+      />
 
       <SimilarityConfirmDialog
         open={confirmOpen}

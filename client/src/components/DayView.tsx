@@ -1,12 +1,13 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DayColumn } from './DayColumn';
 import { NotesArea } from './NotesArea';
 import { ALL_DAYS, type WeekData, getTodayIndex } from '@/types';
 import { useLanguage } from '@/context/LanguageContext';
 import { fetchContentWeeks, fetchWeek, saveNotes } from '@/lib/api';
 import { getMonday, formatISODate } from '@/lib/utils';
+import { WorkspaceCollapsiblePanel, WorkspaceDateBar, WorkspaceDayScroller } from '@inspoclip/workspace-ui';
 
 const COL_WIDTH = 340;
 const COL_GAP = 16;
@@ -64,6 +65,17 @@ function getFallbackTodayTarget(loadedMondays: string[], initMonday: string, tod
 function hasContentOnDay(data: WeekData, dayOfWeek: number) {
   return data.images.some((img) => img.dayOfWeek === dayOfWeek)
     || (data.videos ?? []).some((video) => video.dayOfWeek === dayOfWeek);
+}
+
+export function getDayContentScroller(target: HTMLElement): HTMLElement | null {
+  return target.closest<HTMLElement>('.client-day-column-content')
+}
+
+export function canScrollDayContent(element: HTMLElement, deltaY: number): boolean {
+  if (element.scrollHeight <= element.clientHeight) return false
+  if (deltaY > 0) return element.scrollTop < element.scrollHeight - element.clientHeight - 1
+  if (deltaY < 0) return element.scrollTop > 0
+  return false
 }
 
 export function getInitialDayScrollTarget({
@@ -282,7 +294,7 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
     // Find the dot matching the active date
     const activeEntry = dayEntries[activeDayIndex];
     if (!activeEntry) return;
-    const dot = container.querySelector(`[data-date-dot="${activeEntry.isoDate}"]`) as HTMLElement | null;
+    const dot = container.querySelector(`[data-date="${activeEntry.isoDate}"]`) as HTMLElement | null;
     if (!dot) return;
     // Only scroll if dot is not fully visible
     const cRect = container.getBoundingClientRect();
@@ -292,15 +304,15 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
     }
   }, [activeDayIndex, dayEntries]);
 
-  // Native wheel → horizontal scroll (vertical if inside a day column's content)
+  // Native wheel to horizontal scroll; keep vertical scrolling inside a day column.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       // If over a scrollable day column, let it scroll vertically
       const target = e.target as HTMLElement;
-      const column = target.closest('[data-day-column]') as HTMLElement | null;
-      if (column && column.scrollHeight > column.clientHeight) return;
+      const content = getDayContentScroller(target);
+      if (content && canScrollDayContent(content, e.deltaY)) return;
       // Otherwise scroll horizontally
       e.preventDefault();
       el.scrollBy({ left: e.deltaY, behavior: 'instant' });
@@ -309,7 +321,7 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
 
-  // Dots navigation — wheel → horizontal scroll
+  // Date dots use the same horizontal wheel behavior.
   useEffect(() => {
     const el = dotsRef.current;
     if (!el) return;
@@ -378,7 +390,7 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
         setActiveDayIndex((prev) => prev + 7);
         break;
       }
-      // Empty week — keep searching
+      // Empty week: keep searching.
     }
 
     setLoadingMore(false);
@@ -439,7 +451,7 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
         setWeekMondays((prev) => [...prev, searchMonday]);
         break;
       }
-      // Empty week — keep searching
+      // Empty week: keep searching.
     }
 
     setLoadingMore(false);
@@ -623,104 +635,38 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
   }, [dayEntries]);
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Day navigation — scrapbook date strip */}
-      <div className="flex items-center gap-3 px-2 py-2 rounded-sm"
-        style={{
-          background: 'linear-gradient(180deg, var(--tape) 0%, rgba(232,213,176,0.3) 100%)',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.4)',
+    <div className="workspace-day-board">
+      <WorkspaceDateBar
+        days={visibleEntries}
+        activeIndex={Math.max(0, visibleIndex)}
+        locale={locale}
+        labels={{
+          today: locale === 'zh' ? '\u4eca\u5929' : 'Today',
+          previous: locale === 'zh' ? '\u4e0a\u4e00\u4e2a' : 'Previous',
+          next: locale === 'zh' ? '\u4e0b\u4e00\u4e2a' : 'Next',
         }}
-      >
-        {/* Left: arrows + today + filter toggle */}
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={() => scrollToVisibleDay(visibleIndex - 1)}
-            disabled={visibleIndex <= 0}
-            className="p-1 hover:opacity-70 transition-opacity disabled:opacity-20"
-          >
-            <ChevronLeft className="w-4 h-4 text-[var(--ink)]" />
-          </button>
-          <button
-            onClick={goToToday}
-            className="px-2 py-0.5 text-[11px] font-heading rounded-sm text-[var(--ink)]/80
-              border border-[var(--card-border)] bg-[var(--card)]/50 hover:bg-[var(--card)] transition-colors"
-          >
-            {locale === 'zh' ? '今天' : 'Today'}
-          </button>
-          <button
-            onClick={() => scrollToVisibleDay(visibleIndex + 1)}
-            disabled={visibleIndex >= visibleEntries.length - 1}
-            className="p-1 hover:opacity-70 transition-opacity disabled:opacity-20"
-          >
-            <ChevronRight className="w-4 h-4 text-[var(--ink)]" />
-          </button>
-          {/* Filter toggle */}
-          <button
-            onClick={() => {
-              noMorePreviousRef.current = false;
-              noMoreNextRef.current = false;
-              furthestSearchedPrevRef.current = null;
-              furthestSearchedNextRef.current = null;
-              setHideEmpty(!hideEmpty);
-            }}
-            className={`ml-1 px-1.5 py-0.5 text-[10px] font-heading rounded-sm border transition-colors
-              ${hideEmpty
-                ? 'bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30'
-                : 'text-[var(--text-muted)] border-[var(--card-border)]/50'}`}
-            title={hideEmpty ? '显示全部' : '隐藏空白'}
-          >
-            {hideEmpty ? (locale === 'zh' ? '灵感' : 'Ideas') : (locale === 'zh' ? '全部' : 'All')}
-          </button>
-        </div>
-
-        {/* Center: active day */}
-        <div className="flex-1 text-center min-w-0">
-          <span className="text-sm font-handwriting text-[var(--ink)] whitespace-nowrap">
-            {visibleEntries[visibleIndex]
-              ? `${visibleEntries[visibleIndex].date.getMonth() + 1}月${visibleEntries[visibleIndex].date.getDate()}日 ${t(visibleEntries[visibleIndex].dayName)}`
-              : ''
-            }
-          </span>
-        </div>
-
-        {/* Right: date strip — filtered dots */}
-        <div ref={dotsRef} className="flex gap-0.5 max-w-[220px] overflow-x-auto flex-shrink-0 py-0.5 dots-scroll">
-          {visibleEntries.map((entry, i) => {
-            const isActive = i === visibleIndex;
-            const isToday = entry.isToday;
-            return (
-              <button
-                key={entry.isoDate}
-                data-date-dot={entry.isoDate}
-                onClick={() => scrollToVisibleDay(i)}
-                className={`flex-shrink-0 w-7 h-7 flex items-center justify-center text-[10px] font-handwriting
-                  transition-all rounded-sm border
-                  ${isActive
-                    ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-sm scale-110'
-                    : isToday
-                      ? 'bg-[var(--card)] text-[var(--accent)] border-[var(--accent)]/40 shadow-sm'
-                      : 'bg-[var(--card)]/50 text-[var(--text-muted)] border-[var(--card-border)]/50 hover:bg-[var(--card)]'
-                  }`}
-                style={isActive ? {
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                  transform: 'scale(1.15)',
-                  fontWeight: 'bold',
-                } : isToday ? {
-                  borderStyle: 'dashed',
-                } : undefined}
-              >
-                {entry.date.getDate()}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Horizontal scroll — plain div for stable ref, wheel listener attached via useEffect */}
-      <div
-        ref={scrollRef}
+        previousIcon={<ChevronLeft />}
+        nextIcon={<ChevronRight />}
+        onPrevious={() => scrollToVisibleDay(visibleIndex - 1)}
+        onToday={goToToday}
+        onNext={() => scrollToVisibleDay(visibleIndex + 1)}
+        onSelect={scrollToVisibleDay}
+        filterLabel={hideEmpty ? (locale === 'zh' ? '\u7075\u611f' : 'Ideas') : (locale === 'zh' ? '\u5168\u90e8' : 'All')}
+        filterActive={hideEmpty}
+        onToggleFilter={() => {
+          noMorePreviousRef.current = false;
+          noMoreNextRef.current = false;
+          furthestSearchedPrevRef.current = null;
+          furthestSearchedNextRef.current = null;
+          setHideEmpty(!hideEmpty);
+        }}
+        dotsRef={dotsRef}
+      />
+      {/* Horizontal scroll container; the wheel listener is attached above. */}
+      <WorkspaceDayScroller
+        scrollRef={scrollRef}
         onScroll={handleScroll}
-        className="flex gap-4 overflow-x-auto pb-2"
+        className="workspace-day-scroll"
         style={{
           scrollSnapType: visibleEntries.length > 3 ? 'x proximity' : 'none',
           overscrollBehaviorX: 'contain',
@@ -761,38 +707,37 @@ export function DayView({ initialMonday, onRefresh, onOpenVideo }: DayViewProps)
 
         {/* Loading indicator */}
         {loadingMore && (
-          <div className="flex-shrink-0 w-[340px] flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+          <div className="workspace-day-loading">
+            <div className="workspace-loading-spinner" />
           </div>
         )}
-      </div>
+      </WorkspaceDayScroller>
 
       {/* Notes (collapsible) */}
-      <div className="relative">
-        <button
-          onClick={() => setNotesOpen(!notesOpen)}
-          className="flex items-center gap-1 text-xs font-heading text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors mb-1"
+      <WorkspaceCollapsiblePanel
+        open={notesOpen}
+        onOpenChange={setNotesOpen}
+        className="workspace-notes-panel relative"
+        headingClassName="workspace-notes-toggle"
+        labelClassName="workspace-notes-toggle-label"
+        icon={notesOpen ? <ChevronDown /> : <ChevronUp />}
+        label={t('Notes')}
+      >
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
         >
-          {notesOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-          {t('Notes')}
-        </button>
-        {notesOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-          >
-            <NotesArea
-              content={notesContent}
-              onChange={setNotesContent}
-              onBlur={handleNotesBlur}
-              height={notesHeight}
-              onResizeMouseDown={handleResizeMouseDown}
-              resizeRef={resizeRef}
-            />
-          </motion.div>
-        )}
-      </div>
+          <NotesArea
+            content={notesContent}
+            onChange={setNotesContent}
+            onBlur={handleNotesBlur}
+            height={notesHeight}
+            onResizeMouseDown={handleResizeMouseDown}
+            resizeRef={resizeRef}
+          />
+        </motion.div>
+      </WorkspaceCollapsiblePanel>
     </div>
   );
 }

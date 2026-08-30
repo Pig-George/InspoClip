@@ -1,16 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { WorkspaceTimelineHeader, WorkspaceTimelineList } from '@inspoclip/workspace-ui';
 import { fetchMonth } from '@/lib/api';
 import type { TimelineMonth } from '@/lib/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { getWeekNumber, formatDateRange } from '@/lib/utils';
 import { VideoCard } from '@/components/video/VideoCard';
 import { ImageCard } from '@/components/ImageCard';
+import type { Image as ImageType } from '@/types';
+import type { WeekVideo } from '@/types/video';
 
 interface TimelineViewProps {
   onOpenVideo: (videoId: string, jobId?: string) => void;
 }
+
+type TimelineItem =
+  | { kind: 'image'; value: ImageType }
+  | { kind: 'video'; value: WeekVideo };
 
 export function TimelineView({ onOpenVideo }: TimelineViewProps) {
   const [data, setData] = useState<TimelineMonth | null>(null);
@@ -24,173 +31,96 @@ export function TimelineView({ onOpenVideo }: TimelineViewProps) {
   const loadMonth = useCallback(async (month: string) => {
     setLoading(true);
     try {
-      const result = await fetchMonth(month);
-      setData(result);
-    } catch (err) {
-      console.error('Failed to load month:', err);
+      setData(await fetchMonth(month));
+    } catch (error) {
+      console.error('Failed to load month:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadMonth(currentMonth);
-  }, [currentMonth, loadMonth]);
+  useEffect(() => { void loadMonth(currentMonth); }, [currentMonth, loadMonth]);
 
-  // Keyboard shortcuts for month navigation
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
-      if (document.querySelector('[data-dialog-overlay]')) return;
-
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        goToPrevMonth();
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        goToNextMonth();
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+  const goToPrevMonth = useCallback(() => {
+    const [year, month] = currentMonth.split('-').map(Number);
+    setCurrentMonth(month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`);
   }, [currentMonth]);
 
-  const goToPrevMonth = () => {
-    const [y, m] = currentMonth.split('-').map(Number);
-    const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
-    setCurrentMonth(prev);
-  };
-
-  const goToNextMonth = () => {
-    const [y, m] = currentMonth.split('-').map(Number);
-    const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+  const goToNextMonth = useCallback(() => {
+    const [year, month] = currentMonth.split('-').map(Number);
+    const next = month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`;
     const now = new Date();
     const maxMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     if (next <= maxMonth) setCurrentMonth(next);
-  };
+  }, [currentMonth]);
 
-  const formatMonth = (monthStr: string) => {
-    const [y, m] = monthStr.split('-').map(Number);
-    const date = new Date(y, m - 1);
-    return date.toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', {
-      year: 'numeric',
-      month: 'long',
-    });
-  };
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable || document.querySelector('[data-dialog-overlay]')) return;
+      if (event.key === 'ArrowLeft') { event.preventDefault(); goToPrevMonth(); }
+      if (event.key === 'ArrowRight') { event.preventDefault(); goToNextMonth(); }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [goToNextMonth, goToPrevMonth]);
 
-  const totalInspirations = data?.weeks.reduce(
-    (sum, weekData) => sum + weekData.images.length + (weekData.videos?.length ?? 0),
-    0,
-  ) || 0;
+  const monthLabel = useMemo(() => {
+    const [year, month] = currentMonth.split('-').map(Number);
+    return new Date(year, month - 1).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', { year: 'numeric', month: 'long' });
+  }, [currentMonth, locale]);
+  const currentCalendarMonth = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+
+  const groups = useMemo(() => (data?.weeks || []).map((weekData) => {
+    const start = new Date(`${weekData.week.weekStart}T00:00:00`);
+    const images = weekData.images.map((value) => ({ kind: 'image' as const, value }));
+    const videos = (weekData.videos || []).map((value) => ({ kind: 'video' as const, value }));
+    return {
+      id: weekData.week.id,
+      label: locale === 'zh' ? `第 ${getWeekNumber(start)} 周` : `Week ${getWeekNumber(start)}`,
+      meta: formatDateRange(start),
+      items: [...images, ...videos],
+    };
+  }), [data?.weeks, locale]);
 
   if (loading && !data) {
-    return (
-      <div className="flex items-center justify-center h-64 text-[var(--text-muted)] text-xl font-handwriting">
-        {locale === 'zh' ? '加载中...' : 'Loading...'}
-      </div>
-    );
+    return <div className="flex items-center justify-center h-64 text-[var(--text-muted)] text-xl font-handwriting">{locale === 'zh' ? '加载中...' : 'Loading...'}</div>;
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-6">
-      {/* Month navigation */}
-      <div className="flex items-center justify-between mb-8">
-        <button
-          onClick={goToPrevMonth}
-          className="p-2 rounded-full hover:bg-[var(--muted)] transition-colors"
-        >
-          <ChevronLeft className="w-6 h-6 text-[var(--accent)]" />
-        </button>
+    <section className="workspace-timeline-view inspoclip-workspace">
+      <WorkspaceTimelineHeader
+        title={monthLabel}
+        meta={`${groups.reduce((sum, group) => sum + group.items.length, 0)} ${locale === 'zh' ? '个灵感' : 'inspirations'}`}
+        previousLabel={locale === 'zh' ? '上个月' : 'Previous month'}
+        nextLabel={locale === 'zh' ? '下个月' : 'Next month'}
+        previousIcon={<ChevronLeft />}
+        nextIcon={<ChevronRight />}
+        canGoNext={currentMonth < currentCalendarMonth}
+        onPrevious={goToPrevMonth}
+        onNext={goToNextMonth}
+      />
 
-        <div className="text-center">
-          <h2 className="text-2xl font-heading font-bold text-[var(--text)]">
-            {formatMonth(currentMonth)}
-          </h2>
-          <p className="text-sm text-[var(--text-muted)] font-handwriting">
-            {locale === 'zh' ? `共 ${totalInspirations} 个灵感` : `${totalInspirations} inspirations`}
-          </p>
-        </div>
-
-        <button
-          onClick={goToNextMonth}
-          className="p-2 rounded-full hover:bg-[var(--muted)] transition-colors"
-        >
-          <ChevronRight className="w-6 h-6 text-[var(--accent)]" />
-        </button>
-      </div>
-
-      {/* Timeline */}
-      <div className="relative">
-        <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-[var(--card-border)]" />
-
-        {data?.weeks.map((weekData, weekIdx) => {
-          const videos = weekData.videos ?? [];
-          const hasContent = weekData.images.length > 0 || videos.length > 0;
-
-          return (
-            <motion.div
-              key={weekData.week.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: weekIdx * 0.1 }}
-              className="relative pl-16 mb-8"
-            >
-              <div className="absolute left-4 top-2 w-5 h-5 rounded-full bg-[var(--accent)] border-4 border-[var(--background)] shadow-md" />
-
-              <div className="mb-3">
-                <span className="text-sm font-heading font-semibold text-[var(--accent)]">
-                  {locale === 'zh'
-                    ? `第 ${getWeekNumber(new Date(weekData.week.weekStart))} 周`
-                    : `Week ${getWeekNumber(new Date(weekData.week.weekStart))}`}
-                </span>
-                <span className="ml-2 text-xs text-[var(--text-muted)] font-handwriting">
-                  {formatDateRange(new Date(weekData.week.weekStart))}
-                </span>
-              </div>
-
-              {hasContent ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                  {weekData.images.map((image, imgIdx) => (
-                    <motion.div
-                      key={image.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: weekIdx * 0.1 + imgIdx * 0.05 }}
-                    >
-                      <ImageCard image={image} onRefresh={() => loadMonth(currentMonth)} animDelay={0} />
-                    </motion.div>
-                  ))}
-
-                  {videos.map((video, videoIdx) => (
-                    <motion.div
-                      key={video.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: weekIdx * 0.1 + (weekData.images.length + videoIdx) * 0.05 }}
-                    >
-                      <VideoCard video={video} onOpen={onOpenVideo} onRefresh={() => loadMonth(currentMonth)} />
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-[var(--text-muted)] font-handwriting opacity-50">
-                  {locale === 'zh' ? '本周无灵感' : 'No inspirations this week'}
-                </p>
-              )}
-            </motion.div>
-          );
-        })}
-
-        {data?.weeks.length === 0 && (
-          <div className="text-center py-16 text-[var(--text-muted)]">
-            <Calendar className="w-12 h-12 mx-auto mb-4 opacity-30" />
-            <p className="font-handwriting">
-              {locale === 'zh' ? '本月暂无灵感记录' : 'No inspirations this month'}
-            </p>
-          </div>
+      <WorkspaceTimelineList
+        groups={groups}
+        empty={<><Calendar className="w-12 h-12 mx-auto mb-4 opacity-30" /><p className="font-handwriting">{locale === 'zh' ? '本月暂无灵感记录' : 'No inspirations this month'}</p></>}
+        emptyClassName="text-center py-16 text-[var(--text-muted)]"
+        renderItem={(item, index, group) => (
+          <motion.div
+            key={`${item.kind}-${item.value.id}`}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: Math.min(index, 8) * 0.05 }}
+          >
+            {item.kind === 'image'
+              ? <ImageCard image={item.value} onRefresh={() => void loadMonth(currentMonth)} animDelay={0} />
+              : <VideoCard video={item.value} onOpen={onOpenVideo} onRefresh={() => void loadMonth(currentMonth)} />}
+          </motion.div>
         )}
-      </div>
-    </div>
+      />
+    </section>
   );
 }

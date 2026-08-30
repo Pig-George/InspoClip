@@ -7,7 +7,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="p-2 rounded-full hover:bg-[var(--muted)] transition-colors"
+      className="workspace-icon-button p-2 rounded-full hover:bg-[var(--muted)] transition-colors"
       aria-label="Toggle theme"
     >
       {theme === 'light' ? (

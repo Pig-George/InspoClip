@@ -37,6 +37,11 @@ describe('VideoCard', () => {
 
     const card = screen.getByRole('button', { name: /Demo.mp4/ });
     expect(card).toHaveClass('polaroid');
+    expect(card).toHaveClass('workspace-asset-card');
+    expect(card.querySelector('.workspace-card-media')).not.toBeNull();
+    expect(card.querySelector('.workspace-video-duration')).not.toBeNull();
+    expect(card.querySelector('.workspace-video-caption')).not.toBeNull();
+    expect(card.querySelector('.workspace-video-caption-status')).not.toBeNull();
   });
 
   it('shows AI summary as title when available', () => {

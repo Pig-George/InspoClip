@@ -1,18 +1,12 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { dateKey, getMonday as sharedGetMonday } from '@inspoclip/workspace-ui';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+export const getMonday = sharedGetMonday;
 
 export function formatDateRange(monday: Date): string {
   const sunday = new Date(monday);
@@ -27,9 +21,4 @@ export function getWeekNumber(date: Date): number {
   return Math.ceil((diff / (1000 * 60 * 60 * 24) + start.getDay() + 1) / 7);
 }
 
-export function formatISODate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
+export const formatISODate = dateKey;
