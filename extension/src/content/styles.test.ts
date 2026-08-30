@@ -163,11 +163,14 @@ describe("content styles", () => {
     expect(iconHoverRule).not.toMatch(/border-color:/)
 
     expect(languageGroupRule).toMatch(/padding:\s*2px;/)
-    expect(languageGroupRule).toMatch(/border-radius:\s*5px;/)
+    expect(languageGroupRule).toMatch(/border-radius:\s*6px;/)
     expect(languageGroupRule).toMatch(/background:\s*color-mix\(in srgb, var\(--muted\) 84%, transparent\);/)
-    expect(languageRule).toMatch(/min-width:\s*25px;/)
-    expect(languageRule).toMatch(/height:\s*20px;/)
-    expect(languageRule).toMatch(/font-size:\s*9px;/)
+    expect(languageRule).toMatch(/min-width:\s*0;/)
+    expect(languageRule).toMatch(/height:\s*auto;/)
+    expect(languageRule).toMatch(/padding:\s*2px 6px;/)
+    expect(languageRule).toMatch(/font-size:\s*10px;/)
+    expect(languageRule).toMatch(/line-height:\s*14px;/)
+    expect(languageRule).toMatch(/border-radius:\s*4px;/)
     expect(languageActiveRule).toMatch(/background:\s*var\(--card\);/)
     expect(languageActiveRule).toMatch(/color:\s*var\(--accent\);/)
 

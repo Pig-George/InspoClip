@@ -614,23 +614,23 @@
       display: inline-flex;
       align-items: center;
       background: color-mix(in srgb, var(--muted) 84%, transparent);
-      border-radius: 5px;
+      border-radius: 6px;
       padding: 2px;
       gap: 0;
     }
 
     .inspoclip-lang-btn {
-      min-width: 25px;
-      height: 20px;
-      padding: 0 4px;
+      min-width: 0;
+      height: auto;
+      padding: 2px 6px;
       border: none;
       background: transparent;
-      font-size: 9px;
-      line-height: 20px;
+      font-size: 10px;
+      line-height: 14px;
       font-weight: 400;
       color: var(--text-muted);
       cursor: pointer;
-      border-radius: 3px;
+      border-radius: 4px;
       transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
     }
 
