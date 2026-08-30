@@ -16,6 +16,14 @@
     }
 
     .inspoclip-container {
+      --card: #fdf7ef;
+      --card-alt: #faf3e8;
+      --card-border: #d4c4ac;
+      --accent: #c0784a;
+      --accent-hover: #a8633a;
+      --text: #4a3028;
+      --text-muted: #8b6a52;
+      --muted: #efe0ce;
       position: fixed;
       top: 0;
       right: 0;

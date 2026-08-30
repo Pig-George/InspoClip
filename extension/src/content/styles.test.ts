@@ -148,6 +148,7 @@ describe("content styles", () => {
   test("aligns in-page detail controls with shared workspace buttons", () => {
     const styles = getContentStyles()
     const hostRule = styles.match(/:host\s*\{([^}]*)\}/s)?.[1] || ""
+    const containerRule = styles.match(/\.inspoclip-container\s*\{([^}]*)\}/s)?.[1] || ""
     const iconRule = styles.match(/\.inspoclip-copy-all\s*\{([^}]*)\}/s)?.[1] || ""
     const iconHoverRule = styles.match(/\.inspoclip-copy-all:hover:not\(:disabled\)\s*\{([^}]*)\}/s)?.[1] || ""
     const languageGroupRule = styles.match(/\.inspoclip-lang-group\s*\{([^}]*)\}/s)?.[1] || ""
@@ -161,6 +162,8 @@ describe("content styles", () => {
     expect(hostRule).toMatch(/--muted:\s*#efe0ce;/)
     expect(hostRule).toMatch(/--accent:\s*#c0784a;/)
     expect(hostRule).toMatch(/--text-muted:\s*#8b6a52;/)
+    expect(containerRule).toMatch(/--card:\s*#fdf7ef;/)
+    expect(containerRule).toMatch(/--accent:\s*#c0784a;/)
     expect(modalRule).toMatch(/--card:\s*#fdf7ef;/)
     expect(modalRule).toMatch(/--accent:\s*#c0784a;/)
 
