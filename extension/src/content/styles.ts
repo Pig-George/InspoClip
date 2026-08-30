@@ -1,6 +1,19 @@
 ﻿export function getContentStyles(): string {
   return `
-    :host { all: initial; }
+    :host {
+      all: initial;
+      /* Content scripts render inside a Shadow DOM, so provide the shared
+         workspace palette locally instead of relying on page-level variables. */
+      --background: #faf3e6;
+      --card: #fdf7ef;
+      --card-alt: #faf3e8;
+      --card-border: #d4c4ac;
+      --accent: #c0784a;
+      --accent-hover: #a8633a;
+      --text: #4a3028;
+      --text-muted: #8b6a52;
+      --muted: #efe0ce;
+    }
 
     .inspoclip-container {
       position: fixed;
@@ -345,7 +358,7 @@
     }
 
     .inspoclip-nav-btn {
-      background: none;
+      background: var(--card-alt);
       border: none;
       font-size: 10px;
       color: #8a7060;
@@ -356,7 +369,7 @@
       line-height: 1;
     }
 
-    .inspoclip-nav-btn:hover { background: #e8d5b0; color: #4a3028; }
+    .inspoclip-nav-btn:hover { background: var(--tape, #e8d5b0); color: var(--text); }
     .inspoclip-nav-btn:disabled { opacity: 0.3; cursor: default; }
     .inspoclip-nav-btn:disabled:hover { background: transparent; color: #8a7060; }
 
@@ -369,7 +382,7 @@
     }
 
     .inspoclip-modal-close {
-      background: none;
+      background: var(--card-alt);
       border: none;
       font-size: 16px;
       color: #8a7060;
@@ -379,7 +392,7 @@
       transition: background 0.2s;
     }
 
-    .inspoclip-modal-close:hover { background: #e8d5b0; }
+    .inspoclip-modal-close:hover { background: var(--tape, #e8d5b0); }
 
     /* Preview */
     .inspoclip-preview {
@@ -613,6 +626,7 @@
     .inspoclip-lang-group {
       display: inline-flex;
       align-items: center;
+      background: #efe0ce;
       background: color-mix(in srgb, var(--muted) 84%, transparent);
       border-radius: 6px;
       padding: 2px;

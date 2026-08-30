@@ -147,11 +147,19 @@ describe("content styles", () => {
 
   test("aligns in-page detail controls with shared workspace buttons", () => {
     const styles = getContentStyles()
+    const hostRule = styles.match(/:host\s*\{([^}]*)\}/s)?.[1] || ""
     const iconRule = styles.match(/\.inspoclip-copy-all\s*\{([^}]*)\}/s)?.[1] || ""
     const iconHoverRule = styles.match(/\.inspoclip-copy-all:hover:not\(:disabled\)\s*\{([^}]*)\}/s)?.[1] || ""
     const languageGroupRule = styles.match(/\.inspoclip-lang-group\s*\{([^}]*)\}/s)?.[1] || ""
     const languageRule = styles.match(/\.inspoclip-lang-btn\s*\{([^}]*)\}/s)?.[1] || ""
     const languageActiveRule = styles.match(/\.inspoclip-lang-btn\.active\s*\{([^}]*)\}/s)?.[1] || ""
+    const navRule = styles.match(/\.inspoclip-nav-btn\s*\{([^}]*)\}/s)?.[1] || ""
+    const closeRule = styles.match(/\.inspoclip-modal-close\s*\{([^}]*)\}/s)?.[1] || ""
+
+    expect(hostRule).toMatch(/--card:\s*#fdf7ef;/)
+    expect(hostRule).toMatch(/--muted:\s*#efe0ce;/)
+    expect(hostRule).toMatch(/--accent:\s*#c0784a;/)
+    expect(hostRule).toMatch(/--text-muted:\s*#8b6a52;/)
 
     expect(iconRule).toMatch(/width:\s*22px;/)
     expect(iconRule).toMatch(/height:\s*22px;/)
@@ -173,6 +181,8 @@ describe("content styles", () => {
     expect(languageRule).toMatch(/border-radius:\s*4px;/)
     expect(languageActiveRule).toMatch(/background:\s*var\(--card\);/)
     expect(languageActiveRule).toMatch(/color:\s*var\(--accent\);/)
+    expect(navRule).toMatch(/background:\s*var\(--card-alt\);/)
+    expect(closeRule).toMatch(/background:\s*var\(--card-alt\);/)
 
     const purposeGroupRule = styles.match(/\.inspoclip-video-purpose-group\s*\{([^}]*)\}/s)?.[1] || ""
     const purposeRule = styles.match(/\.inspoclip-video-purpose-btn\s*\{([^}]*)\}/s)?.[1] || ""
