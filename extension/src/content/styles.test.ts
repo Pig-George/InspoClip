@@ -156,6 +156,8 @@ describe("content styles", () => {
     const navRule = styles.match(/\.inspoclip-nav-btn\s*\{([^}]*)\}/s)?.[1] || ""
     const closeRule = styles.match(/\.inspoclip-modal-close\s*\{([^}]*)\}/s)?.[1] || ""
     const modalRule = styles.match(/\.inspoclip-modal\s*\{([^}]*)\}/s)?.[1] || ""
+    const regenerateLoadingRule = styles.match(/\.inspoclip-prompt-regenerate\.is-loading\s*\{([^}]*)\}/s)?.[1] || ""
+    const regenerateIconRule = styles.match(/\.inspoclip-prompt-regenerate\.is-loading svg\s*\{([^}]*)\}/s)?.[1] || ""
 
     expect(hostRule).toMatch(/--card:\s*#fdf7ef;/)
     expect(hostRule).toMatch(/--muted:\s*#efe0ce;/)
@@ -186,6 +188,11 @@ describe("content styles", () => {
     expect(languageActiveRule).toMatch(/color:\s*var\(--accent\);/)
     expect(navRule).toMatch(/background:\s*var\(--card-alt\);/)
     expect(closeRule).toMatch(/background:\s*var\(--card-alt\);/)
+    expect(regenerateLoadingRule).toMatch(/background:\s*color-mix\(in srgb, var\(--accent\) 14%, var\(--card\)\);/)
+    expect(regenerateLoadingRule).toMatch(/color:\s*var\(--accent\);/)
+    expect(regenerateLoadingRule).toMatch(/box-shadow:\s*inset 0 0 0 1px/)
+    expect(regenerateIconRule).toMatch(/animation:\s*inspoclip-prompt-refresh-spin 0\.78s linear infinite;/)
+    expect(regenerateIconRule).toMatch(/transform-origin:\s*center;/)
 
     const purposeGroupRule = styles.match(/\.inspoclip-video-purpose-group\s*\{([^}]*)\}/s)?.[1] || ""
     const purposeRule = styles.match(/\.inspoclip-video-purpose-btn\s*\{([^}]*)\}/s)?.[1] || ""

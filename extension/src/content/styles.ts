@@ -549,8 +549,17 @@
       opacity: 0.6;
     }
 
+    .inspoclip-prompt-regenerate.is-loading {
+      background: color-mix(in srgb, var(--accent) 14%, var(--card));
+      color: var(--accent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+      opacity: 1;
+      transform: scale(0.96);
+    }
+
     .inspoclip-prompt-regenerate.is-loading svg {
-      animation: inspoclip-prompt-refresh-spin 0.85s linear infinite;
+      animation: inspoclip-prompt-refresh-spin 0.78s linear infinite;
+      transform-origin: center;
     }
 
     @keyframes inspoclip-prompt-refresh-spin {

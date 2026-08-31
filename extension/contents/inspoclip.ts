@@ -44,6 +44,7 @@ import { createImagePreviewUrl, dataUrlToBlob } from "../src/content/image"
 import { renderSafeMarkdown } from "../src/content/markdown"
 import { createObjectUrlVideoSource, jumpVideoToTime, revokeObjectUrlVideoSource } from "../src/content/media"
 import {
+  applyPromptRegenerationButtonState,
   createPromptRegenerationTracker,
   extractPromptFromImageAnalysis,
   getPromptText as resolvePromptText
@@ -2244,7 +2245,7 @@ installExtensionErrorLogging({
     }
 
     // Copy all buttons
-    modal.querySelectorAll('.inspoclip-copy-all').forEach((btn) => {
+    modal.querySelectorAll('.inspoclip-copy-all[data-type]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const type = btn.dataset.type;
         let text = '';
@@ -2280,6 +2281,7 @@ installExtensionErrorLogging({
 
     const regeneratePromptBtn = modal.querySelector('.inspoclip-prompt-regenerate');
     if (regeneratePromptBtn) {
+      applyPromptRegenerationButtonState(regeneratePromptBtn, promptRegenerationActive, locale);
       regeneratePromptBtn.addEventListener('click', async () => {
         const entry = currentHistoryEntry();
         if (entry?.kind === 'image' && imagePromptRegenerationTracker.isActive(entry)) return;
@@ -2290,9 +2292,7 @@ installExtensionErrorLogging({
           return;
         }
 
-        regeneratePromptBtn.disabled = true;
-        regeneratePromptBtn.classList.add('is-loading');
-        regeneratePromptBtn.setAttribute('aria-busy', 'true');
+        applyPromptRegenerationButtonState(regeneratePromptBtn, true, locale);
         try {
           const ext = sourceBlob.type === 'image/png' ? '.png' : '.jpg';
           const formData = new FormData();
@@ -2323,9 +2323,7 @@ installExtensionErrorLogging({
           if (visibleModal && currentHistoryEntry() === entry) {
             const visibleButton = visibleModal.querySelector('.inspoclip-prompt-regenerate');
             if (visibleButton) {
-              visibleButton.disabled = false;
-              visibleButton.classList.remove('is-loading');
-              visibleButton.removeAttribute('aria-busy');
+              applyPromptRegenerationButtonState(visibleButton, false, locale);
             }
             if (visibleModal !== modal && entry?.kind === 'image') renderPrompt(entry.data.prompt);
           }

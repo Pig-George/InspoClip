@@ -5,6 +5,30 @@ export type LocalizedPrompt = {
   zh?: string
 }
 
+type PromptRegenerationButton = {
+  disabled: boolean
+  classList: { add(name: string): void; remove(name: string): void }
+  setAttribute(name: string, value: string): void
+  removeAttribute(name: string): void
+}
+
+export function applyPromptRegenerationButtonState(
+  button: PromptRegenerationButton,
+  active: boolean,
+  locale: "en" | "zh"
+): void {
+  const label = active
+    ? (locale === "zh" ? "正在重新生成 Prompt" : "Regenerating Prompt")
+    : (locale === "zh" ? "重新生成" : "Regenerate")
+
+  button.disabled = active
+  button.classList[active ? "add" : "remove"]("is-loading")
+  button.setAttribute("title", label)
+  button.setAttribute("aria-label", label)
+  if (active) button.setAttribute("aria-busy", "true")
+  else button.removeAttribute("aria-busy")
+}
+
 export function createPromptRegenerationTracker<T extends object>() {
   const inFlight = new WeakMap<T, Promise<unknown>>()
 
