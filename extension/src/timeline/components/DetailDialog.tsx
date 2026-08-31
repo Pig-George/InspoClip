@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { WorkspaceBilingualTermList, WorkspaceColorSwatch, WorkspaceConfirmDialog, WorkspaceDetailDialog, WorkspaceDetailSection, WorkspaceMediaPreview, WorkspacePromptOutput, WorkspaceReplicationPromptPanel, WorkspacePromptResult, WorkspaceStageList, WorkspaceTagEditor, type WorkspaceBilingualTerm, type WorkspacePromptLanguage, type WorkspaceStageItem } from "@inspoclip/workspace-ui"
 
 import { PopupIcon } from "../../popup/components/PopupIcon"
-import { asRecord, assetTitle, localized, localizedPrompt, stageEndSeconds, stageStartSeconds } from "../presentation"
+import { asRecord, assetDetailTitle, localized, localizedPrompt, stageEndSeconds, stageStartSeconds } from "../presentation"
 import type { WorkspaceAsset } from "../workspace-model"
 import type { Locale, TimelineCopy } from "../types"
 
@@ -32,7 +32,7 @@ export function DetailDialog({ asset, copyState, locale, t, promptGenerating = f
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const analysis = asRecord(asset.analysis)
-  const title = assetTitle(asset, locale, t.unknown)
+  const title = assetDetailTitle(asset.kind, locale)
   const stages = Array.isArray(analysis?.stages) ? analysis.stages : []
   const sharedStages: WorkspaceStageItem[] = stages.map((stage, index) => {
     const record = asRecord(stage)

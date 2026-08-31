@@ -44,9 +44,11 @@ import { createImagePreviewUrl, dataUrlToBlob } from "../src/content/image"
 import { renderSafeMarkdown } from "../src/content/markdown"
 import { createObjectUrlVideoSource, jumpVideoToTime, revokeObjectUrlVideoSource } from "../src/content/media"
 import {
+  applyPromptRegenerationButtonState,
   createPromptRegenerationTracker,
   extractPromptFromImageAnalysis,
-  getPromptText as resolvePromptText
+  getPromptText as resolvePromptText,
+  normalizeLocalizedPrompt
 } from "../src/content/prompt"
 import { matchShortcut } from "../src/content/shortcut"
 import { getContentStyles } from "../src/content/styles"
@@ -57,7 +59,16 @@ import {
   setVideoPromptInflight,
   videoPromptRequestKey
 } from "../src/content/video-prompt-state"
-import { blobToDataUrl, sendRuntimeCommand } from "../src/runtime/command-client"
+import { sendRuntimeCommand } from "../src/runtime/command-client"
+import {
+  analyzeImageWithRuntime,
+  checkImageSimilarityWithRuntime,
+  getContentUrlWithRuntime,
+  getVideoDetailWithRuntime,
+  regenerateImagePromptWithRuntime,
+  saveImageWithRuntime,
+  startVideoWithRuntime
+} from "../src/content/runtime-actions"
 import { isDevelopmentBuild } from "../src/runtime/build-mode"
 import {
   createExtensionLogRecorder,
@@ -1678,12 +1689,14 @@ installExtensionErrorLogging({
 
   function getVideoPromptOutputText(output) {
     if (!output) return '';
-    if (videoPromptLangMode === 'en') return output.contentEn || '';
-    if (videoPromptLangMode === 'zh') return output.contentZh || output.contentEn || '';
+    const localized = normalizeLocalizedPrompt(output);
+    if (!localized) return '';
+    if (videoPromptLangMode === 'en') return localized.en || '';
+    if (videoPromptLangMode === 'zh') return localized.zh || localized.en || '';
     if (videoPromptLangMode === 'both') {
-      return `EN\n${output.contentEn || ''}\n\n中文\n${output.contentZh || output.contentEn || ''}`.trim();
+      return `EN\n${localized.en || ''}\n\n中文\n${localized.zh || localized.en || ''}`.trim();
     }
-    return locale === 'zh' ? (output.contentZh || output.contentEn || '') : (output.contentEn || output.contentZh || '');
+    return locale === 'zh' ? (localized.zh || localized.en || '') : (localized.en || localized.zh || '');
   }
 
   async function renderVideoPromptOutput(modal, output, statusText = '') {
@@ -1727,9 +1740,18 @@ installExtensionErrorLogging({
       renderVideoPromptOutput(modal, null, locale === 'zh' ? '正在生成复刻提示词...' : 'Generating replication prompt...');
       try {
         const output = await promise;
-        if (isCurrentPrompt(key)) renderVideoPromptOutput(modal, output);
+        if (isCurrentPrompt(key)) {
+          if (!normalizeLocalizedPrompt(output)) throw new Error(locale === 'zh' ? '模型未返回有效复刻提示词' : 'The model returned an invalid replication prompt');
+          renderVideoPromptOutput(modal, output);
+        }
       } catch (err) {
         if (isCurrentPrompt(key)) {
+          void recordContentLog({
+            source: 'content',
+            level: 'error',
+            error: err,
+            context: { event: 'video-prompt-generate', videoId, purpose: videoPromptPurpose, target: videoPromptTarget.trim() }
+          });
           renderVideoPromptOutput(modal, null, locale === 'zh' ? `生成失败: ${err.message}` : `Generation failed: ${err.message}`);
         }
       } finally {
@@ -1861,7 +1883,7 @@ installExtensionErrorLogging({
       ">
         <div class="inspoclip-modal-header">
           <div class="inspoclip-modal-title-row">
-            <h3>${locale === 'zh' ? '视频分析结果' : 'Video Analysis Result'}</h3>
+            <h3>${locale === 'zh' ? '视频详情' : 'Video Detail'}</h3>
           </div>
           <div class="inspoclip-modal-actions">
             ${analysisHistory.length > 1 ? `
@@ -2112,7 +2134,7 @@ installExtensionErrorLogging({
       ">
         <div class="inspoclip-modal-header">
           <div class="inspoclip-modal-title-row">
-            <h3>${locale === 'zh' ? '分析结果' : 'Analysis Result'}</h3>
+            <h3>${locale === 'zh' ? '图片详情' : 'Image Detail'}</h3>
             ${data.similarImages && data.similarImages.length > 0 ? `
               <div class="inspoclip-similar-badge" id="inspoclip-similar-badge">
                 <span class="inspoclip-similar-icon">🔍</span>
@@ -2236,7 +2258,7 @@ installExtensionErrorLogging({
     }
 
     // Copy all buttons
-    modal.querySelectorAll('.inspoclip-copy-all').forEach((btn) => {
+    modal.querySelectorAll('.inspoclip-copy-all[data-type]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const type = btn.dataset.type;
         let text = '';
@@ -2272,6 +2294,7 @@ installExtensionErrorLogging({
 
     const regeneratePromptBtn = modal.querySelector('.inspoclip-prompt-regenerate');
     if (regeneratePromptBtn) {
+      applyPromptRegenerationButtonState(regeneratePromptBtn, promptRegenerationActive, locale);
       regeneratePromptBtn.addEventListener('click', async () => {
         const entry = currentHistoryEntry();
         if (entry?.kind === 'image' && imagePromptRegenerationTracker.isActive(entry)) return;
@@ -2282,20 +2305,10 @@ installExtensionErrorLogging({
           return;
         }
 
-        regeneratePromptBtn.disabled = true;
-        regeneratePromptBtn.classList.add('is-loading');
-        regeneratePromptBtn.setAttribute('aria-busy', 'true');
+        applyPromptRegenerationButtonState(regeneratePromptBtn, true, locale);
         try {
           const ext = sourceBlob.type === 'image/png' ? '.png' : '.jpg';
-          const formData = new FormData();
-          formData.append('image', sourceBlob, `prompt-refresh${ext}`);
-          const request = fetch(`${serverUrl}/api/images/analyze`, {
-            method: 'POST',
-            body: formData
-          }).then(async (response) => {
-            if (!response.ok) throw new Error(await readableError(response, 'Prompt regeneration failed'));
-            return response.json();
-          });
+          const request = regenerateImagePromptWithRuntime(sourceBlob, `prompt-refresh${ext}`);
           const refreshed = entry?.kind === 'image'
             ? await imagePromptRegenerationTracker.start(entry, request)
             : await request;
@@ -2315,9 +2328,7 @@ installExtensionErrorLogging({
           if (visibleModal && currentHistoryEntry() === entry) {
             const visibleButton = visibleModal.querySelector('.inspoclip-prompt-regenerate');
             if (visibleButton) {
-              visibleButton.disabled = false;
-              visibleButton.classList.remove('is-loading');
-              visibleButton.removeAttribute('aria-busy');
+              applyPromptRegenerationButtonState(visibleButton, false, locale);
             }
             if (visibleModal !== modal && entry?.kind === 'image') renderPrompt(entry.data.prompt);
           }

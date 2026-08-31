@@ -5,6 +5,52 @@ export type LocalizedPrompt = {
   zh?: string
 }
 
+export function normalizeLocalizedPrompt(value: unknown, depth = 0): LocalizedPrompt | null {
+  if (depth > 4 || value == null) return null
+  if (typeof value === "string") {
+    const text = value.trim()
+    return text ? { en: text, zh: text } : null
+  }
+  if (typeof value !== "object" || Array.isArray(value)) return null
+
+  const record = value as Record<string, unknown>
+  const en = [record.en, record.contentEn, record.english, record.englishPrompt]
+    .find((item): item is string => typeof item === "string" && item.trim().length > 0)?.trim() || ""
+  const zh = [record.zh, record.contentZh, record.chinese, record.chinesePrompt]
+    .find((item): item is string => typeof item === "string" && item.trim().length > 0)?.trim() || ""
+  if (en || zh) return { en: en || zh, zh: zh || en }
+
+  for (const key of ["content", "prompt", "result", "output", "data"]) {
+    const nested = normalizeLocalizedPrompt(record[key], depth + 1)
+    if (nested) return nested
+  }
+  return null
+}
+
+type PromptRegenerationButton = {
+  disabled: boolean
+  classList: { add(name: string): void; remove(name: string): void }
+  setAttribute(name: string, value: string): void
+  removeAttribute(name: string): void
+}
+
+export function applyPromptRegenerationButtonState(
+  button: PromptRegenerationButton,
+  active: boolean,
+  locale: "en" | "zh"
+): void {
+  const label = active
+    ? (locale === "zh" ? "正在重新生成 Prompt" : "Regenerating Prompt")
+    : (locale === "zh" ? "重新生成" : "Regenerate")
+
+  button.disabled = active
+  button.classList[active ? "add" : "remove"]("is-loading")
+  button.setAttribute("title", label)
+  button.setAttribute("aria-label", label)
+  if (active) button.setAttribute("aria-busy", "true")
+  else button.removeAttribute("aria-busy")
+}
+
 export function createPromptRegenerationTracker<T extends object>() {
   const inFlight = new WeakMap<T, Promise<unknown>>()
 

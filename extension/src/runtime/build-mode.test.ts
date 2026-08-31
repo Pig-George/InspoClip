@@ -8,7 +8,12 @@ describe("extension build mode", () => {
     expect(getIsDevelopmentBuild("production")).toBe(false)
   })
 
+  test("enables diagnostics for a Plasmo development tag", () => {
+    expect(getIsDevelopmentBuild("production", "dev")).toBe(true)
+    expect(getIsDevelopmentBuild("production", "prod")).toBe(false)
+  })
+
   test("fails closed when the build mode is unavailable", () => {
-    expect(getIsDevelopmentBuild(undefined)).toBe(false)
+    expect(getIsDevelopmentBuild(undefined, undefined)).toBe(false)
   })
 })

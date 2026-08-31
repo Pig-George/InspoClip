@@ -147,11 +147,24 @@ describe("content styles", () => {
 
   test("aligns in-page detail controls with shared workspace buttons", () => {
     const styles = getContentStyles()
+    const hostRule = styles.match(/:host\s*\{([^}]*)\}/s)?.[1] || ""
     const iconRule = styles.match(/\.inspoclip-copy-all\s*\{([^}]*)\}/s)?.[1] || ""
     const iconHoverRule = styles.match(/\.inspoclip-copy-all:hover:not\(:disabled\)\s*\{([^}]*)\}/s)?.[1] || ""
     const languageGroupRule = styles.match(/\.inspoclip-lang-group\s*\{([^}]*)\}/s)?.[1] || ""
     const languageRule = styles.match(/\.inspoclip-lang-btn\s*\{([^}]*)\}/s)?.[1] || ""
     const languageActiveRule = styles.match(/\.inspoclip-lang-btn\.active\s*\{([^}]*)\}/s)?.[1] || ""
+    const navRule = styles.match(/\.inspoclip-nav-btn\s*\{([^}]*)\}/s)?.[1] || ""
+    const closeRule = styles.match(/\.inspoclip-modal-close\s*\{([^}]*)\}/s)?.[1] || ""
+    const modalRule = styles.match(/\.inspoclip-modal\s*\{([^}]*)\}/s)?.[1] || ""
+    const regenerateLoadingRule = styles.match(/\.inspoclip-prompt-regenerate\.is-loading\s*\{([^}]*)\}/s)?.[1] || ""
+    const regenerateIconRule = styles.match(/\.inspoclip-prompt-regenerate\.is-loading svg\s*\{([^}]*)\}/s)?.[1] || ""
+
+    expect(hostRule).toMatch(/--card:\s*#fdf7ef;/)
+    expect(hostRule).toMatch(/--muted:\s*#efe0ce;/)
+    expect(hostRule).toMatch(/--accent:\s*#c0784a;/)
+    expect(hostRule).toMatch(/--text-muted:\s*#8b6a52;/)
+    expect(modalRule).toMatch(/--card:\s*#fdf7ef;/)
+    expect(modalRule).toMatch(/--accent:\s*#c0784a;/)
 
     expect(iconRule).toMatch(/width:\s*22px;/)
     expect(iconRule).toMatch(/height:\s*22px;/)
@@ -163,13 +176,23 @@ describe("content styles", () => {
     expect(iconHoverRule).not.toMatch(/border-color:/)
 
     expect(languageGroupRule).toMatch(/padding:\s*2px;/)
-    expect(languageGroupRule).toMatch(/border-radius:\s*5px;/)
+    expect(languageGroupRule).toMatch(/border-radius:\s*6px;/)
     expect(languageGroupRule).toMatch(/background:\s*color-mix\(in srgb, var\(--muted\) 84%, transparent\);/)
-    expect(languageRule).toMatch(/min-width:\s*25px;/)
-    expect(languageRule).toMatch(/height:\s*20px;/)
-    expect(languageRule).toMatch(/font-size:\s*9px;/)
+    expect(languageRule).toMatch(/min-width:\s*0;/)
+    expect(languageRule).toMatch(/height:\s*auto;/)
+    expect(languageRule).toMatch(/padding:\s*2px 6px;/)
+    expect(languageRule).toMatch(/font-size:\s*10px;/)
+    expect(languageRule).toMatch(/line-height:\s*14px;/)
+    expect(languageRule).toMatch(/border-radius:\s*4px;/)
     expect(languageActiveRule).toMatch(/background:\s*var\(--card\);/)
     expect(languageActiveRule).toMatch(/color:\s*var\(--accent\);/)
+    expect(navRule).toMatch(/background:\s*var\(--card-alt\);/)
+    expect(closeRule).toMatch(/background:\s*var\(--card-alt\);/)
+    expect(regenerateLoadingRule).toMatch(/background:\s*color-mix\(in srgb, var\(--accent\) 14%, var\(--card\)\);/)
+    expect(regenerateLoadingRule).toMatch(/color:\s*var\(--accent\);/)
+    expect(regenerateLoadingRule).toMatch(/box-shadow:\s*inset 0 0 0 1px/)
+    expect(regenerateIconRule).toMatch(/animation:\s*inspoclip-prompt-refresh-spin 0\.78s linear infinite;/)
+    expect(regenerateIconRule).toMatch(/transform-origin:\s*center;/)
 
     const purposeGroupRule = styles.match(/\.inspoclip-video-purpose-group\s*\{([^}]*)\}/s)?.[1] || ""
     const purposeRule = styles.match(/\.inspoclip-video-purpose-btn\s*\{([^}]*)\}/s)?.[1] || ""

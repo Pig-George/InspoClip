@@ -28,6 +28,11 @@ export function assetTitle(asset: { title?: string; titleEn?: string; titleZh?: 
   return safeDisplayText((locale === "zh" ? asset.titleZh : asset.titleEn) || asset.title || asset.filename || fallback) || fallback
 }
 
+export function assetDetailTitle(kind: "image" | "video", locale: Locale): string {
+  if (locale === "zh") return kind === "video" ? "视频详情" : "图片详情"
+  return kind === "video" ? "Video Detail" : "Image Detail"
+}
+
 export function weekNumber(value: Date): number {
   const start = new Date(value.getFullYear(), 0, 1)
   const days = (value.getTime() - start.getTime()) / 86_400_000

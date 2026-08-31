@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest"
 
-import { assetTitle, localized, localizedPrompt, stageEndSeconds, stageStartSeconds, weekHeading } from "./presentation"
+import { assetDetailTitle, assetTitle, localized, localizedPrompt, stageEndSeconds, stageStartSeconds, weekHeading } from "./presentation"
 
 describe("timeline presentation", () => {
   test("formats the client-style localized week heading", () => {
@@ -27,5 +27,12 @@ describe("timeline presentation", () => {
     expect(localized({ zh: "langchain_coremessages", en: "langchain.core.messages" }, "zh")).toBe("")
     expect(localizedPrompt({ en: "langchain_core.messages", zh: "正常提示词" })).toEqual({ en: "", zh: "正常提示词" })
     expect(assetTitle({ title: "langchain_coremessages", filename: "capture.mp4" }, "zh", "未命名灵感")).toBe("未命名灵感")
+  })
+
+  test("uses type-specific detail titles for image and video dialogs", () => {
+    expect(assetDetailTitle("image", "zh")).toBe("图片详情")
+    expect(assetDetailTitle("video", "zh")).toBe("视频详情")
+    expect(assetDetailTitle("image", "en")).toBe("Image Detail")
+    expect(assetDetailTitle("video", "en")).toBe("Video Detail")
   })
 })
