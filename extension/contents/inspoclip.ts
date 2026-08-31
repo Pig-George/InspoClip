@@ -47,7 +47,8 @@ import {
   applyPromptRegenerationButtonState,
   createPromptRegenerationTracker,
   extractPromptFromImageAnalysis,
-  getPromptText as resolvePromptText
+  getPromptText as resolvePromptText,
+  normalizeLocalizedPrompt
 } from "../src/content/prompt"
 import { matchShortcut } from "../src/content/shortcut"
 import { getContentStyles } from "../src/content/styles"
@@ -1688,12 +1689,14 @@ installExtensionErrorLogging({
 
   function getVideoPromptOutputText(output) {
     if (!output) return '';
-    if (videoPromptLangMode === 'en') return output.contentEn || '';
-    if (videoPromptLangMode === 'zh') return output.contentZh || output.contentEn || '';
+    const localized = normalizeLocalizedPrompt(output);
+    if (!localized) return '';
+    if (videoPromptLangMode === 'en') return localized.en || '';
+    if (videoPromptLangMode === 'zh') return localized.zh || localized.en || '';
     if (videoPromptLangMode === 'both') {
-      return `EN\n${output.contentEn || ''}\n\n中文\n${output.contentZh || output.contentEn || ''}`.trim();
+      return `EN\n${localized.en || ''}\n\n中文\n${localized.zh || localized.en || ''}`.trim();
     }
-    return locale === 'zh' ? (output.contentZh || output.contentEn || '') : (output.contentEn || output.contentZh || '');
+    return locale === 'zh' ? (localized.zh || localized.en || '') : (localized.en || localized.zh || '');
   }
 
   async function renderVideoPromptOutput(modal, output, statusText = '') {
@@ -1737,9 +1740,18 @@ installExtensionErrorLogging({
       renderVideoPromptOutput(modal, null, locale === 'zh' ? '正在生成复刻提示词...' : 'Generating replication prompt...');
       try {
         const output = await promise;
-        if (isCurrentPrompt(key)) renderVideoPromptOutput(modal, output);
+        if (isCurrentPrompt(key)) {
+          if (!normalizeLocalizedPrompt(output)) throw new Error(locale === 'zh' ? '模型未返回有效复刻提示词' : 'The model returned an invalid replication prompt');
+          renderVideoPromptOutput(modal, output);
+        }
       } catch (err) {
         if (isCurrentPrompt(key)) {
+          void recordContentLog({
+            source: 'content',
+            level: 'error',
+            error: err,
+            context: { event: 'video-prompt-generate', videoId, purpose: videoPromptPurpose, target: videoPromptTarget.trim() }
+          });
           renderVideoPromptOutput(modal, null, locale === 'zh' ? `生成失败: ${err.message}` : `Generation failed: ${err.message}`);
         }
       } finally {

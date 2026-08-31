@@ -5,6 +5,28 @@ export type LocalizedPrompt = {
   zh?: string
 }
 
+export function normalizeLocalizedPrompt(value: unknown, depth = 0): LocalizedPrompt | null {
+  if (depth > 4 || value == null) return null
+  if (typeof value === "string") {
+    const text = value.trim()
+    return text ? { en: text, zh: text } : null
+  }
+  if (typeof value !== "object" || Array.isArray(value)) return null
+
+  const record = value as Record<string, unknown>
+  const en = [record.en, record.contentEn, record.english, record.englishPrompt]
+    .find((item): item is string => typeof item === "string" && item.trim().length > 0)?.trim() || ""
+  const zh = [record.zh, record.contentZh, record.chinese, record.chinesePrompt]
+    .find((item): item is string => typeof item === "string" && item.trim().length > 0)?.trim() || ""
+  if (en || zh) return { en: en || zh, zh: zh || en }
+
+  for (const key of ["content", "prompt", "result", "output", "data"]) {
+    const nested = normalizeLocalizedPrompt(record[key], depth + 1)
+    if (nested) return nested
+  }
+  return null
+}
+
 type PromptRegenerationButton = {
   disabled: boolean
   classList: { add(name: string): void; remove(name: string): void }

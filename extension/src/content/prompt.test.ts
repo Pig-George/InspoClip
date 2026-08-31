@@ -4,10 +4,16 @@ import {
   applyPromptRegenerationButtonState,
   createPromptRegenerationTracker,
   extractPromptFromImageAnalysis,
+  normalizeLocalizedPrompt,
   getPromptText
 } from "./prompt"
 
 describe("content prompt helpers", () => {
+  test("normalizes structured video prompt fields for content rendering", () => {
+    expect(normalizeLocalizedPrompt({ en: "English", zh: "中文" })).toEqual({ en: "English", zh: "中文" })
+    expect(normalizeLocalizedPrompt({ contentEn: "English", contentZh: "中文" })).toEqual({ en: "English", zh: "中文" })
+    expect(normalizeLocalizedPrompt({ content: { en: "Nested", zh: "嵌套" } })).toEqual({ en: "Nested", zh: "嵌套" })
+  })
   test("gives the regenerate button immediate accessible loading feedback", () => {
     const classes = new Set<string>()
     const attributes = new Map<string, string>()
