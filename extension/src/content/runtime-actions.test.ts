@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest"
 
-import { analyzeImageWithRuntime, startVideoWithRuntime } from "./runtime-actions"
+import { analyzeImageWithRuntime, regenerateImagePromptWithRuntime, startVideoWithRuntime } from "./runtime-actions"
 import type { RuntimeMessageSender } from "../runtime/command-client"
 
 function createSender(response: unknown, messages: unknown[]): RuntimeMessageSender {
@@ -27,6 +27,26 @@ describe("content runtime actions", () => {
         filename: "area.png",
         mimeType: "image/png",
         dataUrl: "data:image/png;base64,aW1hZ2U="
+      }
+    })
+  })
+
+  test("regenerates an image prompt through the runtime instead of a content-side backend URL", async () => {
+    const messages: unknown[] = []
+    const blob = new Blob(["image"], { type: "image/jpeg" })
+
+    const result = await regenerateImagePromptWithRuntime(
+      blob,
+      "prompt-refresh.jpg",
+      createSender({ result: { prompt: { en: "Fresh prompt" } } }, messages)
+    )
+
+    expect(result).toEqual({ prompt: { en: "Fresh prompt" } })
+    expect(messages[0]).toMatchObject({
+      type: "runtime.analysis.image.start",
+      payload: {
+        filename: "prompt-refresh.jpg",
+        mimeType: "image/jpeg"
       }
     })
   })

@@ -64,6 +64,7 @@ import {
   checkImageSimilarityWithRuntime,
   getContentUrlWithRuntime,
   getVideoDetailWithRuntime,
+  regenerateImagePromptWithRuntime,
   saveImageWithRuntime,
   startVideoWithRuntime
 } from "../src/content/runtime-actions"
@@ -2295,15 +2296,7 @@ installExtensionErrorLogging({
         applyPromptRegenerationButtonState(regeneratePromptBtn, true, locale);
         try {
           const ext = sourceBlob.type === 'image/png' ? '.png' : '.jpg';
-          const formData = new FormData();
-          formData.append('image', sourceBlob, `prompt-refresh${ext}`);
-          const request = fetch(`${serverUrl}/api/images/analyze`, {
-            method: 'POST',
-            body: formData
-          }).then(async (response) => {
-            if (!response.ok) throw new Error(await readableError(response, 'Prompt regeneration failed'));
-            return response.json();
-          });
+          const request = regenerateImagePromptWithRuntime(sourceBlob, `prompt-refresh${ext}`);
           const refreshed = entry?.kind === 'image'
             ? await imagePromptRegenerationTracker.start(entry, request)
             : await request;

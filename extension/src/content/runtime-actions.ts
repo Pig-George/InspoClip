@@ -29,6 +29,14 @@ export async function analyzeImageWithRuntime(
   return job.result
 }
 
+export async function regenerateImagePromptWithRuntime(
+  blob: Blob,
+  filename: string,
+  sender?: RuntimeMessageSender
+): Promise<unknown> {
+  return analyzeImageWithRuntime(blob, filename, sender)
+}
+
 export async function checkImageSimilarityWithRuntime(
   blob: Blob,
   filename: string,
